@@ -1,0 +1,16 @@
+# Build products
+.build/
+Griasa.app/
+dist/
+*.dmg
+
+# Personal data — never publish
+transcripts/
+*.caf
+
+# Local tooling state
+.claude/
+.DS_Store
+# Xcode's per-user state: window layout, selected scheme. Machine-specific, and
+# .xcuserstate churns on every window move.
+.swiftpm/

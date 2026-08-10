@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Hardened Runtime is required for notarization, and it blocks these two
+	     by default. Everything else Griasa needs (Accessibility, Screen
+	     Recording, Speech Recognition, Reminders, Calendar) is granted by the
+	     user through TCC at runtime, not by an entitlement.
+
+	     Deliberately NOT sandboxed. The app controls other applications through
+	     the Accessibility API and launches whisper-server, claude and codex as
+	     subprocesses; App Sandbox forbids both, which is also why Griasa cannot
+	     ship on the Mac App Store. -->
+
+	<!-- Dictation and conversation recording. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+
+	<!-- ReminderSource sends an Apple Event to the frontmost browser to read
+	     the current tab's URL, so a reminder can link back to the page.
+	     Without this the notarized build loses that link silently. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

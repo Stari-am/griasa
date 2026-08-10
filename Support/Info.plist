@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Griasa</string>
+	<key>CFBundleExecutable</key>
+	<string>Griasa</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>am.stari.griasa</string>
+	<key>CFBundleName</key>
+	<string>Griasa</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Optional convenience: reads the current browser tab's address so a reminder can link back to the page. If you decline, reminders work the same — just without the link.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Needed only by the {slot} snippet placeholder to read your calendar and find free time for meeting proposals. Nothing is created or modified, and every other snippet works without it.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Griasa uses the microphone for dictation and conversation recording. Without it, all text and screen features keep working.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Needed only by “Remind me” to create the reminders you ask for. Nothing else in Griasa uses this access.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Needed only by “Remind me” to create the reminders you ask for. Nothing else in Griasa uses this access.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Griasa uses Apple speech recognition only as a fallback transcriber while local Whisper isn't installed.</string>
+</dict>
+</plist>

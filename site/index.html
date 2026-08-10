@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Griasa — local-first dictation & meeting notes for macOS</title>
+<meta name="description" content="Dictation, meeting transcripts, and AI capture actions that run on your Mac. Your keys, your models, no subscription. Open source.">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --card: #f5f5f7;
+    --accent: #0071e3; --border: #e5e5ea; --good: #1a7f37;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #101012; --fg: #f5f5f7; --muted: #98989d; --card: #1c1c1f;
+            --accent: #2997ff; --border: #2c2c30; --good: #3fb950; }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--fg);
+         font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+  header { text-align: center; padding: 72px 0 48px; }
+  .mic { font-size: 56px; }
+  h1 { font-size: clamp(32px, 6vw, 48px); letter-spacing: -0.02em; margin: 12px 0 8px; }
+  .tagline { font-size: clamp(18px, 3vw, 22px); color: var(--muted); max-width: 620px; margin: 0 auto; }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .btn { display: inline-block; padding: 12px 26px; border-radius: 980px;
+         text-decoration: none; font-weight: 600; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { border: 1px solid var(--border); color: var(--fg); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  section { padding: 40px 0; border-top: 1px solid var(--border); }
+  h2 { font-size: 26px; letter-spacing: -0.01em; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border-radius: 14px; padding: 18px 20px; }
+  .card h3 { font-size: 16px; margin-bottom: 6px; }
+  .card p { font-size: 14px; color: var(--muted); }
+  .privacy li { margin: 8px 0 8px 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .price-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .price { font-size: 34px; font-weight: 700; }
+  .per { font-size: 14px; color: var(--muted); }
+  .good { color: var(--good); }
+  details { border-bottom: 1px solid var(--border); padding: 12px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { padding: 10px 0 4px; color: var(--muted); font-size: 15px; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
+  footer a { color: var(--muted); }
+  .shot { width: 100%; border-radius: 14px; border: 1px solid var(--border); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="mic">🎙️</div>
+  <h1>Griasa</h1>
+  <p class="tagline">Dictation, meeting transcripts, and AI capture actions — running <strong>on your Mac</strong>, with <strong>your</strong> AI keys or fully offline. One price, no subscription.</p>
+  <div class="cta-row">
+    <!-- TODO: replace with your Lemon Squeezy / Gumroad product link -->
+    <a class="btn btn-primary" href="#buy">Get Griasa — $29</a>
+    <!-- TODO: replace with your GitHub repo link -->
+    <a class="btn btn-secondary" href="#opensource">View source on GitHub</a>
+  </div>
+  <p class="note">macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized</p>
+  <!-- TODO: replace with a real screenshot or demo GIF -->
+  <!-- <img class="shot" src="hero.png" alt="Griasa hub window with a live meeting transcript"> -->
+</header>
+
+<section>
+  <h2>Everything the subscription apps do — in one menu-bar app</h2>
+  <div class="grid">
+    <div class="card"><h3>🎤 Hold-to-talk dictation</h3>
+      <p>Hold a key, speak, release — polished text appears in any app. Local Whisper transcription with AI cleanup that keeps your language, fixes punctuation, and handles mixed-language speech (tech terms stay in English).</p></div>
+    <div class="card"><h3>📼 Meeting recorder</h3>
+      <p>Captures your mic and everything the Mac plays — Zoom, Meet, Slack huddles, anything. You get a clean Markdown transcript with speakers, summary, and action items. Take timestamped notes live; they're woven into the summary.</p></div>
+    <div class="card"><h3>⏰ Remind me — anywhere</h3>
+      <p>Select text or drag a rectangle over any app, hit a hotkey, and AI turns it into an Apple Reminder with the right date, a link back to the source, and a screenshot clip.</p></div>
+    <div class="card"><h3>📋 Capture actions</h3>
+      <p>OCR any region of the screen, run AI presets on selected text or clipboard (translate, rewrite, summarize), or draft a reply from the visible chat thread — system-wide hotkeys, works in every app.</p></div>
+    <div class="card"><h3>✨ AI snippets — type <code>;tldr</code> anywhere</h3>
+      <p>Text expansion with an AI inside. <code>;tldr</code> summarizes whatever you copied, <code>;en</code> translates it, <code>;meet</code> proposes your next free calendar slot with your room link — expanded in place, in any app, in any text field. Write your own: <code>{ai: …}</code> takes any instruction and can see your clipboard, date, and calendar.</p></div>
+    <div class="card"><h3>🗂 Projects &amp; history</h3>
+      <p>Everything you capture is auto-filed into projects as plain Markdown on disk. Ask questions about a project and get answers grounded in its notes.</p></div>
+    <div class="card"><h3>🤖 Your choice of AI</h3>
+      <p>Anthropic, OpenAI, Google Gemini — fully local via Ollama / LM Studio — or <strong>no API key at all</strong>: Griasa can answer through the Claude Code or Codex CLI using the subscription you already pay for. No middleman server, ever.</p></div>
+  </div>
+</section>
+
+<section id="privacy">
+  <h2>Advanced AI — on your terms</h2>
+  <ul class="privacy">
+    <li><strong>The smart parts are real AI</strong> — meeting notes with action items, a commitments tracker, per-person dossiers, PRD/RFC drafts, AI snippets. You bring the brain: Anthropic, OpenAI, Gemini, a local model via Ollama / LM Studio — or your existing Claude&nbsp;Pro / ChatGPT subscription through their CLIs, no API key needed.</li>
+    <li><strong>Audio never leaves your Mac.</strong> Transcription is local Whisper (whisper.cpp). There is no Griasa server and no account.</li>
+    <li><strong>Text goes only to the AI provider you configure</strong> — or nowhere at all with a local model. If a local model fails, Griasa asks before ever sending anything to a cloud key.</li>
+    <li><strong>Open source.</strong> Every permission the app asks for (microphone, screen recording, accessibility) is auditable in the code — and each one explains what still works if you decline it. Even the strictest “no cloud recorders” IT policy has a compliant mode: local Whisper + local LLM.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Compare</h2>
+  <table>
+    <tr><th></th><th>Griasa</th><th>Typical cloud stack</th></tr>
+    <tr><td>Dictation</td><td class="good">✓ local Whisper</td><td>$12–15/mo, cloud</td></tr>
+    <tr><td>Meeting notes</td><td class="good">✓ included</td><td>$10–18/mo, bot joins your call</td></tr>
+    <tr><td>Screen capture → reminder / OCR / AI</td><td class="good">✓ included</td><td>separate apps</td></tr>
+    <tr><td>Where audio is processed</td><td class="good">your Mac</td><td>vendor cloud</td></tr>
+    <tr><td>Price</td><td class="good">$29 once</td><td>$250–400 / year</td></tr>
+  </table>
+</section>
+
+<section id="buy">
+  <h2>Pricing</h2>
+  <div class="price-cards">
+    <div class="card">
+      <h3>Signed build</h3>
+      <p class="price">$29 <span class="per">one-time</span></p>
+      <p>Notarized .dmg, updates, and email support. The convenient way — and the way to support development.</p>
+      <div class="cta-row" style="justify-content:flex-start">
+        <!-- TODO: product link -->
+        <a class="btn btn-primary" href="#">Buy on Lemon Squeezy</a>
+      </div>
+    </div>
+    <div class="card" id="opensource">
+      <h3>Build it yourself</h3>
+      <p class="price">Free <span class="per">GPL-3.0</span></p>
+      <p>Clone the repo, run <code>./build.sh</code>, own every line. If Griasa saves you time, <a href="#">buy me a coffee</a>. <!-- TODO: Ko-fi link --></p>
+      <div class="cta-row" style="justify-content:flex-start">
+        <!-- TODO: repo link -->
+        <a class="btn btn-secondary" href="#">GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>FAQ</h2>
+  <details><summary>Does it work offline?</summary>
+    <p>Yes — dictation always (Whisper runs locally), and every AI feature too if you point Griasa at Ollama or LM Studio. With a cloud key, only the text of the specific request is sent to that provider.</p></details>
+  <details><summary>Which languages?</summary>
+    <p>Everything Whisper supports (~100 languages), including mixed-language speech — dictate in your language with English tech terms and both come out right.</p></details>
+  <details><summary>Why does it need microphone / screen recording / accessibility permissions?</summary>
+    <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional — the app tells you exactly what stops working if you decline. It's all in the source.</p></details>
+  <details><summary>Do I need an AI subscription?</summary>
+    <p>No subscription to Griasa, ever. You bring an API key (Anthropic / OpenAI / Gemini — pay-per-use, typically cents per day) or run free local models with Ollama.</p></details>
+  <details><summary>Refunds?</summary>
+    <p>14 days, no questions. Email me.</p></details>
+</section>
+
+<footer>
+  <p>Made by one person who wasn't allowed to use cloud recorders at work.</p>
+  <!-- TODO: real links -->
+  <p><a href="#">GitHub</a> · <a href="#">Support / contact</a> · <a href="#">Donate</a></p>
+</footer>
+
+</div>
+</body>
+</html>

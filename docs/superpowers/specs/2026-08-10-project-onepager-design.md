@@ -104,8 +104,15 @@ capture, custom domain.
   attributes pointing off-origin).
 - Rendered at 375 px width without horizontal body scroll.
 
-## Note on an existing defect, not introduced here
+## Note on the moved sales page
 
-`site/index.html` references `src="hero.png"`, which does not exist in `site/`.
-That image is missing today and stays missing after the move; it is called out so
-it is not mistaken for breakage caused by relocating the file.
+Its dead placeholder links are wired up as part of this change: the Ko-fi page,
+the GitHub repository, a `mailto:` for support, and a link back to the one-pager.
+The Ko-fi buy button points at `ko-fi.com/griasa` until a shop item exists —
+swapping that single `href` for the product URL is the whole remaining step.
+
+The page also carries a commented-out `<img src="hero.png">`. It is inert: no
+broken image renders, because the tag is inside an HTML comment. It stays
+commented out until a real screenshot exists, on the same reasoning as the
+one-pager — an invented screenshot would undercut the credibility both pages
+depend on.

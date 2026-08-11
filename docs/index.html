@@ -13,7 +13,6 @@
     --rule: #e3ded6;
     --accent: #9a4a1e;
     --card: #f6f3ee;
-    --support: #c0392b;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
@@ -24,7 +23,6 @@
       --rule: #2e2b27;
       --accent: #e59b6a;
       --card: #1e1c19;
-      --support: #ff8a66;
     }
   }
   * { box-sizing: border-box; }
@@ -77,7 +75,11 @@
   .case p { margin: 0; color: var(--muted); }
   .case p b { color: var(--fg); font-weight: 600; }
   .quiet { color: var(--muted); }
-  .links { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 1.8rem 0 0; }
+  .links { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 1.8rem 0 0; align-items: center; }
+  /* Ko-fi's own button asset, served from this repo rather than their CDN: same
+     official artwork, but the page still makes zero third-party requests. */
+  .links a.kofi { padding: 0; border: 0; line-height: 0; display: inline-flex; }
+  .links a.kofi img { height: 36px; width: auto; display: block; border-radius: 6px; }
   .links a {
     display: inline-block;
     padding: 0.55rem 1.05rem;
@@ -88,9 +90,8 @@
   }
   .links a:hover { border-color: var(--accent); }
   .links a.go { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 620; }
-  .links a.support-btn { background: var(--support); border-color: var(--support); color: #fff; font-weight: 620; }
-  .support { color: var(--support); font-size: 1.05rem; }
-  .support b { color: var(--support); font-weight: 660; }
+  .support { color: var(--fg); font-size: 1.05rem; }
+  .support b { color: var(--accent); font-weight: 660; }
   footer { margin: 4.5rem 0 5rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
   footer a { color: var(--accent); }
 </style>
@@ -176,7 +177,7 @@
 
 <div class="links">
   <a class="go" href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
-  <a class="support-btn" href="https://ko-fi.com/griasa">Support on Ko-fi</a>
+  <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
   <a href="https://github.com/Stari-am/griasa">Read the source</a>
   <a href="buy/">All the details</a>
 </div>

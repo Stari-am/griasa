@@ -8,11 +8,11 @@
 <style>
   :root {
     --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --card: #f5f5f7;
-    --accent: #0071e3; --border: #e5e5ea; --good: #1a7f37; --support: #e8453c;
+    --accent: #0071e3; --border: #e5e5ea; --good: #1a7f37; --support: #2f62c8;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #101012; --fg: #f5f5f7; --muted: #98989d; --card: #1c1c1f;
-            --accent: #2997ff; --border: #2c2c30; --good: #3fb950; --support: #ff6f6c; }
+            --accent: #2997ff; --border: #2c2c30; --good: #3fb950; --support: #8fb6ff; }
   }
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--bg); color: var(--fg);
@@ -22,12 +22,15 @@
   .mic { font-size: 56px; }
   h1 { font-size: clamp(32px, 6vw, 48px); letter-spacing: -0.02em; margin: 12px 0 8px; }
   .tagline { font-size: clamp(18px, 3vw, 22px); color: var(--muted); max-width: 620px; margin: 0 auto; }
-  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; align-items: center; }
+  /* Ko-fi's own button asset, served from this repo rather than their CDN: same
+     official artwork, but the page still makes zero third-party requests. */
+  .kofi img { height: 40px; width: auto; display: block; border-radius: 8px; }
   .btn { display: inline-block; padding: 12px 26px; border-radius: 980px;
          text-decoration: none; font-weight: 600; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { border: 1px solid var(--border); color: var(--fg); }
-  .btn-support { background: var(--support); color: #fff; }
+  .btn-dark { background: var(--fg); color: var(--bg); }
   .support-line { color: var(--support); font-size: 19px; font-weight: 650;
                   margin-bottom: 16px; letter-spacing: -0.01em; }
   .support-line span { color: var(--muted); font-weight: 400; font-size: 15px; display: block; margin-top: 2px; }
@@ -64,8 +67,8 @@
   <p class="support-line">$29 makes my day — but any amount does.
     <span>The app is free either way, and nothing is locked behind the money.</span></p>
   <div class="cta-row">
-    <a class="btn btn-support" href="https://ko-fi.com/griasa">Support on Ko-fi</a>
-    <a class="btn btn-primary" href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
+    <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="../kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
+    <a class="btn btn-dark" href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
     <a class="btn btn-secondary" href="https://github.com/Stari-am/griasa">View source on GitHub</a>
   </div>
   <p class="note">macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized</p>
@@ -130,8 +133,8 @@
       <h3>Support it, if it earns it</h3>
       <p class="price">$29? <span class="per">or anything at all</span></p>
       <p>Use it for a week first. If it saved you time, <b>$29 would make my day — but any amount does</b>, and none is fine too. This pays for the Apple developer account and the hours, not for access you already have.</p>
-      <div class="cta-row" style="justify-content:flex-start">
-        <a class="btn btn-primary" href="https://ko-fi.com/griasa">Support on Ko-fi</a>
+      <div class="cta-row" style="justify-content:flex-start;margin-top:18px">
+        <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="../kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
       </div>
     </div>
     <div class="card" id="opensource">

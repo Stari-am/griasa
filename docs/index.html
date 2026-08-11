@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Griasa — one menu-bar app for dictation, meetings and follow-through on macOS</title>
+<meta name="description" content="A native macOS menu-bar app that types what you say into any app, turns recorded meetings into commitments, and runs its speech recognition on your own Mac. Built by Hayk Sargsyan.">
+<style>
+  :root {
+    --bg: #fdfcfa;
+    --fg: #1c1a17;
+    --muted: #6a635a;
+    --rule: #e3ded6;
+    --accent: #9a4a1e;
+    --card: #f6f3ee;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161513;
+      --fg: #ece8e1;
+      --muted: #9b938a;
+      --rule: #2e2b27;
+      --accent: #e59b6a;
+      --card: #1e1c19;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 0 1.4rem; }
+  header { padding: 5rem 0 3rem; }
+  h1 {
+    font-size: clamp(2.4rem, 7vw, 3.6rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.6rem;
+    font-weight: 680;
+  }
+  .tagline { font-size: clamp(1.1rem, 3vw, 1.3rem); color: var(--muted); margin: 0 0 1.6rem; }
+  .meta { font-size: 0.86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; }
+  .meta a { color: var(--accent); }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  h2 {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--muted);
+    font-weight: 620;
+    margin: 4rem 0 0.4rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--rule);
+  }
+  .lede { font-size: 1.12rem; margin: 0 0 1.4rem; }
+  ul { padding-left: 0; list-style: none; margin: 1.4rem 0; }
+  li { margin: 0 0 0.85rem; padding-left: 1.15rem; position: relative; }
+  li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0.62em;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.55;
+  }
+  b { font-weight: 640; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--card); padding: 0.1em 0.32em; border-radius: 4px; }
+  .case { border-left: 2px solid var(--rule); padding: 0.15rem 0 0.15rem 1.25rem; margin: 1.9rem 0; }
+  .case h3 { font-size: 1.04rem; margin: 0 0 0.4rem; font-weight: 640; }
+  .case p { margin: 0; color: var(--muted); }
+  .case p b { color: var(--fg); font-weight: 600; }
+  .quiet { color: var(--muted); }
+  .links { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 1.8rem 0 0; }
+  .links a {
+    display: inline-block;
+    padding: 0.55rem 1.05rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+  .links a:hover { border-color: var(--accent); }
+  footer { margin: 4.5rem 0 5rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Griasa</h1>
+  <p class="tagline">One macOS menu-bar app that types what you say into any app, and turns the meetings you record into the things you owe people.</p>
+  <div class="meta">
+    <span>Native Swift · macOS 14+</span>
+    <span>GPL-3.0</span>
+    <a href="https://github.com/Stari-am/griasa">Source on GitHub</a>
+  </div>
+</header>
+
+<p class="lede">Griasa began as dictation and kept going, because dictation on its own solves half a problem: you can say the words, and then you still have to remember what you agreed to. So the same app records the call, extracts who promised what, keeps a page per colleague, and hands you a brief before the next meeting with them.</p>
+
+<p>Speech recognition runs on the Mac itself — Apple's recogniser or a local <code>whisper.cpp</code> model. Only the optional text-cleanup step can reach a language model, and only if you turn it on.</p>
+
+<h2>What it does, in one place</h2>
+
+<ul>
+  <li><b>Hold a key and talk.</b> The words appear in whatever app has focus — Telegram, Slack, a terminal, a browser field — while you are still speaking.</li>
+  <li><b>Record a meeting</b> from system audio and the microphone together, and get a transcript with speaker names and your own live notes woven in.</li>
+  <li><b>Commitments</b> are pulled out of that transcript automatically — who took what on and by when — split into what you promised and what you are waiting on. One click sends any of them to Apple Reminders.</li>
+  <li><b>A page per person</b>, built from the meeting roster with no setup: every meeting with them, their open promises, and an on-demand dossier written from the transcripts they appear in.</li>
+  <li><b>A brief before the call.</b> Minutes before a calendar event, what you last discussed, what each of you promised, and a button that opens the Zoom or Meet link and starts recording in one go.</li>
+  <li><b>Typed abbreviations</b> that expand in place, anywhere, with live values rather than static text.</li>
+  <li><b>Capture from any window</b> — select text or drag a rectangle over the screen, and turn it into a reminder, plain text, or a drafted reply that read the visible conversation.</li>
+  <li><b>Projects</b> that everything files itself into, and which you can then ask questions about across your own history.</li>
+</ul>
+
+<p class="quiet">None of these is a separate tool bolted on. They share one history, one project model and one AI configuration, which is the part that is actually hard to retrofit later.</p>
+
+<h2>What the standard AI apps don't do</h2>
+
+<ul>
+  <li><b>It types into other people's apps, not into its own box.</b> Most assistants give you a text area and a copy button. Griasa puts the words where your cursor already is, as you speak, and never overwrites what you typed yourself.</li>
+  <li><b>You can ask a model mid-sentence, in someone else's window.</b> Type <code>;ai what's the capital of Armenia ;;</code> inside a chat composer and the question is replaced in place by the answer. No window switch, no paste.</li>
+  <li><b>Abbreviations expand to real data.</b> <code>{slots:3}</code> becomes three genuinely free slots read from your calendar; <code>{commitments}</code> becomes your actually-open promises. Not a template you fill in afterwards.</li>
+  <li><b>The meeting turns into obligations, not just a summary.</b> "I'll send it by Friday" becomes a dated item assigned to the person who said it, deduplicated against what is already open, exportable as tasks that Todoist, Things and Linear split into individual rows.</li>
+  <li><b>It uses the AI subscription you already pay for.</b> If the <code>claude</code> or <code>codex</code> CLI is installed and logged in, Griasa answers through it — no API key, no second subscription. Or point it at Ollama and the whole thing runs with nothing leaving the Mac.</li>
+</ul>
+
+<h2>Why this is harder than it looks</h2>
+
+<p>Dictation looks like a small app: capture audio, call a recogniser, insert the text. Every one of those three steps hid a problem that only appears once real people use it.</p>
+
+<div class="case">
+  <h3>Typing live means never being allowed to take a word back</h3>
+  <p>A recogniser revises its guess constantly — "тестирую" becomes "тестируй" becomes "тестирую" again. Retype the line each time and you delete whatever the user typed in between. <b>The fix was a policy, not a patch:</b> commit only the words two successive hypotheses agree on, append and never rewrite, and when they disagree, stall rather than invent. The naive version passed a casual test and ate a sentence the first time someone typed during a pause.</p>
+</div>
+
+<div class="case">
+  <h3>The order of results is not guaranteed</h3>
+  <p>Dispatching each partial result onto the main actor as its own task looks correct and is not: nothing promises they arrive in the order they were sent. Two transposed partials and the app's model of the text field no longer describes the text field — <b>and every edit after that is computed against a fiction.</b> Ordering had to be carried explicitly, in a queue under a lock.</p>
+</div>
+
+<div class="case">
+  <h3>The accessibility APIs lie</h3>
+  <p>The clean way to replace text in another app is the accessibility API. Slack <b>declares</b> its composer writable and then silently ignores the write. Telegram declares it read-only, and reports emoji back as <code>U+FFFC</code>. Measured across three apps before designing anything — which is why synthetic keystrokes are the primary path and the tidy API is only an optimisation for apps that tell the truth.</p>
+</div>
+
+<div class="case">
+  <h3>Local speech models get stuck in loops</h3>
+  <p>One spoken sentence came back seven times in a row. That is a known failure mode of greedy decoding, and no amount of prompt tuning fixes it. It took an entropy threshold, a cap on carried context, and a collapser that can tell human emphasis — "no, no, no" — from a decoder going in circles.</p>
+</div>
+
+<div class="case">
+  <h3>Shipping it is its own engineering problem</h3>
+  <p>An unsigned disk image passes Apple's notarisation, accepts a stapled ticket, and reports success at every step — then Gatekeeper refuses it on the customer's Mac, because notarisation is not a signature. <b>Failures that only appear after both round trips to Apple are the expensive kind</b>, so the release script now verifies the way a stranger's Mac will, and refuses to call a build shippable when it isn't.</p>
+</div>
+
+<p>Also, for the record: macOS ties privacy permissions to an app's signature, so an unstable signing identity silently resets them on every rebuild; and <code>NSLog</code> reaches nowhere at all from an app launched by the Finder, which means the error paths were invisible exactly when they mattered.</p>
+
+<h2>Try it, read it, or support it</h2>
+
+<p>The whole thing is source-available under GPL-3.0 — <code>./build.sh</code> produces the app. A signed and notarised build saves you the toolchain and the four permission dialogs.</p>
+
+<div class="links">
+  <a href="https://github.com/Stari-am/griasa">Read the source</a>
+  <a href="buy/">Get a signed build</a>
+  <a href="https://ko-fi.com/griasa">Support on Ko-fi</a>
+</div>
+
+<footer>
+  Built by Hayk Sargsyan · <a href="mailto:hayk@stari.am">hayk@stari.am</a> · <a href="https://stari.am">stari.am</a><br>
+  Griasa — <span lang="hy">գրի</span> + <span lang="hy">ասա</span>, "write" and "say".
+</footer>
+
+</div>
+</body>
+</html>

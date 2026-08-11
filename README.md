@@ -7,6 +7,14 @@ A native menu-bar app (Swift/SwiftUI, no dependencies) with two modes:
 
 Both modes can run at the same time — you can dictate while a conversation is being recorded.
 
+Made for anyone tired of installing a separate app for every small thing — and paying each one its own subscription.
+
+## Download
+
+**[Download the latest release — signed, notarized, universal](https://github.com/Stari-am/griasa/releases/latest)** · [what it does and what building it took](https://stari-am.github.io/griasa/)
+
+Free, and nothing is held back: there is no licence check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
+
 ## How dictation behaves
 
 | | |
@@ -27,13 +35,16 @@ Both modes can run at the same time — you can dictate while a conversation is 
 open Griasa.app
 ```
 
-## Distribute to colleagues
+## Distribute it yourself
 
 ```sh
-./dist.sh         # produces dist/Griasa-<version>.dmg
+./release.sh      # signed + notarized dist/Griasa-<version>.dmg — the one on Releases
+./dist.sh         # ad-hoc signed dmg, no Apple account needed
 ```
 
-The DMG contains a **universal** (Apple Silicon + Intel) build with an app icon, an `/Applications` shortcut, and `INSTALL.txt` with recipient instructions. The app is ad-hoc signed — without an Apple Developer ID it can't be notarized, so recipients must **right-click → Open** on first launch (explained in INSTALL.txt). Everything else is self-provisioning: on first launch the app installs whisper-cpp via Homebrew, downloads the models, and asks for the four permissions. If a Developer ID certificate is ever available, set it in `dist.sh` and add `notarytool` to remove the right-click step.
+`release.sh` is the path used for the published build: Developer ID signature, Hardened Runtime, Apple's notarization ticket stapled to **both** the app and the disk image, then verified the way a stranger's Mac will — `spctl`, `stapler`, and `lipo -archs` on the finished file rather than on the build settings. It needs a `Developer ID Application` certificate and a stored `notarytool` credential; run it without them and its preflight explains exactly what to create, including the two traps that cost the most time (importing the certificate with `security import` because a double-click reports `-25294`, and installing the G2 intermediate separately or `codesign` dies with "unable to build chain to self-signed root").
+
+`dist.sh` is for handing a build to a colleague with no Apple Developer account: a **universal** dmg with an app icon, an `/Applications` shortcut, and `INSTALL.txt`. Being ad-hoc signed, recipients must **right-click → Open** once. Either way the rest is self-provisioning: on first launch the app installs whisper-cpp via Homebrew, downloads the model, and asks for the four permissions.
 
 Builds on macOS 14+ with either full Xcode or the standalone Command Line Tools; runs on macOS 14+. `build.sh` compiles with `swiftc` directly, which needs no working SwiftPM — some standalone Command Line Tools installs ship a broken manifest library. `Package.swift` is equivalent and `swift build` works under full Xcode; use whichever you prefer.
 

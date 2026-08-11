@@ -8,11 +8,11 @@
 <style>
   :root {
     --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --card: #f5f5f7;
-    --accent: #0071e3; --border: #e5e5ea; --good: #1a7f37;
+    --accent: #0071e3; --border: #e5e5ea; --good: #1a7f37; --support: #e8453c;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #101012; --fg: #f5f5f7; --muted: #98989d; --card: #1c1c1f;
-            --accent: #2997ff; --border: #2c2c30; --good: #3fb950; }
+            --accent: #2997ff; --border: #2c2c30; --good: #3fb950; --support: #ff6f6c; }
   }
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--bg); color: var(--fg);
@@ -27,6 +27,10 @@
          text-decoration: none; font-weight: 600; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { border: 1px solid var(--border); color: var(--fg); }
+  .btn-support { background: var(--support); color: #fff; }
+  .support-line { color: var(--support); font-size: 19px; font-weight: 650;
+                  margin-bottom: 16px; letter-spacing: -0.01em; }
+  .support-line span { color: var(--muted); font-weight: 400; font-size: 15px; display: block; margin-top: 2px; }
   .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
   section { padding: 40px 0; border-top: 1px solid var(--border); }
   h2 { font-size: 26px; letter-spacing: -0.01em; margin-bottom: 20px; }
@@ -56,9 +60,12 @@
 <header>
   <div class="mic">🎙️</div>
   <h1>Griasa</h1>
-  <p class="tagline">Dictation, meeting transcripts, and AI capture actions — running <strong>on your Mac</strong>, with <strong>your</strong> AI keys or fully offline. One price, no subscription.</p>
+  <p class="tagline">Dictation, meeting transcripts, and AI capture actions — running <strong>on your Mac</strong>, with <strong>your</strong> AI keys or fully offline. Free, and no subscription to anything.</p>
+  <p class="support-line">$29 makes my day — but any amount does.
+    <span>The app is free either way, and nothing is locked behind the money.</span></p>
   <div class="cta-row">
-    <a class="btn btn-primary" href="#buy">Get Griasa — $29</a>
+    <a class="btn btn-support" href="https://ko-fi.com/griasa">Support on Ko-fi</a>
+    <a class="btn btn-primary" href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
     <a class="btn btn-secondary" href="https://github.com/Stari-am/griasa">View source on GitHub</a>
   </div>
   <p class="note">macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized</p>
@@ -104,27 +111,33 @@
     <tr><td>Meeting notes</td><td class="good">✓ included</td><td>$10–18/mo, bot joins your call</td></tr>
     <tr><td>Screen capture → reminder / OCR / AI</td><td class="good">✓ included</td><td>separate apps</td></tr>
     <tr><td>Where audio is processed</td><td class="good">your Mac</td><td>vendor cloud</td></tr>
-    <tr><td>Price</td><td class="good">$29 once</td><td>$250–400 / year</td></tr>
+    <tr><td>Price</td><td class="good">free — pay what you like</td><td>$250–400 / year</td></tr>
   </table>
 </section>
 
 <section id="buy">
-  <h2>Pricing</h2>
+  <h2>What it costs</h2>
   <div class="price-cards">
     <div class="card">
-      <h3>Signed build</h3>
-      <p class="price">$29 <span class="per">one-time</span></p>
-      <p>Notarized universal .dmg, updates, and email support. The convenient way — and the way to support development.</p>
+      <h3>Download it</h3>
+      <p class="price">Free <span class="per">signed &amp; notarized</span></p>
+      <p>The built app, ready to run: universal binary, Apple's notarization ticket stapled on, opens with a double-click. Nothing is held back and there is no licence check — there could not be a meaningful one under this licence anyway.</p>
       <div class="cta-row" style="justify-content:flex-start">
-        <!-- Points at the Ko-fi page until the shop item exists; swap this one
-             href for the product URL and the button is live. -->
-        <a class="btn btn-primary" href="https://ko-fi.com/griasa">Buy on Ko-fi</a>
+        <a class="btn btn-primary" href="https://github.com/Stari-am/griasa/releases/latest">Download the latest release</a>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Support it, if it earns it</h3>
+      <p class="price">$29? <span class="per">or anything at all</span></p>
+      <p>Use it for a week first. If it saved you time, <b>$29 would make my day — but any amount does</b>, and none is fine too. This pays for the Apple developer account and the hours, not for access you already have.</p>
+      <div class="cta-row" style="justify-content:flex-start">
+        <a class="btn btn-primary" href="https://ko-fi.com/griasa">Support on Ko-fi</a>
       </div>
     </div>
     <div class="card" id="opensource">
-      <h3>Build it yourself</h3>
+      <h3>Or build it yourself</h3>
       <p class="price">Free <span class="per">GPL-3.0</span></p>
-      <p>Clone the repo, run <code>./build.sh</code>, own every line. If Griasa saves you time, <a href="https://ko-fi.com/griasa">buy me a coffee</a>.</p>
+      <p>Clone the repo, run <code>./build.sh</code>, own every line. Same app, minus the toolchain setup.</p>
       <div class="cta-row" style="justify-content:flex-start">
         <a class="btn btn-secondary" href="https://github.com/Stari-am/griasa">GitHub</a>
       </div>
@@ -142,12 +155,14 @@
     <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional — the app tells you exactly what stops working if you decline. It's all in the source.</p></details>
   <details><summary>Do I need an AI subscription?</summary>
     <p>No subscription to Griasa, ever. You bring an API key (Anthropic / OpenAI / Gemini — pay-per-use, typically cents per day) or run free local models with Ollama.</p></details>
+  <details><summary>What do I get for the $29 that I don't get for free?</summary>
+    <p>Nothing, and that's deliberate. The download is the same app either way — no locked features, no licence check, and under GPL-3.0 there could not be a meaningful one: anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours, so if the app hasn't earned it yet, don't send any.</p></details>
   <details><summary>Refunds?</summary>
-    <p>14 days, no questions. Email me.</p></details>
+    <p>Just ask and it's returned, no questions. Since nothing is gated behind the payment, you keep using the app either way.</p></details>
 </section>
 
 <footer>
-  <p>Made by one person who wasn't allowed to use cloud recorders at work.</p>
+  <p>Made for anyone tired of installing a separate app for every small thing — and paying each one its own subscription.</p>
   <p><a href="../">About the project</a> · <a href="https://github.com/Stari-am/griasa">GitHub</a> · <a href="mailto:hayk@stari.am">Support / contact</a> · <a href="https://ko-fi.com/griasa">Ko-fi</a></p>
 </footer>
 

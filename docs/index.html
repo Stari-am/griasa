@@ -13,6 +13,7 @@
     --rule: #e3ded6;
     --accent: #9a4a1e;
     --card: #f6f3ee;
+    --support: #c0392b;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
@@ -23,6 +24,7 @@
       --rule: #2e2b27;
       --accent: #e59b6a;
       --card: #1e1c19;
+      --support: #ff8a66;
     }
   }
   * { box-sizing: border-box; }
@@ -85,6 +87,10 @@
     font-size: 0.95rem;
   }
   .links a:hover { border-color: var(--accent); }
+  .links a.go { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 620; }
+  .links a.support-btn { background: var(--support); border-color: var(--support); color: #fff; font-weight: 620; }
+  .support { color: var(--support); font-size: 1.05rem; }
+  .support b { color: var(--support); font-weight: 660; }
   footer { margin: 4.5rem 0 5rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
   footer a { color: var(--accent); }
 </style>
@@ -164,12 +170,15 @@
 
 <h2>Try it, read it, or support it</h2>
 
-<p>The whole thing is source-available under GPL-3.0 — <code>./build.sh</code> produces the app. A signed and notarised build saves you the toolchain and the four permission dialogs.</p>
+<p>The build is free and signed — download it and it opens with a double-click. The source is all here too, under GPL-3.0, and <code>./build.sh</code> produces the same app if you would rather compile it yourself. There is no licence check; under this licence there could not be a meaningful one.</p>
+
+<p class="support"><b>$29 makes my day — but any amount does</b>, and none is fine too. Use it for a week before you decide.</p>
 
 <div class="links">
+  <a class="go" href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
+  <a class="support-btn" href="https://ko-fi.com/griasa">Support on Ko-fi</a>
   <a href="https://github.com/Stari-am/griasa">Read the source</a>
-  <a href="buy/">Get a signed build</a>
-  <a href="https://ko-fi.com/griasa">Support on Ko-fi</a>
+  <a href="buy/">All the details</a>
 </div>
 
 <footer>

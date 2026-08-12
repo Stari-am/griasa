@@ -42,6 +42,17 @@ enum GriasaMain {
                 AppDelegate.shotSize = NSSize(width: w, height: h)
             }
         }
+        // `--settings <tab name>` opens the Settings scene on that tab. SwiftUI
+        // reads the selected index from UserDefaults when it builds the window,
+        // so the index has to be written before the scene appears.
+        if let flagIndex = args.firstIndex(of: "--settings"), args.count > flagIndex + 1 {
+            let names = ["dictation", "meetings", "ai", "capture", "snippets", "projects", "system"]
+            if let index = names.firstIndex(of: args[flagIndex + 1].lowercased()) {
+                UserDefaults.standard.set(index, forKey: "com_apple_SwiftUI_Settings_selectedTabIndex")
+                AppDelegate.openSettingsOnLaunch = true
+            }
+        }
+        if args.contains("--demo-brief") { AppDelegate.demoBrief = true }
         GriasaApp.main()
     }
 }
@@ -55,7 +66,7 @@ struct GriasaApp: App {
             MenuView()
                 .environmentObject(state)
         } label: {
-            Image(systemName: state.menuBarSymbol)
+            MenuBarLabel(symbol: state.menuBarSymbol)
         }
         .menuBarExtraStyle(.window)
 
@@ -63,6 +74,25 @@ struct GriasaApp: App {
             SettingsView()
                 .environmentObject(state)
         }
+    }
+}
+
+/// The menu-bar icon, wrapped so it can carry the `openSettings` environment
+/// action. `--settings` needs to open that scene at launch, and the only public
+/// opener is this action — the `showSettingsWindow:` selector silently does
+/// nothing this early, and MenuBarExtra's *content* isn't built until someone
+/// clicks the icon, whereas its label always is.
+private struct MenuBarLabel: View {
+    let symbol: String
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Image(systemName: symbol)
+            .task {
+                guard AppDelegate.openSettingsOnLaunch, !AppDelegate.settingsOpened else { return }
+                AppDelegate.settingsOpened = true
+                openSettings()
+            }
     }
 }
 
@@ -74,25 +104,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static var shotPath: String?
     /// `--size WxH`: hub size to use before the shot.
     nonisolated(unsafe) static var shotSize: NSSize?
+    /// `--settings <tab>`: open the Settings scene, and shoot that window.
+    nonisolated(unsafe) static var openSettingsOnLaunch = false
+    /// Guard so the label's task can't open Settings twice.
+    nonisolated(unsafe) static var settingsOpened = false
+    /// `--demo-brief`: fill the Prep tab from existing history and commitments,
+    /// so the pre-meeting brief can be seen (and documented) without a calendar
+    /// event and without granting Calendar access.
+    nonisolated(unsafe) static var demoBrief = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         Task { @MainActor in
             AppState.shared.bootstrap()
+            if AppDelegate.demoBrief { DemoBrief.install() }
             if let tab = AppDelegate.tabToOpenOnLaunch {
                 HubController.shared.open(tab)
                 if let size = AppDelegate.shotSize { HubController.shared.resize(to: size) }
             }
             if let path = AppDelegate.shotPath {
-                // Long enough for the stores to load and SwiftUI to lay out;
-                // short enough that a failed shot is obvious rather than a hang.
-                try? await Task.sleep(for: .seconds(3))
-                var ok = false
-                if let window = HubController.shared.window {
-                    ok = await WindowShot.save(window: window, to: path)
+                // Long enough for the stores to load, the Settings scene to
+                // appear and SwiftUI to lay out; short enough that a failed
+                // shot is obvious rather than a hang.
+                try? await Task.sleep(for: .seconds(2))
+                let target = AppDelegate.openSettingsOnLaunch
+                    ? AppDelegate.settingsWindow()
+                    : HubController.shared.window
+                // Settings sizes itself to its content and then scrolls; give it
+                // the requested height so nothing sits above the fold.
+                if AppDelegate.openSettingsOnLaunch, let size = AppDelegate.shotSize {
+                    target?.setContentSize(size)
+                    try? await Task.sleep(for: .seconds(1))
                 }
+                try? await Task.sleep(for: .seconds(1))
+                var ok = false
+                if let target { ok = await WindowShot.save(window: target, to: path) }
                 exit(ok ? 0 : 1)
             }
+        }
+    }
+
+    /// The Settings window, identified by elimination: it is the visible window
+    /// that isn't the hub panel and is big enough to be a real window rather
+    /// than one of the slivers a MenuBarExtra app also owns.
+    @MainActor
+    private static func settingsWindow() -> NSWindow? {
+        let hub = HubController.shared.window
+        return NSApp.windows.first { window in
+            window.isVisible && window !== hub
+                && window.frame.width > 300 && window.frame.height > 200
         }
     }
 

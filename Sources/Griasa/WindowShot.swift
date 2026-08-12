@@ -13,6 +13,9 @@ import ScreenCaptureKit
 @MainActor
 enum WindowShot {
     static func save(window: NSWindow, to path: String) async -> Bool {
+        // A window that opens scrolled halfway down photographs badly, and the
+        // scroll position is not something a caller can pass in.
+        scrollToTop(in: window)
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         let data = await captureComposited(window) ?? renderInProcess(window)
         guard let data else {
@@ -67,5 +70,66 @@ enum WindowShot {
 
     private static func png(from rep: NSBitmapImageRep) -> Data? {
         rep.representation(using: .png, properties: [:])
+    }
+
+    /// Scrolls every scroll view in the window back to its top. Our own view
+    /// tree, so no synthetic events and no permission involved.
+    private static func scrollToTop(in window: NSWindow) {
+        func walk(_ view: NSView) {
+            if let scroll = view as? NSScrollView {
+                // Which end is "top" depends on the document view's coordinate
+                // system: flipped (what SwiftUI uses) puts it at y = 0, plain
+                // AppKit puts it at the far end.
+                let document = scroll.documentView
+                let flipped = document?.isFlipped ?? true
+                let top = flipped
+                    ? 0
+                    : max(0, (document?.frame.height ?? 0) - scroll.contentView.bounds.height)
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: top))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            view.subviews.forEach(walk)
+        }
+        if let root = window.contentView { walk(root) }
+        window.displayIfNeeded()
+    }
+}
+
+/// Fills the Prep tab from data that already exists — the newest recorded
+/// meeting and the open commitments — so the pre-meeting brief can be looked at
+/// without waiting for a real calendar event, and without Calendar access.
+/// `Griasa --demo-brief --open prep`.
+@MainActor
+enum DemoBrief {
+    static func install() {
+        let history = HistoryStore.shared.entries
+        guard let last = history.first(where: { $0.kind == .meeting }) else { return }
+        let names = last.participants ?? []
+        let commitments = CommitmentStore.shared
+
+        let attendees = names.map { name in
+            PrepBrief.Attendee(
+                name: name,
+                knownName: name,
+                notesPreview: PersonStore.shared.person(named: name)?.notes,
+                openCommitments: commitments.open(for: name).count)
+        }
+        // A brief is only ever shown for a meeting about to start, so the
+        // example is placed a few minutes out rather than in the past.
+        let start = Date().addingTimeInterval(6 * 60)
+        let brief = PrepBrief(
+            title: "Checkout latency — follow-up",
+            start: start,
+            end: start.addingTimeInterval(30 * 60),
+            videoURL: URL(string: "https://meet.example.com/checkout-followup"),
+            attendees: attendees,
+            lastMeeting: PrepBrief.PastMeeting(
+                title: last.title,
+                date: last.date,
+                summary: last.preview,
+                filePath: last.filePath),
+            youPromised: commitments.openMine.filter { names.contains($0.owner) || $0.isMine },
+            theyPromised: commitments.openTheirs.filter { names.contains($0.owner) })
+        MeetingPrepWatcher.shared.state = .brief(brief)
     }
 }

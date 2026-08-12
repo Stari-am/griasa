@@ -25,6 +25,10 @@ Think of it the way you think of WinRAR: the trial never ends and it keeps worki
 
 *The same meetings read a different way: what you owe, and what you are owed.*
 
+![The pre-meeting brief: who is on the call with each person's open-promise count, what the last meeting was about, and both lists of promises](docs/screenshot-prep.png)
+
+*Five minutes before a call, without taking keyboard focus. Built from local data only.*
+
 ## How dictation behaves
 
 | | |

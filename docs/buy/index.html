@@ -3,197 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Griasa — local-first dictation & meeting notes for macOS</title>
-<meta name="description" content="Dictation, meeting transcripts, and AI capture actions that run on your Mac. Your keys, your models, no subscription. Open source.">
-
-<!-- Link previews; og:image must be absolute or scrapers ignore it. -->
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Griasa">
-<meta property="og:title" content="Griasa — everything the subscription apps do, in one menu-bar app">
-<meta property="og:description" content="Dictation, meeting transcripts and AI capture actions running on your Mac, with your own AI keys or fully offline. Free, signed and notarized. No subscription to anything.">
-<meta property="og:url" content="https://stari-am.github.io/griasa/buy/">
-<meta property="og:image" content="https://stari-am.github.io/griasa/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The Griasa app icon">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Griasa — everything the subscription apps do, in one menu-bar app">
-<meta name="twitter:description" content="Dictation, meeting notes and capture actions on your own Mac. Free, signed and notarized, no subscription.">
-<meta name="twitter:image" content="https://stari-am.github.io/griasa/og.png">
-
+<title>Griasa — now on one page</title>
+<!-- This page's content moved to the project page. Two pages described the same
+     app to the same people and split the download button between them, so the
+     sales copy, the privacy list and the FAQ now live at the root. Kept as a
+     redirect rather than deleted, because the URL is already out in the world;
+     canonical points at the survivor so search engines don't index both. -->
+<link rel="canonical" href="https://stari-am.github.io/griasa/">
+<meta http-equiv="refresh" content="0; url=../">
+<meta name="robots" content="noindex, follow">
 <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <style>
-  :root {
-    --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --card: #f5f5f7;
-    --accent: #0071e3; --border: #e5e5ea; --good: #1a7f37; --support: #2f62c8;
-  }
+  :root { --bg: #fdfcfa; --fg: #1c1a17; --muted: #6a635a; --accent: #9a4a1e; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #101012; --fg: #f5f5f7; --muted: #98989d; --card: #1c1c1f;
-            --accent: #2997ff; --border: #2c2c30; --good: #3fb950; --support: #8fb6ff; }
+    :root { --bg: #161513; --fg: #ece8e1; --muted: #9b938a; --accent: #e59b6a; }
   }
-  * { box-sizing: border-box; margin: 0; }
-  body { background: var(--bg); color: var(--fg);
-         font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
-  header { text-align: center; padding: 72px 0 48px; }
-  .mic { font-size: 56px; }
-  h1 { font-size: clamp(32px, 6vw, 48px); letter-spacing: -0.02em; margin: 12px 0 8px; }
-  .tagline { font-size: clamp(18px, 3vw, 22px); color: var(--muted); max-width: 620px; margin: 0 auto; }
-  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; align-items: center; }
-  /* Ko-fi's own button asset, served from this repo rather than their CDN: same
-     official artwork, but the page still makes zero third-party requests. */
-  .kofi img { height: 40px; width: auto; display: block; border-radius: 8px; }
-  .btn { display: inline-block; padding: 12px 26px; border-radius: 980px;
-         text-decoration: none; font-weight: 600; white-space: nowrap; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-secondary { border: 1px solid var(--border); color: var(--fg); }
-  /* Download and source get identical weight: the Ko-fi button above is the one
-     thing meant to stand out, and two competing accents would flatten it. */
-  .btn-pair { background: var(--card); border: 1px solid var(--border); color: var(--fg); }
-  .cta-kofi { margin-top: 24px; margin-bottom: 0; }
-  .cta-kofi + .cta-row { margin-top: 14px; }
-  .support-line { color: var(--support); font-size: 19px; font-weight: 650;
-                  margin-bottom: 16px; letter-spacing: -0.01em; }
-  .support-line span { color: var(--muted); font-weight: 400; font-size: 15px; display: block; margin-top: 2px; }
-  .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
-  section { padding: 40px 0; border-top: 1px solid var(--border); }
-  h2 { font-size: 26px; letter-spacing: -0.01em; margin-bottom: 20px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-  .card { background: var(--card); border-radius: 14px; padding: 18px 20px; }
-  .card h3 { font-size: 16px; margin-bottom: 6px; }
-  .card p { font-size: 14px; color: var(--muted); }
-  .privacy li { margin: 8px 0 8px 20px; }
-  table { width: 100%; border-collapse: collapse; font-size: 15px; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; font-size: 13px; }
-  .price-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
-  .price { font-size: 34px; font-weight: 700; }
-  .per { font-size: 14px; color: var(--muted); }
-  .good { color: var(--good); }
-  details { border-bottom: 1px solid var(--border); padding: 12px 0; }
-  summary { cursor: pointer; font-weight: 600; }
-  details p { padding: 10px 0 4px; color: var(--muted); font-size: 15px; }
-  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
-  footer a { color: var(--muted); }
-  .shot { width: 100%; border-radius: 14px; border: 1px solid var(--border); margin-top: 18px; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    max-width: 34rem; margin: 20vh auto; padding: 0 1.4rem;
+  }
+  a { color: var(--accent); }
+  p { margin: 0 0 1rem; }
+  .quiet { color: var(--muted); font-size: 0.92rem; }
 </style>
 </head>
 <body>
-<div class="wrap">
-
-<header>
-  <div class="mic">🎙️</div>
-  <h1>Griasa</h1>
-  <p class="tagline">Dictation, meeting transcripts, and AI capture actions — running <strong>on your Mac</strong>, with <strong>your</strong> AI keys or fully offline. Free, and no subscription to anything.</p>
-  <p class="support-line">$29 makes my day — but any amount does.
-    <span>The app is free either way, and nothing is locked behind the money.</span></p>
-  <div class="cta-row cta-kofi">
-    <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="../kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
-  </div>
-  <div class="cta-row">
-    <a class="btn btn-pair" href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
-    <a class="btn btn-pair" href="https://github.com/Stari-am/griasa">View source on GitHub</a>
-  </div>
-  <p class="note">macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized</p>
-  <img class="shot" src="../screenshot-history.png" width="1280" height="880"
-       alt="The Griasa hub with one recorded meeting open: summary, key points, open questions, per-person action items and a timestamped transcript.">
-</header>
-
-<section>
-  <h2>Everything the subscription apps do — in one menu-bar app</h2>
-  <div class="grid">
-    <div class="card"><h3>🎤 Hold-to-talk dictation</h3>
-      <p>Hold a key, speak, release — polished text appears in any app. Local Whisper transcription with AI cleanup that keeps your language, fixes punctuation, and handles mixed-language speech (tech terms stay in English).</p></div>
-    <div class="card"><h3>📼 Meeting recorder</h3>
-      <p>Captures your mic and everything the Mac plays — Zoom, Meet, Slack huddles, anything. You get a clean Markdown transcript with speakers, summary, and action items. Take timestamped notes live; they're woven into the summary.</p></div>
-    <div class="card"><h3>⏰ Remind me — anywhere</h3>
-      <p>Select text or drag a rectangle over any app, hit a hotkey, and AI turns it into an Apple Reminder with the right date, a link back to the source, and a screenshot clip.</p></div>
-    <div class="card"><h3>📋 Capture actions</h3>
-      <p>OCR any region of the screen, run AI presets on selected text or clipboard (translate, rewrite, summarize), or draft a reply from the visible chat thread — system-wide hotkeys, works in every app.</p></div>
-    <div class="card"><h3>✨ AI snippets — type <code>;tldr</code> anywhere</h3>
-      <p>Text expansion with an AI inside. <code>;tldr</code> summarizes whatever you copied, <code>;en</code> translates it, <code>;meet</code> proposes your next free calendar slot with your room link — expanded in place, in any app, in any text field. Write your own: <code>{ai: …}</code> takes any instruction and can see your clipboard, date, and calendar.</p></div>
-    <div class="card"><h3>🗂 Projects &amp; history</h3>
-      <p>Everything you capture is auto-filed into projects as plain Markdown on disk. Ask questions about a project and get answers grounded in its notes.</p></div>
-    <div class="card"><h3>🤖 Your choice of AI</h3>
-      <p>Anthropic, OpenAI, Google Gemini — fully local via Ollama / LM Studio — or <strong>no API key at all</strong>: Griasa can answer through the Claude Code or Codex CLI using the subscription you already pay for. No middleman server, ever.</p></div>
-  </div>
-</section>
-
-<section id="privacy">
-  <h2>Advanced AI — on your terms</h2>
-  <ul class="privacy">
-    <li><strong>The smart parts are real AI</strong> — meeting notes with action items, a commitments tracker, per-person dossiers, PRD/RFC drafts, AI snippets. You bring the brain: Anthropic, OpenAI, Gemini, a local model via Ollama / LM Studio — or your existing Claude&nbsp;Pro / ChatGPT subscription through their CLIs, no API key needed.</li>
-    <li><strong>Audio never leaves your Mac.</strong> Transcription is local Whisper (whisper.cpp). There is no Griasa server and no account.</li>
-    <li><strong>Text goes only to the AI provider you configure</strong> — or nowhere at all with a local model. If a local model fails, Griasa asks before ever sending anything to a cloud key.</li>
-    <li><strong>Open source.</strong> Every permission the app asks for (microphone, screen recording, accessibility) is auditable in the code — and each one explains what still works if you decline it. Even the strictest “no cloud recorders” IT policy has a compliant mode: local Whisper + local LLM.</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Compare</h2>
-  <table>
-    <tr><th></th><th>Griasa</th><th>Typical cloud stack</th></tr>
-    <tr><td>Dictation</td><td class="good">✓ local Whisper</td><td>$12–15/mo, cloud</td></tr>
-    <tr><td>Meeting notes</td><td class="good">✓ included</td><td>$10–18/mo, bot joins your call</td></tr>
-    <tr><td>Screen capture → reminder / OCR / AI</td><td class="good">✓ included</td><td>separate apps</td></tr>
-    <tr><td>Where audio is processed</td><td class="good">your Mac</td><td>vendor cloud</td></tr>
-    <tr><td>Price</td><td class="good">free — pay what you like</td><td>$250–400 / year</td></tr>
-  </table>
-</section>
-
-<section id="buy">
-  <h2>What it costs</h2>
-  <div class="price-cards">
-    <div class="card">
-      <h3>Download it</h3>
-      <p class="price">Free <span class="per">signed &amp; notarized</span></p>
-      <p>The built app, ready to run: universal binary, Apple's notarization ticket stapled on, opens with a double-click. Nothing is held back and there is no licence check — there could not be a meaningful one under this licence anyway.</p>
-      <div class="cta-row" style="justify-content:flex-start">
-        <a class="btn btn-primary" href="https://github.com/Stari-am/griasa/releases/latest">Download</a>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Support it, if it earns it</h3>
-      <p class="price">$29? <span class="per">or anything at all</span></p>
-      <p>Use it for a week first. If it saved you time, <b>$29 would make my day — but any amount does</b>, and none is fine too. This pays for the Apple developer account and the hours, not for access you already have.</p>
-      <div class="cta-row" style="justify-content:flex-start;margin-top:18px">
-        <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="../kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
-      </div>
-    </div>
-    <div class="card" id="opensource">
-      <h3>Or build it yourself</h3>
-      <p class="price">Free <span class="per">GPL-3.0</span></p>
-      <p>Clone the repo, run <code>./build.sh</code>, own every line. Same app, minus the toolchain setup.</p>
-      <div class="cta-row" style="justify-content:flex-start">
-        <a class="btn btn-secondary" href="https://github.com/Stari-am/griasa">GitHub</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section>
-  <h2>FAQ</h2>
-  <details><summary>Does it work offline?</summary>
-    <p>Yes — dictation always (Whisper runs locally), and every AI feature too if you point Griasa at Ollama or LM Studio. With a cloud key, only the text of the specific request is sent to that provider.</p></details>
-  <details><summary>Which languages?</summary>
-    <p>Everything Whisper supports (~100 languages), including mixed-language speech — dictate in your language with English tech terms and both come out right.</p></details>
-  <details><summary>Why does it need microphone / screen recording / accessibility permissions?</summary>
-    <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional — the app tells you exactly what stops working if you decline. It's all in the source.</p></details>
-  <details><summary>Do I need an AI subscription?</summary>
-    <p>No subscription to Griasa, ever. You bring an API key (Anthropic / OpenAI / Gemini — pay-per-use, typically cents per day) or run free local models with Ollama.</p></details>
-  <details><summary>What do I get for the $29 that I don't get for free?</summary>
-    <p>Nothing, and that's deliberate. The download is the same app either way — no locked features, no licence check, and under GPL-3.0 there could not be a meaningful one: anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours, so if the app hasn't earned it yet, don't send any.</p>
-    <p>Which puts Griasa squarely in the WinRAR tradition: the trial never ends, the reminder stays polite, and the thing keeps working forever whether or not you ever pay. WinRAR reportedly does perfectly well on that arrangement, which leaves the question nobody has answered in thirty years — <i>who are the people who actually pay?</i> You could be one of them.</p></details>
-  <details><summary>Refunds?</summary>
-    <p>Just ask and it's returned, no questions. Since nothing is gated behind the payment, you keep using the app either way.</p></details>
-</section>
-
-<footer>
-  <p>Made for anyone tired of installing a separate app for every small thing — and paying each one its own subscription.</p>
-  <p><a href="../">About the project</a> · <a href="https://github.com/Stari-am/griasa">GitHub</a> · <a href="mailto:hayk@stari.am">Support / contact</a> · <a href="https://ko-fi.com/griasa">Ko-fi</a></p>
-</footer>
-
-</div>
+<p>Everything that was here — what Griasa does, what it costs, what leaves your
+Mac, and the download — is now on <a href="../">the project page</a>.</p>
+<p class="quiet">You should be sent there automatically. If not, follow the link.</p>
 </body>
 </html>

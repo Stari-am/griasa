@@ -118,6 +118,27 @@
 
   /* Screenshots are captured in light appearance; on the dark page a bare
      white window glares, so it sits on a muted plate with a rule around it. */
+
+  /* The ask and the two buttons sit in the first screen: someone who arrives
+     ready to try it should not have to reach the bottom to find the download. */
+  .top-cta { margin: 1.9rem 0 0.4rem; }
+  details {
+    border-top: 1px solid var(--rule);
+    padding: 0.85rem 0;
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before {
+    content: "+ ";
+    color: var(--accent);
+    font-weight: 700;
+  }
+  details[open] summary::before { content: "\2212 "; }
+  details p { color: var(--muted); margin: 0.7rem 0 0.2rem; }
   figure.shot { margin: 30px 0; }
   figure.shot img {
     display: block; width: 100%; height: auto;
@@ -145,6 +166,17 @@
 </header>
 
 <p class="lede">Griasa began as dictation and kept going, because dictation on its own solves half a problem: you can say the words, and then you still have to remember what you agreed to. So the same app records the call, extracts who promised what, keeps a page per colleague, and hands you a brief before the next meeting with them.</p>
+
+<div class="top-cta">
+  <p class="support"><b>$29 makes my day — but any amount does</b>, and none is fine too. The app is free either way: there is no licence check, and under GPL-3.0 there could not be a meaningful one.</p>
+  <div class="links links-kofi">
+    <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
+  </div>
+  <div class="links">
+    <a href="https://github.com/Stari-am/griasa/releases/latest">Download — free, signed, notarized</a>
+    <a href="https://github.com/Stari-am/griasa">Read the source</a>
+  </div>
+</div>
 
 <figure class="shot">
   <img src="screenshot-history.png" width="1280" height="880"
@@ -194,6 +226,15 @@
   <figcaption>A page per colleague appears on its own, built from the meeting roster — no setup step, no contact to create.</figcaption>
 </figure>
 
+<h2>What leaves your Mac, and what doesn't</h2>
+
+<ul>
+  <li><b>Audio never leaves it.</b> Transcription is local — Apple's recogniser or <code>whisper.cpp</code>. There is no Griasa server and no account to create.</li>
+  <li><b>Text goes only to the provider you configure</b> — Anthropic, OpenAI, Gemini, or a local model via Ollama or LM Studio, in which case nowhere at all. If a local model fails, the app asks before it ever sends anything to a cloud key.</li>
+  <li><b>Or use the subscription you already have.</b> With the <code>claude</code> or <code>codex</code> CLI installed and logged in, there is no API key at all.</li>
+  <li><b>Every permission is auditable and optional.</b> Microphone, screen recording, accessibility — each one says what still works if you decline it, and the code that asks is right there. Even a strict "no cloud recorders" IT policy has a compliant mode: local Whisper plus a local model.</li>
+</ul>
+
 <h2>Why this is harder than it looks</h2>
 
 <p>Dictation looks like a small app: capture audio, call a recogniser, insert the text. Every one of those three steps hid a problem that only appears once real people use it.</p>
@@ -225,6 +266,22 @@
 
 <p>Also, for the record: macOS ties privacy permissions to an app's signature, so an unstable signing identity silently resets them on every rebuild; and <code>NSLog</code> reaches nowhere at all from an app launched by the Finder, which means the error paths were invisible exactly when they mattered.</p>
 
+<h2>Questions people actually ask</h2>
+
+<details><summary>Does it work offline?</summary>
+  <p>Dictation always — Whisper runs locally. Every AI feature too, if you point it at Ollama or LM Studio. With a cloud key, only the text of that one request is sent.</p></details>
+<details><summary>Which languages?</summary>
+  <p>Everything Whisper supports, around a hundred, including mixed-language speech — dictate in your own language with English technical terms and both come out right.</p></details>
+<details><summary>Why does it need microphone, screen recording and accessibility permissions?</summary>
+  <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional and the app tells you what stops working if you decline. It's all in the source.</p></details>
+<details><summary>Do I need an AI subscription?</summary>
+  <p>Never to Griasa. You bring an API key — typically cents a day — or run local models with Ollama for nothing, or let it use the Claude or ChatGPT subscription you already pay for.</p></details>
+<details><summary>What do I get for the $29 that I don't get for free?</summary>
+  <p>Nothing, and that's deliberate. The download is the same app either way: no locked features, no licence check, and under GPL-3.0 there could not be a meaningful one — anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours.</p>
+  <p>Which puts Griasa squarely in the WinRAR tradition: the trial never ends, the reminder stays polite, and the thing keeps working forever whether or not you ever pay. WinRAR reportedly does perfectly well on that arrangement, which leaves the question nobody has answered in thirty years — <i>who are the people who actually pay?</i> You could be one of them.</p></details>
+<details><summary>Refunds?</summary>
+  <p>Just ask, and it's returned with no questions. Since nothing is gated behind the payment, you keep using the app either way.</p></details>
+
 <h2>Try it, read it, or support it</h2>
 
 <p>The build is free and signed — download it and it opens with a double-click. The source is all here too, under GPL-3.0, and <code>./build.sh</code> produces the same app if you would rather compile it yourself. There is no licence check; under this licence there could not be a meaningful one.</p>
@@ -238,7 +295,7 @@
 <div class="links">
   <a href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
   <a href="https://github.com/Stari-am/griasa">Read the source</a>
-  <a href="buy/">All the details</a>
+  <a href="https://github.com/Stari-am/griasa/blob/main/CHANGELOG.md">What changed</a>
 </div>
 
 <footer>

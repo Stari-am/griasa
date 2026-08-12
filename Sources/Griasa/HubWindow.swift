@@ -50,6 +50,20 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
 
     private var panel: NSPanel?
 
+    /// The hub's window, for `--shoot` documentation screenshots.
+    var window: NSWindow? { panel }
+
+    /// Resizes the hub, keeping it centred — `--size 1100x760` for a screenshot
+    /// that doesn't look cramped.
+    func resize(to size: NSSize) {
+        guard let panel else { return }
+        var frame = panel.frame
+        frame.origin.x -= (size.width - frame.width) / 2
+        frame.origin.y -= (size.height - frame.height) / 2
+        frame.size = size
+        panel.setFrame(frame, display: true)
+    }
+
     /// Opens (or fronts) the hub with `tab` selected. `activate: false` shows
     /// the panel without making it key — background events (the pre-meeting
     /// brief) must never yank keyboard focus from what the user is typing.

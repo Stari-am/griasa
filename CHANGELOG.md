@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.1 — 2026-08-11
+
+**Meeting notes read as notes.** The detail pane was printing its own source —
+`## Summary` and `**Dana**` instead of a heading and a name. Headings, bullets,
+quotes and emphasis now render. Copy and Export still hand over the Markdown,
+which is what Notion, Obsidian and git want.
+
+**The history list is scannable again.** Every meeting's preview line read
+"## Summary", so the column you scan by said the same thing on every row. It now
+shows the first line that carries content. History also opens on your newest
+entry instead of an empty pane asking you to click first.
+
+**The transcript mirror folder no longer defaults to somebody else's directory.**
+1.0 shipped with `~/work/wispr/transcripts` as the default — the author's own
+path, under the project's former name. The setting is now *Transcript mirror
+folder* (Settings → Folders) and is **empty by default**: copying your meeting
+notes to a second location should be something you ask for. If you set your own
+path, it is untouched.
+
+**New: `--open <tab>` and `--shoot <path>`.** `Griasa --open commitments` opens
+that tab directly; `--shoot out.png --size 1280x880` saves a picture of it and
+quits. For documentation, and for saying which screen you mean.
+
 ## 1.0 — 2026-08-10
 
 First public release. [Download](https://github.com/Stari-am/griasa/releases/latest) —

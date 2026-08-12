@@ -11,7 +11,7 @@ import Speech
 ///
 /// `@unchecked Sendable` because the mutable state here is confined to the
 /// serial `stateQueue` — the recognizer's callbacks, the partial stream and the
-/// finalisation all run there — and the compiler cannot see a dispatch queue as
+/// finalization all run there — and the compiler cannot see a dispatch queue as
 /// an isolation domain the way it sees an actor. The word to weigh is
 /// *unchecked*: this is a claim about the code, not something proven by it, so
 /// anything added below has to keep its mutations on `stateQueue`.

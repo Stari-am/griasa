@@ -31,7 +31,7 @@ final class SnippetExpander {
     /// could only ever be reached by switching layout twice mid-question.
     private static let askOpenerCodes = [kVK_ANSI_Semicolon, kVK_ANSI_A, kVK_ANSI_I]
     private static let askCloserCodes = [kVK_ANSI_Semicolon, kVK_ANSI_Semicolon]
-    /// The key codes behind `buffer`, so the trigger can be recognised by the
+    /// The key codes behind `buffer`, so the trigger can be recognized by the
     /// keys pressed rather than the letters they happened to produce.
     private var codes: [Int] = []
     /// Everything typed since the opener, terminator included. nil when not
@@ -232,12 +232,12 @@ final class SnippetExpander {
     }
 
     private func cancelAsk(quietly: Bool, reason: String) {
-        TypingTrace.log("ask cancelled — \(reason)")
+        TypingTrace.log("ask canceled — \(reason)")
         asking = nil
         if quietly {
             SnippetHUD.shared.hide()
         } else {
-            SnippetHUD.shared.flash("\(Self.askOpener) cancelled — \(reason)", seconds: 2)
+            SnippetHUD.shared.flash("\(Self.askOpener) canceled — \(reason)", seconds: 2)
         }
     }
 

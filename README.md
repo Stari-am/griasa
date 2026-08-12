@@ -13,7 +13,7 @@ Made for anyone tired of installing a separate app for every small thing — and
 
 **[Download the latest release — signed, notarized, universal](https://github.com/Stari-am/griasa/releases/latest)** · [what it does and what building it took](https://stari-am.github.io/griasa/)
 
-Free, and nothing is held back: there is no licence check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
+Free, and nothing is held back: there is no license check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
 
 Think of it the way you think of WinRAR: the trial never ends and it keeps working whether or not you pay. WinRAR apparently makes real money like that, which leaves the mystery nobody has solved in thirty years — *somebody* pays. Feel free to be one of the somebodies.
 
@@ -47,7 +47,17 @@ Think of it the way you think of WinRAR: the trial never ends and it keeps worki
 ```sh
 ./build.sh        # produces Griasa.app (local dev build)
 open Griasa.app
+./test.sh         # the invariant checks; release.sh runs these first
 ```
+
+`test.sh` checks the rules live typing must never break — emitted text only ever
+grows, a hypothesis that re-words the start of an utterance may not extend its end,
+the language leg locks once. The first two were regressions that actually shipped;
+they now fail a command instead of a text field. There is no test framework involved: `swiftc` compiles
+`PartialStabilizer.swift` with the checks and the binary exits non-zero, so this
+works on a machine with only the Command Line Tools. Each failure message states
+the rule and why it matters, because "expected true, got false" tells whoever reads
+it nothing.
 
 ## Distribute it yourself
 
@@ -86,13 +96,13 @@ Bundle identifier and version live in `Support/Info.plist` — change `CFBundleI
 
 ### Changing what the AI is told
 
-Every system prompt Griasa sends to a model is in **one file**: [`Sources/Griasa/Prompts.swift`](Sources/Griasa/Prompts.swift) — dictation cleanup, meeting notes, commitment extraction, colleague dossiers, project filing, document drafting, reminder parsing, chat replies, inline answers. Reading that file is enough to know exactly what the app asks a model to do; edit it and rebuild to change the app's behaviour.
+Every system prompt Griasa sends to a model is in **one file**: [`Sources/Griasa/Prompts.swift`](Sources/Griasa/Prompts.swift) — dictation cleanup, meeting notes, commitment extraction, colleague dossiers, project filing, document drafting, reminder parsing, chat replies, inline answers. Reading that file is enough to know exactly what the app asks a model to do; edit it and rebuild to change the app's behavior.
 
 Runtime values are written `{{placeholder}}` and filled by the call site — `{{today}}`, `{{participants}}`, `{{skeleton}}` and so on. A placeholder the caller doesn't supply is left visible in the prompt rather than silently blanked, so a mistake shows up in the output instead of hiding.
 
 You don't have to rebuild to experiment: **Settings → AI & Actions → System prompts → Export for editing** writes the current wording to `~/Documents/Griasa Prompts.json`. Any key present there overrides the built-in version; delete a key (or the file) to go back. **Reload edits** picks up changes without a restart.
 
-The prompt-preset library (Settings → Prompt presets) is deliberately *not* in that file — those are your own documents, edited in the UI and stored per user, not app behaviour.
+The prompt-preset library (Settings → Prompt presets) is deliberately *not* in that file — those are your own documents, edited in the UI and stored per user, not app behavior.
 
 > Always run the **bundled app** (`Griasa.app`), not the bare binary — macOS permission prompts (mic, speech) need the Info.plist in the bundle.
 

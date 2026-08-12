@@ -93,6 +93,19 @@ print "Notary   : $NOTARY_PROFILE"
 print "Version  : $VERSION"
 print
 
+# ── Invariant checks, before anything expensive ──
+#
+# The rules live typing must never break are checked here rather than described
+# in a comment, because a comment cannot fail a build. This runs before the
+# notarization round trips: finding a broken invariant after two trips to Apple
+# is the expensive way to find out.
+
+print "Checking invariants…"
+if ! ./test.sh; then
+    die "invariant checks failed — the message above names the rule that broke. Not shipping this."
+fi
+print
+
 # ── Build: universal, so Intel Macs are not excluded from the sale ──
 
 print "Building universal binary (arm64 + x86_64)…"

@@ -142,7 +142,7 @@ enum WhisperTranscriber {
     /// No decoder setting makes looping impossible, and a loop reaching the
     /// user's document is the worst outcome this app has — one spoken sentence
     /// arrived seven times. So the transcript is checked here as well, where the
-    /// behaviour is testable and the trace records what was removed.
+    /// behavior is testable and the trace records what was removed.
     private static func deloop(_ text: String) -> String {
         let result = SpeechRepetition.collapse(text)
         if result.dropped > 0 {

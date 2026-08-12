@@ -9,7 +9,7 @@ import SwiftUI
 ///
 /// Results are verified through whichever channel the target actually supports.
 /// Accessibility is preferred: where `AXValue` is readable it is ground truth,
-/// costs one call, and can't be confused by selection behaviour. The ⌘A ⌘C
+/// costs one call, and can't be confused by selection behavior. The ⌘A ⌘C
 /// pasteboard readback is the fallback for apps that expose no accessible text
 /// — but it is fragile (⌘A means "select the whole scrollback" in a terminal,
 /// and an app that ignores ⌘C is indistinguishable from an empty field), so it
@@ -343,7 +343,7 @@ final class TypingDiagnostics: ObservableObject {
         for policy in [LiveTyper.ChunkPolicy.fixedUTF16(16), .graphemeSafe(maxUnits: 16)] {
             let name: String
             if case .fixedUTF16 = policy {
-                name = "Chunking — fixed 16 units (old behaviour)"
+                name = "Chunking — fixed 16 units (old behavior)"
             } else {
                 name = "Chunking — grapheme-safe (shipping)"
             }

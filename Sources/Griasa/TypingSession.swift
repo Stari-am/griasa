@@ -39,9 +39,9 @@ final class TypingSession {
         case nothingTyped
     }
 
-    /// The intake side, reachable from any thread and synchronised by `lock`
+    /// The intake side, reachable from any thread and synchronized by `lock`
     /// rather than by the actor. `nonisolated(unsafe)` states exactly that: the
-    /// compiler is being told the synchronisation is the lock's job here, and
+    /// compiler is being told the synchronization is the lock's job here, and
     /// nowhere else in this type.
     private nonisolated let lock = NSLock()
     private nonisolated(unsafe) var queue: [String] = []

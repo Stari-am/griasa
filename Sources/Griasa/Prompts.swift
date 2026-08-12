@@ -3,7 +3,7 @@ import Foundation
 /// Every system prompt Griasa sends to an LLM, in one place.
 ///
 /// They used to be inline string literals scattered across ten files, which
-/// made the app's actual behaviour impossible to review or adjust without
+/// made the app's actual behavior impossible to review or adjust without
 /// hunting through the source. Reading them here should be enough to know what
 /// the app asks a model to do.
 ///
@@ -21,7 +21,7 @@ import Foundation
 ///
 /// The prompt-preset library (PromptPresets.swift) is deliberately not here:
 /// those are user-owned documents edited in Settings and persisted per user, not
-/// app behaviour.
+/// app behavior.
 enum Prompts {
     enum Key: String, CaseIterable {
         /// Dictation cleanup — the fast pass over recognized speech.

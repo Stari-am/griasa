@@ -53,7 +53,7 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
     /// The hub's window, for `--shoot` documentation screenshots.
     var window: NSWindow? { panel }
 
-    /// Resizes the hub, keeping it centred — `--size 1100x760` for a screenshot
+    /// Resizes the hub, keeping it centered — `--size 1100x760` for a screenshot
     /// that doesn't look cramped.
     func resize(to size: NSSize) {
         guard let panel else { return }
@@ -81,7 +81,7 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
     }
 
     /// The ✕ on a tab — routed through the owning flow so pending work is
-    /// cancelled properly (orphan clip cleanup, unblocking the meeting
+    /// canceled properly (orphan clip cleanup, unblocking the meeting
     /// pipeline), not just hidden.
     func requestClose(_ tab: HubTab) {
         switch tab {

@@ -30,7 +30,7 @@ signed with a Developer ID, notarized by Apple, universal (Apple silicon and Int
 
 **Dictation.** Hold a key and talk; the words appear in whatever app has focus,
 while you are still speaking, and are replaced once by a polished version on
-release. Speech recognition is local — Apple's recogniser or `whisper.cpp`
+release. Speech recognition is local — Apple's recognizer or `whisper.cpp`
 (large-v3-turbo, installed on first launch). Two or three languages run as
 parallel recognition legs and the winner is locked in for the utterance.
 
@@ -56,4 +56,4 @@ including Ollama, or the `claude` / `codex` CLI you already pay for — no API k
 in that last case. With Ollama plus local Whisper, nothing leaves the Mac at all.
 
 **Requires** macOS 14 or later. Homebrew only if you want the local Whisper
-engine; without it the app says so and keeps working on Apple's recogniser.
+engine; without it the app says so and keeps working on Apple's recognizer.

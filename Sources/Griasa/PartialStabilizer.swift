@@ -22,7 +22,7 @@ import Foundation
 /// utterance stay uncommitted until more audio confirms them, so the live text
 /// trails the voice slightly. The polished transcription that lands on hotkey
 /// release completes and corrects it in one edit — which is also why committed
-/// words don't need to chase every capitalisation and comma the recognizer
+/// words don't need to chase every capitalization and comma the recognizer
 /// changes its mind about.
 struct PartialStabilizer {
     /// The chosen language leg. Switching legs mid-utterance would rewrite the

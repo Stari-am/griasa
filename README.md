@@ -15,6 +15,16 @@ Made for anyone tired of installing a separate app for every small thing — and
 
 Free, and nothing is held back: there is no licence check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
 
+Think of it the way you think of WinRAR: the trial never ends and it keeps working whether or not you pay. WinRAR apparently makes real money like that, which leaves the mystery nobody has solved in thirty years — *somebody* pays. Feel free to be one of the somebodies.
+
+![The Griasa hub with one recorded meeting open: summary, key points, open questions, per-person action items and a timestamped transcript](docs/screenshot-history.png)
+
+*One recorded meeting after it ended. Nothing in that pane was typed by hand.*
+
+![The Commitments tab, split into My promises and Waiting on others, each item with a due date and the meeting it came from](docs/screenshot-commitments.png)
+
+*The same meetings read a different way: what you owe, and what you are owed.*
+
 ## How dictation behaves
 
 | | |
@@ -103,7 +113,7 @@ After granting Accessibility or Screen Recording, quit and relaunch Griasa.
 1. Click into any text field in any app.
 2. **Hold Right Option (⌥)** — the menu-bar mic fills in.
 3. Speak — **words appear live at your cursor as you talk** (instant on-device recognizer).
-4. Release the key — the live text is corrected in place with the polished Whisper + Claude version (only the differing tail is rewritten, via a diff of synthetic keystrokes).
+4. Release the key — the live text is corrected in place with the polished Whisper + AI-cleaned version (only the differing tail is rewritten, via a diff of synthetic keystrokes).
 
 Live typing can be turned off in Settings → Dictation (then everything is pasted once at the end) — useful in apps where synthetic keystrokes misbehave (e.g. fields with aggressive autocomplete).
 
@@ -145,12 +155,12 @@ Griasa keeps a local **`whisper-server`** running with the model loaded, so dict
 
 Mixed-in **English tech/crypto terms** are handled two ways:
 - A built-in vocabulary ([Vocabulary.swift](Sources/Griasa/Vocabulary.swift): GitHub, deploy, staking, jetton, seed phrase, mainnet…) plus your own terms from Settings is fed to Whisper as an initial prompt and to Apple recognizers as contextual hints.
-- Claude's prompts instruct it to keep English terms untranslated and to fix phonetically transliterated ones ("гит хаб" → "GitHub") while never translating the rest of the text.
+- The cleanup prompt instructs the model to keep English terms untranslated and to fix phonetically transliterated ones ("гит хаб" → "GitHub") while never translating the rest of the text.
 
 ### Prompt presets on selected text (any app)
 Select text anywhere — browser, Slack, PDF — and apply a **prompt preset** from the menu or its hotkey. Ships with Summarize (⌃⌥⌘S), Fix grammar (⌃⌥⌘G), Translate to English, Make it professional, To bullet points, and Rewrite as commit message. Editable presets that rewrite the text (grammar, translate…) show a *Replace Selection* button; summaries don't.
 
-**Add your own** in Settings → AI & Actions: name, emoji, the instruction to Claude, whether it replaces the selection, and an optional hotkey. Defaults use the triple-modifier ⌃⌥⌘ because global hotkeys on macOS can't be swallowed — the frontmost app also receives the keystroke, so the combo must be one no app binds. Griasa waits for you to release the modifiers before reading the selection (synthesizing ⌘C while modifiers are held can reach some apps as plain text and wipe the selection); your clipboard is saved and restored.
+**Add your own** in Settings → AI & Actions: name, emoji, the instruction to the model, whether it replaces the selection, and an optional hotkey. Defaults use the triple-modifier ⌃⌥⌘ because global hotkeys on macOS can't be swallowed — the frontmost app also receives the keystroke, so the combo must be one no app binds. Griasa waits for you to release the modifiers before reading the selection (synthesizing ⌘C while modifiers are held can reach some apps as plain text and wipe the selection); your clipboard is saved and restored.
 
 ### History & export
 Every dictation, meeting transcript, and preset result is saved to a searchable **History** window (menu → History…). Search full text, then Copy, Insert, Reveal File, or **Export**. Stored locally in `~/Library/Application Support/Griasa/history.json` (last 500 entries).
@@ -164,7 +174,7 @@ Markdown imports cleanly into Notion/Obsidian/GitHub; HTML and RTF paste with fo
 ### Capture (any app)
 Four system-wide actions, each with a menu item and a configurable hotkey (Settings → Capture):
 
-- **⏰ Remind me** (⌃⌥⌘R) — from selected text, or drag a screen region if nothing is selected. A Slack-style menu pops up at the cursor: **In 20 minutes / In 1 hour / In 3 hours / Tomorrow 9:00 / Next week Mon 9:00 / Custom… (date picker)**, plus *From the text* where Claude reads the due date out of the text itself ("завтра в 3", "in 2 hours"). Fixed times work without an API key. The reminder lands in the **Reminders app**, so it syncs to your iPhone/Watch. Every reminder records **where it came from**: the source app and window title (Slack workspace/channel, Telegram chat) in the notes, and for browsers the tab URL with a scroll-to-text anchor to the captured text — attached as the reminder's link, one click back to the exact spot. Region-drag reminders also save the clipped image to `Documents/Griasa/Reminders/` and link it from the reminder (EventKit can't attach files directly), so you keep the pixels, not just the OCR text. ([ReminderSource.swift](Sources/Griasa/ReminderSource.swift); browser URLs need a one-time Automation permission per browser.)
+- **⏰ Remind me** (⌃⌥⌘R) — from selected text, or drag a screen region if nothing is selected. A Slack-style menu pops up at the cursor: **In 20 minutes / In 1 hour / In 3 hours / Tomorrow 9:00 / Next week Mon 9:00 / Custom… (date picker)**, plus *From the text* where the model reads the due date out of the text itself ("завтра в 3", "in 2 hours"). Fixed times work without an API key. The reminder lands in the **Reminders app**, so it syncs to your iPhone/Watch. Every reminder records **where it came from**: the source app and window title (Slack workspace/channel, Telegram chat) in the notes, and for browsers the tab URL with a scroll-to-text anchor to the captured text — attached as the reminder's link, one click back to the exact spot. Region-drag reminders also save the clipped image to `Documents/Griasa/Reminders/` and link it from the reminder (EventKit can't attach files directly), so you keep the pixels, not just the OCR text. ([ReminderSource.swift](Sources/Griasa/ReminderSource.swift); browser URLs need a one-time Automation permission per browser.)
 - **🔤 OCR region** (⌃⌥⌘O) — drag a rectangle; the text inside is recognized on-device (Apple Vision, RU+EN, offline) and copied to your clipboard. Works on images, PDFs, and someone else's shared screen.
 - **💬 Draft reply** (⌃⌥⌘Y) — reads the frontmost chat window via OCR and drafts a contextual reply in the thread's language and tone. Universal: Telegram, Slack, Gmail, any app. *Replace Selection* pastes it back.
 - **Run on clipboard** (menu) — run any prompt preset against the current clipboard contents, no selection needed.
@@ -181,36 +191,36 @@ Screen/window capture reuses the Screen Recording permission; Remind asks once f
 - **📋 Meeting prep** — a few minutes before a calendar event with participants or a call link (lead time configurable, Settings → Meetings), the Prep tab slides in **without stealing your keyboard focus**: who's on the call (with your notes and their open-promise counts), what last meeting with these people was about, what you promised them and they promised you — and a **Join & Record** button that opens the Zoom/Meet/Teams link and starts recording in one go. Also on demand: menu → *Prep Next Meeting*. ([MeetingPrep.swift](Sources/Griasa/MeetingPrep.swift))
 - **📄 New Document** — pick a template (PRD, RFC, One-pager, Postmortem — all editable, add your own in Settings → AI & Actions), talk or paste a brief, and the smart model fills the template's sections. Where the brief is silent it writes an honest *TBD* with the question that would fill it — it never invents facts. The result is editable in place, copies with a click, and saves to History where it's auto-filed into a project. ([DocTemplates.swift](Sources/Griasa/DocTemplates.swift))
 
-### Projects (organize everything + ask Claude about it)
-Every history entry — dictation, meeting, capture result — is filed into a **project** automatically: Claude (Haiku) matches the entry against each project's name and description (Settings → Projects), falling back to **Inbox** when unsure or offline. Re-assign any entry from the History window (project picker in the detail pane, filter in the sidebar), and run **Categorize existing history** once to file everything recorded before the feature existed.
+### Projects (organize everything + ask questions about it)
+Every history entry — dictation, meeting, capture result — is filed into a **project** automatically: the fast model matches the entry against each project's name and description (Settings → Projects), falling back to **Inbox** when unsure or offline. Re-assign any entry from the History window (project picker in the detail pane, filter in the sidebar), and run **Categorize existing history** once to file everything recorded before the feature existed.
 
 Each project is mirrored on disk as plain Markdown: `~/Documents/Griasa/Projects/<Project>/YYYY-MM-DD-HHmm-<kind>-<id>.md` with YAML frontmatter — browsable, git/Obsidian-friendly, and never deleted (removing a project moves its files to Inbox).
 
-**🗂 Ask project** (⌃⌥⌘P or menu) opens a window where Claude (Opus) answers questions using the project's entries **plus attached source folders** as context — attach a repo, a docs folder, anything; text files are read newest-entries-first up to ~150k characters. Answers are saved back into the project's history. ([Projects.swift](Sources/Griasa/Projects.swift), [ProjectFiles.swift](Sources/Griasa/ProjectFiles.swift), [ProjectAI.swift](Sources/Griasa/ProjectAI.swift), [AskProjectWindow.swift](Sources/Griasa/AskProjectWindow.swift))
+**🗂 Ask project** (⌃⌥⌘P or menu) opens a window where the smart model answers questions using the project's entries **plus attached source folders** as context — attach a repo, a docs folder, anything; text files are read newest-entries-first up to ~150k characters. Answers are saved back into the project's history. ([Projects.swift](Sources/Griasa/Projects.swift), [ProjectFiles.swift](Sources/Griasa/ProjectFiles.swift), [ProjectAI.swift](Sources/Griasa/ProjectAI.swift), [AskProjectWindow.swift](Sources/Griasa/AskProjectWindow.swift))
 
 ### Live notes during a call
-Enable *Show live notes while recording* (Settings → Meetings). While a recording runs, the hub's **Recording tab** transcribes both tracks in ~18-second chunks against the warm Whisper server and shows a **running summary** (headline, key points, open questions, action items). The summary refreshes with Claude every minute when the **Auto** toggle is on, or only when you press **⟳ Summarize now** — your choice. Below the transcript there's a **note field**: anything you type is pinned into the transcript at the current timecode (📝 rows), fed to the live summary as high-signal input, and woven into the final meeting notes — Claude reflects your notes in the Summary/Key points/Action items and keeps them in the transcript as `> 📝 **Note [mm:ss]:**` blockquotes.
+Enable *Show live notes while recording* (Settings → Meetings). While a recording runs, the hub's **Recording tab** transcribes both tracks in ~18-second chunks against the warm Whisper server and shows a **running summary** (headline, key points, open questions, action items). The summary refreshes every minute when the **Auto** toggle is on, or only when you press **⟳ Summarize now** — your choice. Below the transcript there's a **note field**: anything you type is pinned into the transcript at the current timecode (📝 rows), fed to the live summary as high-signal input, and woven into the final meeting notes — the model reflects your notes in the Summary/Key points/Action items and keeps them in the transcript as `> 📝 **Note [mm:ss]:**` blockquotes.
 
 ### One hub window instead of popup sprawl
 Everything lives in a single floating **hub window with tabs**: action results, the live Recording tab, the Custom-reminder date picker, the "who was on the call?" question, Ask Project, and History. A busy moment — recording a call while setting a reminder off a preset result — is one window with three tabs, not three windows fighting for focus. Closing a tab resolves its flow properly (a dismissed reminder deletes its orphan clip; closing the participants tab counts as "Skip" so the transcription pipeline never stalls). Only Settings (the standard macOS settings scene) and system dialogs (file save/open, the region-drag capture overlay) stay outside. ([HubWindow.swift](Sources/Griasa/HubWindow.swift))
 
 ### Speaker names
-Set *Your name* and enable *Ask who was on the call* (Settings → Meetings). When a recording stops, Griasa asks which known people took part (roster is remembered) plus any new names, and Claude attributes the transcript to real names — using conversational cues like self-introductions and people addressing each other by name — instead of generic "You"/"Them". This is content-based attribution (the two tracks are mic vs. everything-else, not per-speaker audio), so it's most accurate with the roster provided.
+Set *Your name* and enable *Ask who was on the call* (Settings → Meetings). When a recording stops, Griasa asks which known people took part (roster is remembered) plus any new names, and the model attributes the transcript to real names — using conversational cues like self-introductions and people addressing each other by name — instead of generic "You"/"Them". This is content-based attribution (the two tracks are mic vs. everything-else, not per-speaker audio), so it's most accurate with the roster provided.
 
-### Meeting recording + Claude transcription
+### Meeting recording + AI transcription
 - Menu bar → **Start Recording** (or enable *Start recording when Griasa launches* in Settings for always-on capture).
 - When you **stop** a recording, Griasa automatically:
-  1. Transcribes both tracks **on-device** in 30-second chunks with timestamps (the Claude API doesn't accept audio, so speech-to-text always stays local — only text leaves the machine).
+  1. Transcribes both tracks **on-device** in 30-second chunks with timestamps (every supported provider is text-only, so speech-to-text always stays local — only text leaves the machine).
   2. Interleaves them chronologically into a `You:` / `Them:` dialogue (`transcript-raw.txt`).
-  3. Sends the dialogue to **Claude (Opus 4.8)**, which fixes recognition errors and produces `meeting-transcript.md` with a summary, key points, action items, and a cleaned speaker-labeled transcript — then opens it (toggleable).
+  3. Sends the dialogue to the configured **smart model**, which fixes recognition errors and produces `meeting-transcript.md` with a summary, key points, action items, and a cleaned speaker-labeled transcript — then opens it (toggleable).
 - Without an API key, you still get the raw merged transcript in `meeting-transcript.md`.
 - Each session folder in `~/Documents/Griasa Recordings/<timestamp>/` contains:
   - `microphone.caf` — your voice
   - `system-audio.caf` — everything the Mac played (call participants, videos…)
   - `transcript-raw.txt` — timestamped merged dialogue
-  - `meeting-transcript.md` — Claude-formatted meeting notes
-- Every finished transcript is **also copied to the Claude project folder** (default `~/work/wispr/transcripts/`, configurable in Settings), so Claude Code sessions in that project can read your meetings. (claude.ai Projects have no public upload API, so a project-local folder is the integration point.)
-- The menu-bar icon shows a red record badge while a session is running, and the menu shows progress while Claude is working.
+  - `meeting-transcript.md` — AI-formatted meeting notes
+- Optionally, every finished transcript is **also copied to a mirror folder** you nominate (Settings → Folders → *Transcript mirror folder*; empty by default, so nothing is duplicated unless you ask). Point it at a coding agent's project directory, an Obsidian vault, or a git repo and your meetings show up there as plain Markdown.
+- The menu-bar icon shows a red record badge while a session is running, and the menu shows progress while the model is working.
 
 > ⚠️ **Consent**: recording calls may require consent from all participants depending on your jurisdiction (many places are two-party-consent). Tell people you're recording.
 
@@ -232,7 +242,7 @@ Sources/Griasa/
 ├── WhisperTranscriber.swift # whisper.cpp integration (preferred engine)
 ├── WhisperInstaller.swift   # First-launch auto-install: brew + model download
 ├── FileTranscriber.swift    # Apple-recognizer fallback (chunked, timestamped)
-├── MeetingTranscriber.swift # Merge tracks + Claude meeting-notes formatting
+├── MeetingTranscriber.swift # Merge tracks + AI meeting-notes formatting
 ├── Permissions.swift        # TCC requests/status
 ├── SelectionActions.swift   # Global preset hotkeys, selection grab
 ├── PromptPresets.swift      # Prompt-preset model + store (built-in + custom)
@@ -252,7 +262,7 @@ Sources/Griasa/
 ├── ReminderSource.swift     # source app / window / tab URL for reminders
 ├── Projects.swift           # Project model + store (auto-categorized history)
 ├── ProjectFiles.swift       # Markdown mirror: one .md per entry per project
-├── ProjectAI.swift          # Claude classification + Ask Project context/Q&A
+├── ProjectAI.swift          # AI classification + Ask Project context/Q&A
 ├── AskProjectWindow.swift   # Ask Project window (question → answer over context)
 ├── Exporter.swift           # Markdown → MD/PDF/HTML/RTF/plain export + rich copy
 ├── Prompts.swift            # EVERY system prompt, in one place (JSON-overridable)
@@ -280,7 +290,7 @@ Sources/Griasa/
 
 Design notes:
 - **One mic tap, many consumers** — `MicCapture` installs a single `AVAudioEngine` tap and fans buffers out, so dictation and recording never fight over the input device.
-- **Privacy-first transcription** — Apple's recognizer runs on-device when the locale supports it (`requiresOnDeviceRecognition`). Only the short *cleanup* step sends text (never audio) to the Claude API, and only if you enable it.
+- **Privacy-first transcription** — Apple's recognizer runs on-device when the locale supports it (`requiresOnDeviceRecognition`). Only the short *cleanup* step sends text (never audio) to the configured provider, and only if you enable it.
 - **System audio via ScreenCaptureKit** — the supported way to capture app audio on macOS 13+; video leg is configured to a 2×2 px, 1 fps stream and discarded.
 
 ## Known limitations / ideas
@@ -289,7 +299,7 @@ Design notes:
 - No personal dictionary or hands-free toggle mode yet. `Prompts.swift` (key `dictationCleanup`) is the place to inject a custom dictionary.
 - Recordings are kept as two separate tracks rather than a mixed file; that's deliberate (cleaner transcripts) but a `ffmpeg -filter_complex amix` post-step could produce a single file.
 - The model is **large-v3-turbo** — per published benchmarks it trails full large-v3 by only ~0.4 pp WER on average while being ~4× faster, which suits both dictation latency and meeting throughput. If maximum Russian accuracy ever matters more than speed, swap `ggml-large-v3.bin` into `~/Library/Application Support/Griasa/` (3 GB) and update the filename in `WhisperTranscriber.swift`.
-- Whisper detects one language per speech region; heavy mid-sentence code-switching may come out in the dominant language (Claude's cleanup pass fixes the tech terms).
+- Whisper detects one language per speech region; heavy mid-sentence code-switching may come out in the dominant language (the AI cleanup pass fixes the tech terms).
 - Apple-fallback language detection runs one recognizer per configured language in parallel — keep the language list short (2–3).
 
 ## License

@@ -115,6 +115,20 @@
   .support b { color: var(--accent); font-weight: 660; }
   footer { margin: 4.5rem 0 5rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
   footer a { color: var(--accent); }
+
+  /* Screenshots are captured in light appearance; on the dark page a bare
+     white window glares, so it sits on a muted plate with a rule around it. */
+  figure.shot { margin: 30px 0; }
+  figure.shot img {
+    display: block; width: 100%; height: auto;
+    border: 1px solid var(--rule); border-radius: 10px; background: var(--card);
+  }
+  figure.shot figcaption {
+    margin-top: 10px; font-size: 0.86rem; color: var(--muted); line-height: 1.5;
+  }
+  @media (prefers-color-scheme: dark) {
+    figure.shot img { border-color: #3a3630; }
+  }
 </style>
 </head>
 <body>
@@ -131,6 +145,12 @@
 </header>
 
 <p class="lede">Griasa began as dictation and kept going, because dictation on its own solves half a problem: you can say the words, and then you still have to remember what you agreed to. So the same app records the call, extracts who promised what, keeps a page per colleague, and hands you a brief before the next meeting with them.</p>
+
+<figure class="shot">
+  <img src="screenshot-history.png" width="1280" height="880"
+       alt="The Griasa hub: a list of recorded meetings and dictations on the left, and one meeting opened on the right with a summary, key points, open questions, per-person action items and a timestamped transcript.">
+  <figcaption>One recorded meeting, after it ended: summary, key points, the questions nobody could answer, who took what on, and the transcript with names and timecodes. Nothing here was typed by hand.</figcaption>
+</figure>
 
 <p>Speech recognition runs on the Mac itself — Apple's recogniser or a local <code>whisper.cpp</code> model. Only the optional text-cleanup step can reach a language model, and only if you turn it on.</p>
 
@@ -151,6 +171,12 @@
 
 <p class="quiet">None of these is a separate tool bolted on. They share one history, one project model and one AI configuration, which is the part that is actually hard to retrofit later.</p>
 
+<figure class="shot">
+  <img src="screenshot-commitments.png" width="1080" height="800"
+       alt="The Commitments tab, split into My promises and Waiting on others, each item showing its due date, the meeting it came from and who made the promise.">
+  <figcaption>The same meetings, read a different way: what you owe, and what you are owed. The split is the point — a flat list of action items is a list nobody owns.</figcaption>
+</figure>
+
 <h2>What the standard AI apps don't do</h2>
 
 <ul>
@@ -160,6 +186,13 @@
   <li><b>The meeting turns into obligations, not just a summary.</b> "I'll send it by Friday" becomes a dated item assigned to the person who said it, deduplicated against what is already open, exportable as tasks that Todoist, Things and Linear split into individual rows.</li>
   <li><b>It uses the AI subscription you already pay for.</b> If the <code>claude</code> or <code>codex</code> CLI is installed and logged in, Griasa answers through it — no API key, no second subscription. Or point it at Ollama and the whole thing runs with nothing leaving the Mac.</li>
 </ul>
+
+
+<figure class="shot">
+  <img src="screenshot-people.png" width="1080" height="800"
+       alt="A page for one colleague: notes that save themselves, an on-demand AI dossier, and every meeting held with that person.">
+  <figcaption>A page per colleague appears on its own, built from the meeting roster — no setup step, no contact to create.</figcaption>
+</figure>
 
 <h2>Why this is harder than it looks</h2>
 

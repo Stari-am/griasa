@@ -45,7 +45,7 @@
      official artwork, but the page still makes zero third-party requests. */
   .kofi img { height: 40px; width: auto; display: block; border-radius: 8px; }
   .btn { display: inline-block; padding: 12px 26px; border-radius: 980px;
-         text-decoration: none; font-weight: 600; }
+         text-decoration: none; font-weight: 600; white-space: nowrap; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { border: 1px solid var(--border); color: var(--fg); }
   /* Download and source get identical weight: the Ko-fi button above is the one
@@ -96,8 +96,8 @@
     <a class="btn btn-pair" href="https://github.com/Stari-am/griasa">View source on GitHub</a>
   </div>
   <p class="note">macOS 14+ · Apple silicon &amp; Intel · signed &amp; notarized</p>
-  <!-- TODO: replace with a real screenshot or demo GIF -->
-  <!-- <img class="shot" src="hero.png" alt="Griasa hub window with a live meeting transcript"> -->
+  <img class="shot" src="../screenshot-history.png" width="1280" height="880"
+       alt="The Griasa hub with one recorded meeting open: summary, key points, open questions, per-person action items and a timestamped transcript.">
 </header>
 
 <section>
@@ -150,7 +150,7 @@
       <p class="price">Free <span class="per">signed &amp; notarized</span></p>
       <p>The built app, ready to run: universal binary, Apple's notarization ticket stapled on, opens with a double-click. Nothing is held back and there is no licence check — there could not be a meaningful one under this licence anyway.</p>
       <div class="cta-row" style="justify-content:flex-start">
-        <a class="btn btn-primary" href="https://github.com/Stari-am/griasa/releases/latest">Download the latest release</a>
+        <a class="btn btn-primary" href="https://github.com/Stari-am/griasa/releases/latest">Download</a>
       </div>
     </div>
     <div class="card">
@@ -183,7 +183,8 @@
   <details><summary>Do I need an AI subscription?</summary>
     <p>No subscription to Griasa, ever. You bring an API key (Anthropic / OpenAI / Gemini — pay-per-use, typically cents per day) or run free local models with Ollama.</p></details>
   <details><summary>What do I get for the $29 that I don't get for free?</summary>
-    <p>Nothing, and that's deliberate. The download is the same app either way — no locked features, no licence check, and under GPL-3.0 there could not be a meaningful one: anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours, so if the app hasn't earned it yet, don't send any.</p></details>
+    <p>Nothing, and that's deliberate. The download is the same app either way — no locked features, no licence check, and under GPL-3.0 there could not be a meaningful one: anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours, so if the app hasn't earned it yet, don't send any.</p>
+    <p>Which puts Griasa squarely in the WinRAR tradition: the trial never ends, the reminder stays polite, and the thing keeps working forever whether or not you ever pay. WinRAR reportedly does perfectly well on that arrangement, which leaves the question nobody has answered in thirty years — <i>who are the people who actually pay?</i> You could be one of them.</p></details>
   <details><summary>Refunds?</summary>
     <p>Just ask and it's returned, no questions. Since nothing is gated behind the payment, you keep using the app either way.</p></details>
 </section>

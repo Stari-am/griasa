@@ -40,6 +40,21 @@ struct HistoryEntry: Identifiable, Codable, Equatable {
     /// For meetings: who was on the call (drives the People pages). Optional
     /// so history saved before this field existed still decodes.
     var participants: [String]?
+
+    /// One-line preview for the sidebar. Skips Markdown headings and strips
+    /// inline markers, because every meeting's first line is "## Summary" and a
+    /// list where every row reads the same is a list you can't scan.
+    var preview: String {
+        for raw in text.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") { continue }
+            return line
+                .replacingOccurrences(of: "**", with: "")
+                .replacingOccurrences(of: "`", with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "-*> "))
+        }
+        return text
+    }
 }
 
 /// Persistent, searchable history of everything Griasa produced. Backed by a

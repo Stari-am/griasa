@@ -177,8 +177,8 @@ private struct RecordingSettings: View {
                     .help("How many minutes before the meeting the brief appears.")
             }
             Section("Folders") {
-                TextField("Claude project folder", text: $state.claudeProjectFolder)
-                    .help("Every finished meeting transcript is also copied here, so Claude (e.g. Claude Code in that project) can read your meetings. Leave empty to disable.")
+                TextField("Transcript mirror folder", text: $state.transcriptMirrorFolder)
+                    .help("Every finished meeting transcript is also copied here — point it at a coding agent's project folder, a notes vault, a repo, anything that reads plain Markdown. Empty (the default) disables the copy.")
                 LabeledContent("Recordings folder") {
                     Button("Open") { state.openRecordingsFolder() }
                 }

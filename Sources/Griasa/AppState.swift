@@ -60,7 +60,10 @@ final class AppState: ObservableObject {
     @AppStorage("useWhisperForDictation") var useWhisperForDictation: Bool = true
     @AppStorage("liveTyping") var liveTyping: Bool = true
 
-    @AppStorage("claudeProjectFolder") var claudeProjectFolder: String = "~/work/wispr/transcripts"
+    /// Optional second home for finished meeting transcripts, so a coding agent
+    /// or any tool pointed at that folder can read them. Empty = off, which is
+    /// the default: copying meeting notes somewhere else should be a choice.
+    @AppStorage("transcriptMirrorFolder") var transcriptMirrorFolder: String = ""
 
     /// Shipped default, and the fallback whenever the setting is unusable.
     static let defaultDictationLocales = "en-US"
@@ -426,7 +429,7 @@ final class AppState: ObservableObject {
                 state.isProcessingRecording = false
                 state.lastMeetingTranscript = url
                 if let url {
-                    state.copyToClaudeProject(url)
+                    state.mirrorTranscript(url)
                     if let text = try? String(contentsOf: url, encoding: .utf8) {
                         let title = MeetingTranscriber.title(fromMarkdown: text)
                         let entryID = HistoryStore.shared.add(
@@ -492,10 +495,11 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.open(ConversationRecorder.recordingsRoot)
     }
 
-    /// Copies a finished meeting transcript into the configured Claude project
-    /// folder so Claude Code sessions in that project can read it.
-    func copyToClaudeProject(_ transcript: URL) {
-        let path = claudeProjectFolder.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Copies a finished meeting transcript into the configured mirror folder,
+    /// so whatever reads that folder — a coding agent's project directory, a
+    /// synced notes vault, a git repo — sees the meeting too.
+    func mirrorTranscript(_ transcript: URL) {
+        let path = transcriptMirrorFolder.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else { return }
         let dir = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
         do {

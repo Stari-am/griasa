@@ -42,7 +42,7 @@ struct HistoryView: View {
                             .font(.caption)
                         Text(entry.title).font(.callout).lineLimit(1)
                     }
-                    Text(entry.text)
+                    Text(entry.preview)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -53,6 +53,10 @@ struct HistoryView: View {
                 .tag(entry.id)
             }
             .searchable(text: $query, placement: .sidebar, prompt: "Search transcriptions")
+            // Open on the newest entry rather than an empty detail pane. Opening
+            // History almost always means "what did I just record", and an empty
+            // pane makes you click before you can read anything.
+            .onAppear { if selection == nil { selection = results.first?.id } }
             // Inline instead of .toolbar — the hub panel has no window toolbar.
             HStack {
                 Button(role: .destructive) { store.clear() } label: {
@@ -119,7 +123,10 @@ private struct DetailPane: View {
             }
             Divider()
             ScrollView {
-                Text(entry.text)
+                // Rendered, not raw: the app writes Markdown, so showing "##"
+                // to the person reading their own meeting notes is a leak of
+                // the format. Copy and Export still hand over the source.
+                MarkdownText(text: entry.text)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

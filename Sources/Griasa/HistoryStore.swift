@@ -178,6 +178,29 @@ final class HistoryStore: ObservableObject {
         Task.detached { ProjectFiles.write(entry: entry, projectName: projectName) }
     }
 
+    /// Part of the rename in `PersonStore.rename`. Only the stored participant
+    /// list is rewritten — the transcript text keeps the spelling that was used
+    /// at the time, because a transcript is a record of what was said and
+    /// editing it would make the notes disagree with the audio they came from.
+    /// Returns how many meetings were touched, so the UI can say what happened.
+    @discardableResult
+    func renameParticipant(_ oldName: String, to newName: String) -> Int {
+        var touched = 0
+        for index in entries.indices {
+            guard let participants = entries[index].participants,
+                  participants.contains(where: {
+                      $0.caseInsensitiveCompare(oldName) == .orderedSame
+                  }) else { continue }
+            var seen = Set<String>()
+            entries[index].participants = participants
+                .map { $0.caseInsensitiveCompare(oldName) == .orderedSame ? newName : $0 }
+                .filter { seen.insert($0.lowercased()).inserted }
+            touched += 1
+        }
+        if touched > 0 { save() }
+        return touched
+    }
+
     /// Re-run the AI meeting summary from the saved raw transcript — for
     /// meetings the AI couldn't process the first time (no provider / failure).
     /// Rebuilds the notes, updates the entry, then refreshes commitments.

@@ -71,6 +71,22 @@ final class CommitmentStore: ObservableObject {
         save()
     }
 
+    /// Part of the rename in `PersonStore.rename`. Only `owner` moves —
+    /// `sourceTitle` is the name of the meeting the promise came from, not a
+    /// person, and rewriting the promise text would edit what someone said.
+    /// Returns how many promises were reassigned.
+    @discardableResult
+    func renameOwner(_ oldName: String, to newName: String) -> Int {
+        var touched = 0
+        for index in commitments.indices
+        where commitments[index].owner.caseInsensitiveCompare(oldName) == .orderedSame {
+            commitments[index].owner = newName
+            touched += 1
+        }
+        if touched > 0 { save() }
+        return touched
+    }
+
     private static func normalize(_ text: String) -> String {
         text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ".", with: "")

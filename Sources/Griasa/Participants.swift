@@ -30,6 +30,16 @@ final class ParticipantRoster: ObservableObject {
 
     func remove(_ name: String) { names.removeAll { $0 == name } }
 
+    /// Part of the rename in `PersonStore.rename`; not meant to be called alone,
+    /// or the roster disagrees with the history it came from. Deduplicates,
+    /// because the new spelling may already be in the list.
+    func rename(_ oldName: String, to newName: String) {
+        var seen = Set<String>()
+        names = names
+            .map { $0.caseInsensitiveCompare(oldName) == .orderedSame ? newName : $0 }
+            .filter { seen.insert($0.lowercased()).inserted }
+    }
+
     private func save() {
         if let data = try? JSONEncoder().encode(names) {
             UserDefaults.standard.set(data, forKey: Self.key)

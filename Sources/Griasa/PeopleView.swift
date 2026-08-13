@@ -23,7 +23,7 @@ struct PeopleView: View {
             list
                 .frame(minWidth: 190, idealWidth: 220, maxWidth: 280)
             if let name = selected {
-                PersonDetailView(name: name)
+                PersonDetailView(name: name) { selected = $0 }
                     .id(name)  // fresh state (notes draft) per person
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -119,11 +119,18 @@ struct PeopleView: View {
 
 private struct PersonDetailView: View {
     let name: String
+    /// The list owns the selection, so a rename has to tell it which row to
+    /// select — otherwise the sidebar keeps a name that no longer exists.
+    let onRenamed: (String) -> Void
     @ObservedObject private var store = PersonStore.shared
     @ObservedObject private var commitments = CommitmentStore.shared
 
     @State private var notesDraft = ""
     @State private var saveTask: Task<Void, Never>?
+    @State private var renaming = false
+    @State private var renameDraft = ""
+    @State private var renameProblem: String?
+    @State private var renameNote: String?
 
     var body: some View {
         ScrollView {
@@ -205,12 +212,92 @@ private struct PersonDetailView: View {
         HStack(spacing: 12) {
             PersonAvatar(name: name, size: 44)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.title2.weight(.semibold))
+                HStack(spacing: 6) {
+                    Text(name).font(.title2.weight(.semibold))
+                    Button {
+                        renameDraft = name
+                        renameProblem = nil
+                        renaming = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Fix this person's name everywhere — their meetings, their promises and the roster.")
+                }
                 if let met = store.lastMet(name) {
                     Text("Last met \(met.formatted(.relative(presentation: .named)))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+            Spacer()
+            if let note = renameNote {
+                Text(note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+            }
+        }
+        .popover(isPresented: $renaming, arrowEdge: .bottom) { renamePopover }
+    }
+
+    /// Names arrive typed in a hurry, right after a call ends, so getting one
+    /// wrong is normal. This fixes it in the four places it is stored at once.
+    private var renamePopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Rename this person")
+                .font(.headline)
+            TextField("Name", text: $renameDraft)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 250)
+                .onSubmit(commitRename)
+            Text("Changes their page, the participant list of every meeting they were on, the owner of their promises, and the roster offered after the next call. Recorded transcripts keep the original spelling.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 250, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if let problem = renameProblem {
+                Text(problem)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(width: 250, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { renaming = false }
+                Button("Rename", action: commitRename)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .frame(width: 250)
+        }
+        .padding(14)
+    }
+
+    private func commitRename() {
+        switch store.rename(name, to: renameDraft) {
+        case .emptyName:
+            renameProblem = "A name can't be empty."
+        case .nameTaken:
+            renameProblem = "Someone else already has that name. Renaming can't merge two people — their notes and dossiers would have to be combined, and only you can decide how."
+        case .unchanged:
+            renaming = false
+        case .renamed(let meetings, let commitments):
+            renaming = false
+            let parts = [
+                meetings == 1 ? "1 meeting" : "\(meetings) meetings",
+                commitments == 1 ? "1 promise" : "\(commitments) promises",
+            ]
+            renameNote = "Renamed · \(parts.joined(separator: ", ")) updated"
+            // The row this view was showing is gone; the list picks the new name
+            // up on its own, and the note explains why the page changed under you.
+            onRenamed(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines))
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                withAnimation(.snappy) { renameNote = nil }
             }
         }
     }

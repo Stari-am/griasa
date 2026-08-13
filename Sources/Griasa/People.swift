@@ -93,6 +93,52 @@ final class PersonStore: ObservableObject {
         }
     }
 
+    /// Why a person can be renamed at all: the names come from a question asked
+    /// the moment a recording stops, typed in a hurry, sometimes from what a
+    /// recognizer heard. Typos are certain, and until now there was no way to
+    /// fix one — the misspelling stayed in the roster and was offered again
+    /// after the next call.
+    enum RenameResult {
+        case renamed(meetings: Int, commitments: Int)
+        case unchanged
+        /// The target name already belongs to someone else. Merging two people
+        /// means deciding what happens to two sets of notes and two dossiers,
+        /// which is a different operation — so this refuses instead of guessing.
+        case nameTaken
+        case emptyName
+    }
+
+    /// Renames a person everywhere at once. It has to be everywhere: the four
+    /// stores are joined only by the name string, so renaming in one of them
+    /// silently detaches the rest — the page loses its meetings, the open-promise
+    /// count drops to zero, and the old spelling still comes back next time the
+    /// roster is offered.
+    func rename(_ oldName: String, to proposed: String) -> RenameResult {
+        let newName = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newName.isEmpty else { return .emptyName }
+        guard newName != oldName else { return .unchanged }
+
+        // A change of case or spacing on the same person is a rename, not a
+        // collision with themselves.
+        let sameNameDifferently = newName.caseInsensitiveCompare(oldName) == .orderedSame
+        if !sameNameDifferently {
+            let taken = allNames.contains { $0.caseInsensitiveCompare(newName) == .orderedSame }
+            if taken { return .nameTaken }
+        }
+
+        if let index = people.firstIndex(where: {
+            $0.name.caseInsensitiveCompare(oldName) == .orderedSame
+        }) {
+            people[index].name = newName
+            save()
+        }
+        let meetings = HistoryStore.shared.renameParticipant(oldName, to: newName)
+        let commitments = CommitmentStore.shared.renameOwner(oldName, to: newName)
+        ParticipantRoster.shared.rename(oldName, to: newName)
+
+        return .renamed(meetings: meetings, commitments: commitments)
+    }
+
     // MARK: - Derived from history
 
     /// Meetings this person took part in — tagged entries first, plus a text

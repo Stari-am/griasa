@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.2 — 2026-08-13
+
+**A person's name can be corrected.** Names are typed in a hurry, in the question
+that appears the moment a recording stops — so typos happen, and until now one was
+permanent: nothing could change it, and the misspelling was offered again after the
+next call. The pencil beside the name on a person's page now fixes it in the four
+places a name is stored: the page, the participant list of every meeting they were
+on, the owner of their promises, and the remembered roster. It is all four at once
+because the only thing joining them is the name itself — rename in one and the page
+loses its meetings while the old spelling comes back next week.
+
+Recorded transcripts keep the original spelling. A transcript is a record of what
+was said, and rewriting it would make the notes disagree with the audio they came
+from. Renaming onto a name that already exists is refused rather than merged: two
+people becoming one means deciding what happens to two sets of notes and two
+dossiers, which is your decision, not the app's. Changing only case or spacing is
+allowed, since that is the most common correction of all.
+
+**The rules live typing must never break are now checked, not described.** `./test.sh`
+replays recognizer hypotheses and fails if emitted text ever stops growing, if a
+hypothesis that re-worded the start of an utterance extends its end, or if the
+language leg stops holding. Two of those were regressions that actually shipped in
+earlier builds. `release.sh` runs the checks before it will build anything, so a
+broken invariant costs a second instead of two notarization round trips — this is
+the first release that had to pass them.
+
 ## 1.0.1 — 2026-08-11
 
 **Meeting notes read as notes.** The detail pane was printing its own source —

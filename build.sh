@@ -21,13 +21,24 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Griasa"
 cp Support/Info.plist "$APP/Contents/Info.plist"
 
-# Make a local build say so. Both copies carry the same bundle identifier — that
-# is deliberate, since it keeps the privacy grants — but it also means macOS
-# cannot tell them apart in Privacy settings, Activity Monitor or Force Quit.
-# So this build gets the amber DEV icon and its own display name, and marks
-# itself so the menu-bar icon differs too. release.sh does none of this.
+# A local build gets its own identity: bundle identifier, name and icon.
+#
+# The identifier is the important one, and sharing it was a mistake worth
+# recording. Both builds used to be am.stari.griasa, on the theory that one
+# identifier keeps the privacy grants. TCC actually stores a grant against the
+# identifier *and the code requirement it saw*, and these two builds are signed
+# by different certificates — so whichever ran last owned the record, the other
+# was re-prompted every launch, and neither ever worked reliably. The system log
+# says it plainly: "Failed to match existing code requirement for subject
+# am.stari.griasa".
+#
+# Separate identifiers cost one round of permission prompts for the local build,
+# once, and then the two never interfere again. Settings are not shared either;
+# copy them across if you want them:
+#   defaults export am.stari.griasa - | defaults import am.stari.griasa.dev -
 cp Support/AppIcon-dev.icns "$APP/Contents/Resources/AppIcon.icns"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName Griasa Dev" \
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier am.stari.griasa.dev" \
+                        -c "Set :CFBundleName Griasa Dev" \
                         -c "Set :CFBundleDisplayName Griasa Dev" \
                         -c "Add :GriasaDevBuild bool true" \
                         "$APP/Contents/Info.plist" > /dev/null

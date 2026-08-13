@@ -2,10 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Hardened Runtime is required for notarization, and it blocks these two
-	     by default. Everything else Griasa needs (Accessibility, Screen
-	     Recording, Speech Recognition, Reminders, Calendar) is granted by the
-	     user through TCC at runtime, not by an entitlement.
+	<!-- Hardened Runtime is required for notarization, and it blocks resource
+	     access unless the entitlement is present. Accessibility, Screen
+	     Recording and Speech Recognition need no entitlement — the user grants
+	     those through TCC at runtime. EventKit is the exception, and this file
+	     used to claim otherwise: a call into EventKit from a process without the
+	     entitlement is refused at the signature level, **even after the user has
+	     granted permission in System Settings**. Everything worked in local
+	     builds because those have no Hardened Runtime, so the released app
+	     silently lost three advertised features until 1.0.3.
 
 	     Deliberately NOT sandboxed. The app controls other applications through
 	     the Accessibility API and launches whisper-server, claude and codex as
@@ -20,6 +25,18 @@
 	     the current tab's URL, so a reminder can link back to the page.
 	     Without this the notarized build loses that link silently. -->
 	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+
+	<!-- Calendar: the {slot} / {slots:3} snippet placeholders read free time, and
+	     the pre-meeting brief watches for the next event. Missing this made both
+	     dead in every signed build through 1.0.2. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+
+	<!-- Reminders: "Remind me" (⌃⌥⌘R) writes into the Reminders app so the item
+	     syncs to iPhone and Watch. Same story — refused at the signature level
+	     without this, no matter what the user granted. -->
+	<key>com.apple.security.personal-information.reminders</key>
 	<true/>
 </dict>
 </plist>

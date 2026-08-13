@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.3 — 2026-08-13
+
+**Calendar and Reminders work in the signed build.** They never have. Hardened
+Runtime — required for notarization — refuses an EventKit call from a process
+without the matching entitlement, *even after you have granted permission in
+System Settings*, and this app shipped without them. So three advertised features
+were dead in every release up to and including 1.0.2:
+
+- **"Remind me" (⌃⌥⌘R)** could not create anything in the Reminders app.
+- **`{slot}` and `{slots:3}`** could not read your calendar, so meeting proposals
+  had no free time to offer.
+- **The pre-meeting brief** never appeared, because the watcher could not see the
+  next event.
+
+All three worked in local development builds, which is exactly why it went
+unnoticed: a local build has no Hardened Runtime, so nothing was refused. The
+entitlements file even said in a comment that calendar and reminders access
+needed no entitlement. It was wrong, and a comment cannot be tested.
+
+If you granted Calendar or Reminders access to an earlier version and it did
+nothing, that was this. Update, and the permission you already gave will be used.
+
 ## 1.0.2 — 2026-08-13
 
 **A person's name can be corrected.** Names are typed in a hurry, in the question

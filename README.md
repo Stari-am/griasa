@@ -45,17 +45,19 @@ Think of it the way you think of WinRAR: the trial never ends and it keeps worki
 ## Build & run
 
 ```sh
-./build.sh        # produces Griasa.app (local dev build)
-open Griasa.app
+./build.sh        # produces "Griasa Dev.app"
+open "Griasa Dev.app"
 ./test.sh         # the invariant checks; release.sh runs these first
 ```
 
-A local build announces itself: amber **DEV** icon, "Griasa Dev" as its name in
-Privacy settings and Activity Monitor, and a squared-off menu-bar glyph. Both
-builds keep the same bundle identifier on purpose — that is what preserves your
-privacy grants — which is exactly why the local one has to be recognizable some
-other way. `release.sh` does none of it; the signed build carries the real icon
-and the real name.
+A local build announces itself: amber **DEV** icon, its own file name, "Griasa
+Dev" in Privacy settings and Activity Monitor, and a squared-off menu-bar glyph.
+It also uses its own bundle identifier, `am.stari.griasa.dev`. That last part is
+not cosmetic — macOS stores a privacy grant against the identifier *and* the
+signature it saw, so two differently-signed builds sharing one identifier
+overwrite each other's grants and both end up asking every launch. Separate
+identifiers cost one round of permission prompts, once. `release.sh` does none of
+this; the signed build carries the real identifier, icon and name.
 
 `test.sh` checks the rules live typing must never break — emitted text only ever
 grows, a hypothesis that re-words the start of an utterance may not extend its end,
@@ -118,7 +120,7 @@ You don't have to rebuild to experiment: **Settings → AI & Actions → System 
 
 The prompt-preset library (Settings → Prompt presets) is deliberately *not* in that file — those are your own documents, edited in the UI and stored per user, not app behavior.
 
-> Always run the **bundled app** (`Griasa.app`), not the bare binary — macOS permission prompts (mic, speech) need the Info.plist in the bundle.
+> Always run the **bundled app** (`Griasa Dev.app` locally, `Griasa.app` once installed), not the bare binary — macOS permission prompts (mic, speech) need the Info.plist in the bundle.
 
 ### Permissions (one-time)
 
@@ -175,7 +177,7 @@ curl -L -o ~/Library/Application\ Support/Griasa/ggml-large-v3-turbo.bin \
 
 Griasa keeps a local **`whisper-server`** running with the model loaded, so dictation transcribes near-instantly on hotkey release and meeting regions don't pay a per-call model load. When whisper-cli or the model is missing, everything falls back to the Apple recognizer.
 
-**Correct timeline on meetings**: whisper.cpp's built-in `--vad` concatenates speech chunks and re-times them continuously, so text after long pauses drifts earlier (upstream [issue #3634](https://github.com/ggml-org/whisper.cpp/issues/3634)). Griasa avoids this by running Silero VAD itself (`whisper-vad-speech-segments`), slicing each speech region out of the audio, transcribing regions individually against the warm server, and stamping each with its true start time — segments stay in real chronological order even across long silences. A headless mode re-runs the pipeline on any past recording: `./Griasa.app/Contents/MacOS/Griasa --transcribe "<recording folder>"`.
+**Correct timeline on meetings**: whisper.cpp's built-in `--vad` concatenates speech chunks and re-times them continuously, so text after long pauses drifts earlier (upstream [issue #3634](https://github.com/ggml-org/whisper.cpp/issues/3634)). Griasa avoids this by running Silero VAD itself (`whisper-vad-speech-segments`), slicing each speech region out of the audio, transcribing regions individually against the warm server, and stamping each with its true start time — segments stay in real chronological order even across long silences. A headless mode re-runs the pipeline on any past recording: `"./Griasa Dev.app"/Contents/MacOS/Griasa --transcribe "<recording folder>"`.
 
 ### Automatic language detection
 - **Whisper**: language detection is native to the model (`-l auto`) — nothing to configure.

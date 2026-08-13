@@ -1,6 +1,7 @@
 # Build products
 .build/
 Griasa.app/
+Griasa Dev.app/
 dist/
 *.dmg
 

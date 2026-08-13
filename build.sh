@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds Griasa.app from the Swift package.
+# Builds "Griasa Dev.app" from the Swift package — the local build.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -13,7 +13,10 @@ ARCH="$(uname -m)"
 swiftc -O -parse-as-library -target "${ARCH}-apple-macos14.0" \
     Sources/Griasa/*.swift -o .build/Griasa
 
-APP="Griasa.app"
+# The file name, not just CFBundleName: Spotlight and Finder list the
+# bundle by its name on disk, so two "Griasa.app" rows look identical
+# however the Info.plist is labelled.
+APP="Griasa Dev.app"
 BIN=".build/Griasa"
 
 rm -rf "$APP"
@@ -75,4 +78,4 @@ fi
 
 echo
 echo "Built $PWD/$APP"
-echo "Run:  open $APP"
+echo "Run:  open \"$APP\""

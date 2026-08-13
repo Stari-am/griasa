@@ -203,6 +203,15 @@ if (( ${#FAILED[@]} )); then
     die "verification failed (${FAILED[*]}) — this build is not fit to sell."
 fi
 
+# The staged .app has done its job — it exists to be signed, notarized and
+# verified, and the disk image is the artifact. Leaving it behind puts a second
+# "Griasa" in Spotlight and in Launch Services with the same name and icon as the
+# installed one, which is exactly the confusion this release fixed elsewhere.
+# Removed only after verification passed, so a failed run leaves it for inspection.
+rm -rf "$APP"
+
 print
 print "Ready to ship:"
 ls -lh "$DMG"
+print
+print "The staged app bundle was removed; the disk image above is the artifact."

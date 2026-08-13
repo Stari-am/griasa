@@ -12,9 +12,9 @@ spend an evening.
 ## Build and check
 
 ```sh
-./build.sh        # Griasa.app, signed locally, amber DEV icon
+./build.sh        # "Griasa Dev.app", signed locally, amber DEV icon
 ./test.sh         # the invariant checks
-open Griasa.app
+open "Griasa Dev.app"
 ```
 
 Both must be clean. **Zero warnings is the standard**, verified at deployment
@@ -66,9 +66,12 @@ silently discards writes, another reports emoji as a placeholder character. The
 harness is in the app — Settings → Dictation → *Typing reliability* — and its
 output beats any reasoning about what should happen.
 
-**Don't change the bundle identifier**, and don't replace the local signing
-certificate casually. macOS keys privacy grants to the signature, so both cost
-you and everyone testing your branch a fresh round of four permission dialogs.
+**Leave the release bundle identifier alone**, and don't replace the local
+signing certificate casually — macOS keys privacy grants to the identifier *and*
+the signature, so either change costs everyone testing your branch a fresh round
+of four permission dialogs. Local builds deliberately use a different identifier
+(`am.stari.griasa.dev`, set by `build.sh`): sharing one with the signed app made
+the two overwrite each other's grants, so neither ever worked reliably.
 
 **American spelling**, throughout code, comments and documentation. The mix was
 cleaned up in one pass; please don't reintroduce it.

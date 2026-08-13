@@ -50,6 +50,13 @@ open Griasa.app
 ./test.sh         # the invariant checks; release.sh runs these first
 ```
 
+A local build announces itself: amber **DEV** icon, "Griasa Dev" as its name in
+Privacy settings and Activity Monitor, and a squared-off menu-bar glyph. Both
+builds keep the same bundle identifier on purpose — that is what preserves your
+privacy grants — which is exactly why the local one has to be recognizable some
+other way. `release.sh` does none of it; the signed build carries the real icon
+and the real name.
+
 `test.sh` checks the rules live typing must never break — emitted text only ever
 grows, a hypothesis that re-words the start of an utterance may not extend its end,
 the language leg locks once. The first two were regressions that actually shipped;
@@ -73,6 +80,13 @@ it nothing.
 Builds on macOS 14+ with either full Xcode or the standalone Command Line Tools; runs on macOS 14+. `build.sh` compiles with `swiftc` directly, which needs no working SwiftPM — some standalone Command Line Tools installs ship a broken manifest library. `Package.swift` is equivalent and `swift build` works under full Xcode; use whichever you prefer.
 
 **Intel builds have a deadline.** Xcode 26 is the last release that runs on Intel Macs and the last that gives you `x86_64` for free. Under Xcode 27, a deployment target of 27.0 or later drops `x86_64` from `ARCHS_STANDARD` silently — no error, just an arm64-only binary — and Intel software support ends altogether in macOS 28. This project targets macOS 14.0, so `release.sh` still produces a genuine universal binary; it verifies with `lipo -archs` rather than trusting the build settings, and you should keep doing that if you ever raise the target.
+
+## Contributing
+
+Patches welcome, and so is a fork. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+build, the invariant checks, and the handful of conventions a patch is most likely
+to trip over — where prompts live, why new UI is a hub tab rather than a window,
+and why screenshots must never be taken against real data.
 
 ## Make it yours (forks & custom builds)
 

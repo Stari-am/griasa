@@ -21,6 +21,17 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Griasa"
 cp Support/Info.plist "$APP/Contents/Info.plist"
 
+# Make a local build say so. Both copies carry the same bundle identifier — that
+# is deliberate, since it keeps the privacy grants — but it also means macOS
+# cannot tell them apart in Privacy settings, Activity Monitor or Force Quit.
+# So this build gets the amber DEV icon and its own display name, and marks
+# itself so the menu-bar icon differs too. release.sh does none of this.
+cp Support/AppIcon-dev.icns "$APP/Contents/Resources/AppIcon.icns"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName Griasa Dev" \
+                        -c "Set :CFBundleDisplayName Griasa Dev" \
+                        -c "Add :GriasaDevBuild bool true" \
+                        "$APP/Contents/Info.plist" > /dev/null
+
 # Sign with a stable local identity so macOS privacy grants (mic, screen
 # recording, accessibility) survive rebuilds — an ad-hoc signature changes
 # every build and makes TCC treat each build as a new app.

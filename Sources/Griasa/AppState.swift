@@ -113,11 +113,19 @@ final class AppState: ObservableObject {
         set { hotkeyRaw = newValue.rawValue; installHotkey() }
     }
 
+    /// True in builds made by `build.sh`, which sets the flag; false in anything
+    /// `release.sh` produced. Both share a bundle identifier so privacy grants
+    /// survive, which is exactly why a local build has to announce itself some
+    /// other way — otherwise you cannot tell which one is in the menu bar.
+    static let isDevBuild = Bundle.main.object(forInfoDictionaryKey: "GriasaDevBuild") as? Bool ?? false
+
     var menuBarSymbol: String {
         if isRecording { return "record.circle.fill" }
         switch dictationStatus {
-        case .idle: return "mic"
-        case .listening: return "mic.fill"
+        // A hollow square around the glyph in local builds: visible at a glance
+        // in the menu bar without occupying more room than the normal icon.
+        case .idle: return AppState.isDevBuild ? "mic.square" : "mic"
+        case .listening: return AppState.isDevBuild ? "mic.square.fill" : "mic.fill"
         case .processing: return "ellipsis.circle"
         }
     }

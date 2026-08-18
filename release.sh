@@ -184,6 +184,40 @@ xcrun stapler staple "$DMG"
 # Apple already paid for. Failures are collected and named at the end instead.
 
 print
+# ── Do the entitlements match what the code actually calls? ──
+#
+# The bug this exists for: EventKit is refused under Hardened Runtime unless the
+# entitlement is declared, and three releases shipped without it. Nothing caught
+# it, because the only place it can fail is the signed artifact — a local build
+# has no Hardened Runtime, so every test on this machine passed.
+#
+# So the check reads the *signature of the thing about to ship* and compares it
+# against what the source imports. Each row is: if the code uses this, the
+# signature must declare that. Adding an API that needs a new entitlement fails
+# the release until it is declared — which is the opposite of a comment claiming
+# no entitlement is needed.
+print "Checking entitlements against what the code calls…"
+SIGNED_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$APP" 2>/dev/null | plutil -p - 2>/dev/null)
+
+needs() {  # <grep pattern over Sources> <entitlement key> <what breaks without it>
+    local pattern="$1" key="$2" feature="$3"
+    grep -rqE "$pattern" Sources/Griasa/*.swift || return 0
+    if ! print -- "$SIGNED_ENTITLEMENTS" | grep -q "\"$key\""; then
+        print
+        print "  The code uses $pattern but the signature does not declare $key."
+        print "  Without it macOS refuses the call even after the user grants permission,"
+        print "  so $feature would ship dead. This is what happened in 1.0 through 1.02."
+        die "entitlement missing — not shipping this."
+    fi
+    print "  ok  $key — required by $pattern"
+}
+
+needs "import EventKit"        "com.apple.security.personal-information.calendars" "free-slot snippets and the pre-meeting brief"
+needs "EKReminder|EKEntityType.reminder" "com.apple.security.personal-information.reminders" "Remind me"
+needs "AVAudioEngine|AVCaptureDevice" "com.apple.security.device.audio-input" "dictation and meeting recording"
+needs "NSAppleScript|osascript"  "com.apple.security.automation.apple-events" "the link back to a browser tab in a reminder"
+print
+
 print "Verification:"
 FAILED=()
 verify() {

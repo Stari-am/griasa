@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.0.4 — 2026-08-27
+
+**The pre-meeting brief still never appeared, and 1.0.3 was wrong about why.**
+That release added the calendar entitlement and said the permission you had
+already granted would now be used. For "Remind me" and for `{slots}` that was
+true. For the brief it was not, because nothing in the app had ever asked for
+calendar access at all.
+
+The request existed in exactly two places, both requiring you to act first: the
+`{slots}` snippet, and the "Prep next meeting" menu item. The watcher that is
+supposed to open the brief five minutes before a call checks the authorization
+status on a timer and — deliberately, so that a background timer never throws a
+dialog at somebody mid-sentence — never prompts. Nothing else asked. So the
+feature was on by default and silently dead, and because macOS does not list an
+app that has never requested a permission, it did not even appear under Privacy
+& Security → Calendars for you to grant it by hand.
+
+Griasa now asks for calendar access at launch, once, and only while the brief is
+switched on. If access is refused, the Prep tab says so instead of showing
+nothing. `release.sh` gained a check, beside the one that compares entitlements
+against the source: a feature that runs on its own and is gated on a permission
+must have a request on the launch path.
+
+**A recording no longer runs all night.** One session here ran from 19:00 to
+05:48 and wrote 8.6 GB before macOS flagged the process for exceeding its
+disk-write limit. Nothing in the app had any opinion about a recording nobody was
+speaking into.
+
+When neither the microphone nor the Mac's own audio has carried speech for a
+while, a small window asks whether to carry on. "Keep recording" restarts the
+clock, so the same wait asks again rather than never asking twice. With no answer
+at all the recording stops by itself, gets transcribed exactly as a manual stop
+would be, and the transcript ends with a line saying it stopped automatically and
+after how long. Both intervals are in Settings → Meetings → Silence, and default
+to five minutes and two. If speech resumes while the question is on screen, the
+question disappears and the recording continues — losing a meeting that was in
+progress would be the worst thing this feature could do, so it is the case with
+the most tests behind it.
+
+**Fixed a crash in the microphone path.** A crash report showed SIGSEGV with the
+program counter at zero on CoreAudio's IO thread, which is not a null object
+being read but CoreAudio calling a function pointer that no longer exists. The
+tap was being removed before the engine was stopped, so a message already on its
+way arrived after its block was freed; the engine was also being mutated from
+whichever thread happened to call in, and AVAudioEngine is not thread-safe. Every
+engine operation now happens in order on one queue, the engine stops before its
+tap is removed, and a change of audio device — sleep and wake, AirPods
+connecting, a dock — puts the microphone back instead of leaving the recording
+silently dead.
+
+**The window can be pinned.** The hub closed whenever you clicked into another
+app, which is right for a popup and wrong for reading history or working through
+commitments. The pin beside the tabs keeps it open, and remembers.
+
 ## 1.0.3 — 2026-08-13
 
 **Calendar and Reminders work in the signed build.** They never have. Hardened

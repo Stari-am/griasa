@@ -48,6 +48,19 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
     @Published var openTabs: [HubTab] = []
     @Published var selected: HubTab?
 
+    /// Pinned keeps the hub on screen when the app loses focus.
+    ///
+    /// NSPanel sets `hidesOnDeactivate` to true for itself, which is why the
+    /// hub vanishes the moment you click into another app — fine for a
+    /// transient popup, wrong for reading history or working through
+    /// commitments while switching between windows.
+    @Published var pinned: Bool = UserDefaults.standard.bool(forKey: "hubPinned") {
+        didSet {
+            UserDefaults.standard.set(pinned, forKey: "hubPinned")
+            panel?.hidesOnDeactivate = !pinned
+        }
+    }
+
     private var panel: NSPanel?
 
     /// The hub's window, for `--shoot` documentation screenshots.
@@ -109,6 +122,7 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
             panel.title = "Griasa"
             panel.level = .floating
             panel.isReleasedWhenClosed = false
+            panel.hidesOnDeactivate = !pinned
             panel.delegate = self
             panel.contentView = NSHostingView(rootView: HubView(hub: self))
             if let screen = NSScreen.main {
@@ -180,6 +194,18 @@ struct HubView: View {
                     }
                     .padding(.trailing, 4)
                 }
+                Button {
+                    hub.pinned.toggle()
+                } label: {
+                    Image(systemName: hub.pinned ? "pin.fill" : "pin")
+                        .font(.system(size: 11, weight: .medium))
+                        .rotationEffect(.degrees(hub.pinned ? 0 : 45))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(hub.pinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .help(hub.pinned
+                      ? "Unpin: the window hides when you switch apps"
+                      : "Pin: keep the window open when you switch apps")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

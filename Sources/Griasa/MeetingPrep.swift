@@ -50,15 +50,31 @@ final class MeetingPrepWatcher: ObservableObject {
     /// Occurrences already shown this run, so a brief fires once per event.
     private var shown: Set<String> = []
 
-    static var isEnabled: Bool {
+    // Nonisolated: both only read UserDefaults, and Permissions asks whether the
+    // brief is on from the launch path, before anything is on the main actor.
+    nonisolated static var isEnabled: Bool {
         UserDefaults.standard.object(forKey: "prepBriefEnabled") as? Bool ?? true
     }
-    static var leadMinutes: Int {
+    nonisolated static var leadMinutes: Int {
         UserDefaults.standard.object(forKey: "prepLeadMinutes") as? Int ?? 5
     }
 
     func start() {
         guard timer == nil else { return }
+        // Access is asked for once, here, rather than by the timer: the brief is
+        // on by default, so something has to ask, and launch is the only moment
+        // where a dialog is not an interruption. Without this the watcher below
+        // returns at its first guard on every tick, forever, in silence.
+        Permissions.requestCalendarIfNeeded()
+        if Self.isEnabled, !Permissions.calendarGranted,
+           EKEventStore.authorizationStatus(for: .event) != .notDetermined {
+            // Denied, and the brief is switched on. Say so in the tab instead of
+            // doing nothing — the user has no other way to find out, because an
+            // app in this state does not appear in Privacy & Security at all.
+            state = .empty("The pre-meeting brief is on, but Griasa has no calendar access. "
+                         + "Grant it in System Settings → Privacy & Security → Calendars, "
+                         + "or turn the brief off in Settings → Meetings.")
+        }
         let timer = Timer(timeInterval: 60, repeats: true) { _ in
             Task { @MainActor in MeetingPrepWatcher.shared.tick() }
         }

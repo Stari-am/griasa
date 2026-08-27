@@ -18,10 +18,33 @@ enum Permissions {
         if !CGPreflightScreenCaptureAccess() {
             CGRequestScreenCaptureAccess()
         }
+
+        requestCalendarIfNeeded()
+    }
+
+    /// The pre-meeting brief is on by default and its watcher deliberately
+    /// never prompts — a background timer must not throw a permission dialog at
+    /// somebody mid-sentence. Which meant nothing ever asked: calendar access
+    /// was only ever requested by the ";slots" snippet and the "Prep next
+    /// meeting" menu item, so the automatic brief stayed dead until the user
+    /// happened to trigger one of those. An app that has never asked does not
+    /// even appear under Privacy & Security → Calendars, so it could not be
+    /// granted by hand either.
+    static func requestCalendarIfNeeded() {
+        guard MeetingPrepWatcher.isEnabled,
+              EKEventStore.authorizationStatus(for: .event) == .notDetermined else { return }
+        // Held for the duration of the call: EKEventStore must outlive the
+        // request, and a temporary would be released before it returns.
+        let store = EKEventStore()
+        Task { _ = try? await store.requestFullAccessToEvents() }
     }
 
     static var accessibilityGranted: Bool { AXIsProcessTrusted() }
     static var screenRecordingGranted: Bool { CGPreflightScreenCaptureAccess() }
+    static var calendarGranted: Bool {
+        EKEventStore.authorizationStatus(for: .event) == .fullAccess
+    }
+
     static var microphoneGranted: Bool {
         AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }

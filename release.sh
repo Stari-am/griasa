@@ -218,6 +218,39 @@ needs "AVAudioEngine|AVCaptureDevice" "com.apple.security.device.audio-input" "d
 needs "NSAppleScript|osascript"  "com.apple.security.automation.apple-events" "the link back to a browser tab in a reminder"
 print
 
+# An entitlement is only half of a permission. The other half is somebody
+# actually asking for it, and the pre-meeting brief shipped for four releases
+# without that: it checked authorizationStatus on a timer, deliberately never
+# prompted, and nothing else on the launch path requested calendar access — so
+# the feature was on by default and silently dead, and the app never appeared
+# under Privacy & Security → Calendars for the user to fix it by hand.
+#
+# The rule is about automatic features only. "Remind me" and the {slots} snippet
+# ask at the moment they are used, which is the right design and is not checked
+# here — a user who presses the shortcut is present for the dialog. What must be
+# on the launch path is the permission for anything that runs on its own, because
+# there is no moment of use to hang a request on. Checked by grep, because the
+# failure was never in the logic.
+asks() {  # <status check pattern> <request pattern> <what breaks without it>
+    local gate="$1" request="$2" feature="$3"
+    grep -rqE "$gate" Sources/Griasa/*.swift || return 0
+    # Comment lines stripped first. Without that, the paragraph explaining why
+    # this check exists would satisfy the check — and a grep that its own
+    # documentation can satisfy is not a check.
+    if ! sed -E 's|//.*||' Sources/Griasa/Permissions.swift | grep -qE "$request"; then
+        print
+        print "  Something is gated on $gate, but Permissions.swift never asks for it."
+        print "  A status check with no request is a feature that can never turn on:"
+        print "  $feature would ship dead, and macOS would not list the app in"
+        print "  Privacy & Security, so the user could not grant it either."
+        die "permission never requested — not shipping this."
+    fi
+    print "  ok  $feature — gated on $gate and requested in Permissions.swift"
+}
+
+asks "authorizationStatus\(for: \.event\)" "requestFullAccessToEvents" "the pre-meeting brief"
+print
+
 print "Verification:"
 FAILED=()
 verify() {

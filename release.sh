@@ -104,6 +104,17 @@ print "Checking invariants…"
 if ! ./test.sh; then
     die "invariant checks failed — the message above names the rule that broke. Not shipping this."
 fi
+
+# A version nobody has described is not a release. Checked here, before the two
+# notarization round trips, because the alternative is writing the notes from
+# memory afterwards — which is how a changelog ends up describing a build that
+# does something else.
+CHANGELOG_HEADING="## $VERSION — "
+grep -q "^$CHANGELOG_HEADING" CHANGELOG.md || die "CHANGELOG.md has no \"$CHANGELOG_HEADING…\" section.
+  Info.plist says $VERSION. Describe it before shipping it: the release page,
+  the changelog and the built binary all have to say the same thing, and the
+  only way to keep them saying it is to have one source."
+print "  ok  CHANGELOG.md describes $VERSION"
 print
 
 # ── Build: universal, so Intel Macs are not excluded from the sale ──
@@ -277,8 +288,23 @@ fi
 # Removed only after verification passed, so a failed run leaves it for inspection.
 rm -rf "$APP"
 
+# The release page's body, extracted from the changelog rather than written a
+# second time. One text, one place to correct it.
+NOTES="$DIST/release-notes-$VERSION.md"
+awk -v want="## $VERSION — " '
+    index($0, want) == 1 { inside = 1; next }
+    inside && /^## / { exit }
+    inside { print }
+' CHANGELOG.md | sed '1{/^$/d;}' > "$NOTES"
+[[ -s "$NOTES" ]] || die "extracted release notes are empty — check the CHANGELOG.md heading format."
+
 print
 print "Ready to ship:"
 ls -lh "$DMG"
+ls -lh "$NOTES"
 print
 print "The staged app bundle was removed; the disk image above is the artifact."
+print
+print "Publish with:"
+print "  gh release create v$VERSION $DMG \\"
+print "    --title \"Griasa $VERSION\" --notes-file $NOTES"

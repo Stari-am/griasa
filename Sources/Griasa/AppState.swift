@@ -60,6 +60,13 @@ final class AppState: ObservableObject {
     @AppStorage("useWhisperForDictation") var useWhisperForDictation: Bool = true
     @AppStorage("liveTyping") var liveTyping: Bool = true
 
+    /// A recording nobody is speaking into gets a question, then stops itself.
+    /// Defaults on, because the failure it prevents is not subtle: one session
+    /// ran for eleven hours and wrote 8.6 GB before macOS complained.
+    @AppStorage("silenceWatchEnabled") var silenceWatchEnabled: Bool = true
+    @AppStorage("silenceWatchMinutes") var silenceWatchMinutes: Int = 5
+    @AppStorage("silenceReplyMinutes") var silenceReplyMinutes: Int = 2
+
     /// Optional second home for finished meeting transcripts, so a coding agent
     /// or any tool pointed at that folder can read them. Empty = off, which is
     /// the default: copying meeting notes somewhere else should be a choice.
@@ -389,13 +396,22 @@ final class AppState: ObservableObject {
                                                  myName: ParticipantRoster.shared.myName,
                                                  recorder: recorder)
             }
+            // Started last, and only once the recorder is actually running, so
+            // a failed start cannot leave a watchdog counting down against a
+            // session that never began.
+            SilenceWatch.shared.start()
         } catch {
             lastError = "Recording failed to start: \(error.localizedDescription)"
         }
     }
 
-    func stopRecording() async {
+    /// - Parameter autoStoppedAfterSilence: minutes of silence that ended the
+    ///   session, when the silence watch stopped it rather than the user. The
+    ///   number rides all the way to the bottom of the transcript, so a file
+    ///   that ends mid-sentence says why.
+    func stopRecording(autoStoppedAfterSilence: Int? = nil) async {
         guard isRecording else { return }
+        SilenceWatch.shared.stop()
         if liveNotesEnabled { LiveNotesController.shared.stop() }
         let folder = await recorder.stop()
         recorder.onSystemBuffer = nil
@@ -403,6 +419,10 @@ final class AppState: ObservableObject {
         recordingStartedAt = nil
 
         guard transcribeRecordings, let folder else { return }
+        let autoStopNote = autoStoppedAfterSilence.map {
+            "Recording stopped automatically after \($0) min without speech "
+            + "on either input, and nobody answered the prompt."
+        }
 
         // Notes typed in the live window ride into the final transcript at
         // their timecodes.
@@ -413,14 +433,17 @@ final class AppState: ObservableObject {
         if askParticipants, AIFormatter.isConfigured {
             ParticipantsPrompt.shared.ask { [weak self] names in
                 ParticipantRoster.shared.remember(names)
-                self?.runMeetingPipeline(folder: folder, participants: names, notes: meetingNotes)
+                self?.runMeetingPipeline(folder: folder, participants: names,
+                                        notes: meetingNotes, autoStopNote: autoStopNote)
             }
         } else {
-            runMeetingPipeline(folder: folder, participants: [], notes: meetingNotes)
+            runMeetingPipeline(folder: folder, participants: [], notes: meetingNotes,
+                               autoStopNote: autoStopNote)
         }
     }
 
-    private func runMeetingPipeline(folder: URL, participants: [String], notes: [LiveNote]) {
+    private func runMeetingPipeline(folder: URL, participants: [String], notes: [LiveNote],
+                                    autoStopNote: String? = nil) {
         isProcessingRecording = true
         let locales = localeList
         let vocabulary = vocabularyList
@@ -437,6 +460,12 @@ final class AppState: ObservableObject {
                 state.isProcessingRecording = false
                 state.lastMeetingTranscript = url
                 if let url {
+                    // Appended before the mirror copy is made and before the
+                    // text is read for history, so all three copies of the
+                    // transcript carry the same ending.
+                    if let autoStopNote {
+                        AppState.appendFooter(autoStopNote, to: url)
+                    }
                     state.mirrorTranscript(url)
                     if let text = try? String(contentsOf: url, encoding: .utf8) {
                         let title = MeetingTranscriber.title(fromMarkdown: text)
@@ -454,6 +483,11 @@ final class AppState: ObservableObject {
                     if state.openTranscriptWhenReady {
                         NSWorkspace.shared.open(url)
                     }
+                } else if let autoStopNote {
+                    // Nothing was transcribed, so there is no file to write the
+                    // footer into. The reason still has to reach the user
+                    // somewhere, or a session simply vanishes.
+                    state.lastError = autoStopNote + " Nothing was transcribed."
                 } else {
                     state.lastError = "No speech was detected in the recording."
                 }
@@ -520,5 +554,15 @@ final class AppState: ObservableObject {
         } catch {
             lastError = "Couldn't copy transcript to project folder: \(error.localizedDescription)"
         }
+    }
+
+    /// Adds a closing note to a finished transcript. Read-modify-write rather
+    /// than an append handle: the file is small, already closed, and this way a
+    /// missing trailing newline cannot glue the note onto the last sentence.
+    static func appendFooter(_ note: String, to url: URL) {
+        guard var text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        if !text.hasSuffix("\n") { text += "\n" }
+        text += "\n---\n\n_\(note)_\n"
+        try? text.write(to: url, atomically: true, encoding: .utf8)
     }
 }

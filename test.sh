@@ -14,7 +14,9 @@ BIN="${TMPDIR:-/tmp}/griasa-checks"
 # nothing but Foundation, which is what makes it testable in isolation.
 swiftc -O \
   Sources/Griasa/PartialStabilizer.swift \
+  Sources/Griasa/SilenceLevel.swift \
   Tests/StabilizerChecks.swift \
+  Tests/SilenceChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

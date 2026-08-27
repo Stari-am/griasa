@@ -162,6 +162,21 @@ private struct RecordingSettings: View {
                     .help("Speech-to-text runs on-device; with an Anthropic API key set, Claude then produces cleaned notes with a summary and action items.")
                 Toggle("Open the transcript when it's ready", isOn: $state.openTranscriptWhenReady)
             }
+            Section("Silence") {
+                Toggle("Ask before recording silence forever", isOn: $state.silenceWatchEnabled)
+                Stepper("Ask after: \(state.silenceWatchMinutes) min without speech",
+                        value: $state.silenceWatchMinutes, in: 1...120)
+                    .disabled(!state.silenceWatchEnabled)
+                Stepper("Then stop by itself after: \(state.silenceReplyMinutes) min",
+                        value: $state.silenceReplyMinutes, in: 1...60)
+                    .disabled(!state.silenceWatchEnabled)
+                Text("Silence means neither the microphone nor the Mac's own audio "
+                     + "carried speech. Answering \"Keep recording\" restarts the clock, "
+                     + "so the same wait asks again. With no answer the recording stops, "
+                     + "gets transcribed as usual, and the transcript says it stopped by itself.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Speakers & live notes") {
                 TextField("Your name", text: $roster.myName)
                     .help("Used to label your microphone track in transcripts.")

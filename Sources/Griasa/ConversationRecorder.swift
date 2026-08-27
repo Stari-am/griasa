@@ -38,7 +38,13 @@ final class ConversationRecorder {
         // System audio (requires Screen Recording permission). Start it first so
         // a permission failure aborts the session before we touch the mic.
         let system = SystemAudioCapture(outputURL: folder.appendingPathComponent("system-audio.caf"))
-        system.onPCMBuffer = { [weak self] buffer in self?.onSystemBuffer?(buffer) }
+        system.onPCMBuffer = { [weak self] buffer in
+            // Fed here rather than through onSystemBuffer, which live notes
+            // reassign to themselves — the watch has to see this input whether
+            // live notes are on or not.
+            SilenceWatch.shared.heard(buffer)
+            self?.onSystemBuffer?(buffer)
+        }
         try await system.start()
         systemCapture = system
 
@@ -50,6 +56,7 @@ final class ConversationRecorder {
         var micFileRef: AVAudioFile?
         do {
             try MicCapture.shared.addConsumer(micConsumerID) { [weak self] buffer, _ in
+                SilenceWatch.shared.heard(buffer)
                 do {
                     if micFileRef == nil {
                         micFileRef = try AVAudioFile(forWriting: micURL, settings: buffer.format.settings)

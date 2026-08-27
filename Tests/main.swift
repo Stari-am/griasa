@@ -1,11 +1,11 @@
 import Foundation
 
-// Entry point, kept separate from the checks so that file reads as a
+// Entry point, kept separate from the checks so those files read as a
 // description of the rules rather than as a program.
-let failed = runStabilizerChecks()
+let failed = runStabilizerChecks() + runSilenceChecks()
 if failed == 0 {
-    print("stabilizer checks: all passed")
+    print("checks: all passed")
 } else {
-    print("\nstabilizer checks: \(failed) failed")
+    print("\nchecks: \(failed) failed")
 }
 exit(failed == 0 ? 0 : 1)

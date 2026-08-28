@@ -15,8 +15,10 @@ BIN="${TMPDIR:-/tmp}/griasa-checks"
 swiftc -O \
   Sources/Griasa/PartialStabilizer.swift \
   Sources/Griasa/SilenceLevel.swift \
+  Sources/Griasa/PersonIdentity.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
+  Tests/IdentityChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

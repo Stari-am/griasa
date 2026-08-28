@@ -1,13 +1,37 @@
-# Griasa — system-wide dictation + conversation recorder for macOS
+# Griasa — what was promised, by whom, and what you walk into next
 
-A native menu-bar app (Swift/SwiftUI, no dependencies) with two modes:
+A native macOS menu-bar app (Swift/SwiftUI, no dependencies) for the part of a
+manager's week that no tool holds: who owed what, when it was last raised, and
+what is about to walk through the door.
 
-1. **Dictation** — hold a hotkey, speak, release: your speech is transcribed on-device, cleaned up by AI (filler words removed, punctuation fixed, tone matched to the app you're typing into), and inserted at the cursor of whatever app is frontmost.
-2. **Conversation recording** — records your microphone **and** everything the Mac plays (the other side of a Zoom/Meet/FaceTime call, videos, etc.) into timestamped session folders, with automatic transcripts when the session ends.
+1. **Meetings into obligations** — records your microphone **and** everything the
+   Mac plays (the other side of a Zoom/Meet/FaceTime call) into timestamped
+   session folders, transcribes them on-device, and pulls out who promised what,
+   split into what you took on and what you are waiting on.
+2. **A page per person, and a brief before the call** — every meeting with them,
+   their open promises, and, minutes before a calendar event, what you last
+   discussed with exactly these people.
+3. **Small things, in place, in other people's apps** — a reminder made from
+   anything on screen that remembers *where* it came from; abbreviations that
+   expand to live calendar slots rather than static text; a model answer that
+   replaces your question inside the field you were already typing in.
+4. **Dictation** — hold a hotkey, speak, release: transcribed on-device, cleaned
+   up by AI (filler words removed, punctuation fixed, tone matched to the app
+   you are typing into), inserted at the cursor of whatever app is frontmost.
+   Where the project started, and now the least interesting thing in it.
 
-Both modes can run at the same time — you can dictate while a conversation is being recorded.
+Everything runs at once: you can dictate while a conversation is being recorded.
 
-Made for anyone tired of installing a separate app for every small thing — and paying each one its own subscription.
+Most of these features are small — a day of work each, and Apple could ship
+several of them tomorrow. What is hard to copy is that they are one thing. The
+reminder made during a call, the promises extracted from that same call, the page
+for the person who made them and the brief before the next meeting with them all
+point at the same people and the same history. Separate apps would need separate
+integrations and would still lose the joins, because a join is not a feature any
+one of them owns.
+
+Made for anyone tired of installing a separate app for every small thing — and
+paying each one its own subscription.
 
 ## Download
 

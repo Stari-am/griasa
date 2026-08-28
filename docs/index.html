@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Griasa — one menu-bar app for dictation, meetings and follow-through on macOS</title>
-<meta name="description" content="A native macOS menu-bar app that types what you say into any app, turns recorded meetings into commitments, and runs its speech recognition on your own Mac. Built by Hayk Sargsyan.">
+<title>Griasa — meetings, promises and follow-through in one macOS app</title>
+<meta name="description" content="A native macOS menu-bar app that remembers what was promised in your meetings, by whom, and hands you a brief before the next one. Records and transcribes on your own Mac; also types what you say into any app. Built by Hayk Sargsyan.">
 
 <!-- Link previews. Without these, posting the URL anywhere — LinkedIn, X,
      Telegram, Slack — renders a bare link with no title, text or image. og:image
      must be absolute; relative paths are ignored by every scraper. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Griasa">
-<meta property="og:title" content="Griasa — dictation, meetings and follow-through, on your own Mac">
-<meta property="og:description" content="One macOS menu-bar app that types what you say into any app, and turns the meetings you record into the things you owe people. Speech recognition runs locally. Free and open source.">
+<meta property="og:title" content="Griasa — what was promised, by whom, and what happens next">
+<meta property="og:description" content="One macOS menu-bar app that turns the meetings you record into the things you owe people — and hands you a brief before the next call. Everything is transcribed on your own Mac. Free and open source.">
 <meta property="og:url" content="https://stari-am.github.io/griasa/">
 <meta property="og:image" content="https://stari-am.github.io/griasa/og.png">
 <meta property="og:image:width" content="1200">
@@ -157,7 +157,7 @@
 
 <header>
   <h1>Griasa</h1>
-  <p class="tagline">One macOS menu-bar app that types what you say into any app, and turns the meetings you record into the things you owe people.</p>
+  <p class="tagline">One macOS menu-bar app that keeps track of what was promised, by whom, and what you walk into next.</p>
   <div class="meta">
     <span>Native Swift · macOS 14+</span>
     <span>GPL-3.0</span>
@@ -165,7 +165,7 @@
   </div>
 </header>
 
-<p class="lede">Griasa began as dictation and kept going, because dictation on its own solves half a problem: you can say the words, and then you still have to remember what you agreed to. So the same app records the call, extracts who promised what, keeps a page per colleague, and hands you a brief before the next meeting with them.</p>
+<p class="lede">The work a manager loses is not the words — it is who owed what, and when it was last raised. So Griasa records the call, extracts who promised what, keeps a page per colleague, and hands you a brief before the next meeting with them. It also types what you say into any app, which is where it started and is now the least interesting thing about it.</p>
 
 <div class="top-cta">
   <p class="support"><b>$29 makes my day — but any amount does</b>, and none is fine too. The app is free either way: there is no license check, and under GPL-3.0 there could not be a meaningful one.</p>
@@ -191,18 +191,20 @@
 <h2>What it does, in one place</h2>
 
 <ul>
-  <li><b>Hold a key and talk.</b> The words appear in whatever app has focus — Telegram, Slack, a terminal, a browser field — while you are still speaking.</li>
   <li><b>Record a meeting</b> from system audio and the microphone together, and get a transcript with speaker names and your own live notes woven in.</li>
   <li><b>Commitments</b> are pulled out of that transcript automatically — who took what on and by when — split into what you promised and what you are waiting on. One click sends any of them to Apple Reminders.</li>
   <li><b>A page per person</b>, built from the meeting roster with no setup: every meeting with them, their open promises, and an on-demand dossier written from the transcripts they appear in.</li>
   <li><b>A brief before the call.</b> Minutes before a calendar event, what you last discussed, what each of you promised, and a button that opens the Zoom or Meet link and starts recording in one go.</li>
-  <li><b>Typed abbreviations</b> that expand in place, anywhere, with live values rather than static text.</li>
   <li><b>Remind me, from anything on screen</b> (⌃⌥⌘R). Select a line in Slack, Telegram, Mail or a browser — or drag a rectangle over a part of the screen that isn't selectable at all — and a small menu opens at the cursor: in 20 minutes, an hour, three hours, tomorrow at nine, next Monday, a date picker, or <i>from the text</i>, where the model reads the deadline out of the sentence itself. It lands in Apple Reminders, so it reaches your phone and watch.</li>
+  <li><b>Typed abbreviations</b> that expand in place, anywhere, with live values rather than static text.</li>
+  <li><b>Hold a key and talk.</b> The words appear in whatever app has focus — Telegram, Slack, a terminal, a browser field — while you are still speaking.</li>
   <li><b>Capture from any window</b> — the same selection or rectangle also becomes plain text via OCR, or a reply drafted from the conversation actually visible on screen.</li>
   <li><b>Projects</b> that everything files itself into, and which you can then ask questions about across your own history.</li>
 </ul>
 
-<p class="quiet">None of these is a separate tool bolted on. They share one history, one project model and one AI configuration, which is the part that is actually hard to retrofit later.</p>
+<p>Most of these are small. Any competent engineer could build any one of them in a day, and Apple could ship several with a snap of the fingers — worth saying plainly, because they could, and they have not. Each serves somebody with a full calendar rather than a segment that moves a metric, and none of them demos on a stage.</p>
+
+<p class="quiet">The part that is actually hard to copy is not on the list. It is that these are one thing: the reminder you make during a call, the promises extracted from that same call, the page for the person who made them, and the brief that greets you before the next meeting with them all point at the same people and the same history. Five separate apps would need five integrations and would still lose the joins, because a join is not a feature any one of them owns.</p>
 
 <figure class="shot">
   <img src="screenshot-commitments.png" width="1080" height="800"
@@ -213,14 +215,15 @@
 <h2>What the standard AI apps don't do</h2>
 
 <ul>
-  <li><b>It types into other people's apps, not into its own box.</b> Most assistants give you a text area and a copy button. Griasa puts the words where your cursor already is, as you speak, and never overwrites what you typed yourself.</li>
   <li><b>A reminder that remembers where it came from.</b> Every item records the app and window it was created in — the Slack channel, the Telegram chat — and in a browser it carries the tab's URL with a text anchor, so one click on the reminder scrolls you back to the exact paragraph three days later. Rectangle captures keep the clipped image too. Other tools save the words; the thing you actually need at the deadline is the context, and reconstructing "where did I read this" is the work nobody accounts for.</li>
-  <li><b>You can ask a model mid-sentence, in someone else's window.</b> Type <code>;ai what's the capital of Armenia ;;</code> inside a chat composer and the question is replaced in place by the answer. No window switch, no paste.</li>
   <li><b>Abbreviations expand to real data.</b> <code>{slots:3}</code> becomes three genuinely free slots read from your calendar; <code>{commitments}</code> becomes your actually-open promises. Not a template you fill in afterwards.</li>
+  <li><b>You can ask a model mid-sentence, in someone else's window.</b> Type <code>;ai what's the capital of Armenia ;;</code> inside a chat composer and the question is replaced in place by the answer. No window switch, no paste.</li>
   <li><b>The meeting turns into obligations, not just a summary.</b> "I'll send it by Friday" becomes a dated item assigned to the person who said it, deduplicated against what is already open, exportable as tasks that Todoist, Things and Linear split into individual rows.</li>
   <li><b>It uses the AI subscription you already pay for.</b> If the <code>claude</code> or <code>codex</code> CLI is installed and logged in, Griasa answers through it — no API key, no second subscription. Or point it at Ollama and the whole thing runs with nothing leaving the Mac.</li>
+  <li><b>It types into other people's apps, not into its own box.</b> Most assistants give you a text area and a copy button. Griasa puts the words where your cursor already is, as you speak, and never overwrites what you typed yourself.</li>
 </ul>
 
+<p class="quiet">Some of this will arrive in the operating system, and the inline model answer is the obvious candidate — a rebuilt Siri should do exactly that, and probably will. What does not arrive that way is a record of what was promised, by whom, across months of calls, tied to the people you actually work with. Operating systems ship features; so do the startups shipping the same three. Nobody ships the joins between them, because the joins are somebody's job rather than a product category.</p>
 
 <figure class="shot">
   <img src="screenshot-people.png" width="1080" height="800"

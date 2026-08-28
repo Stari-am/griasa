@@ -16,9 +16,11 @@ swiftc -O \
   Sources/Griasa/PartialStabilizer.swift \
   Sources/Griasa/SilenceLevel.swift \
   Sources/Griasa/PersonIdentity.swift \
+  Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
+  Tests/MCPChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

@@ -1,6 +1,16 @@
 # Changelog
 
-## 1.0.5 — 2026-08-28
+## Unreleased
+
+**The welcome guide had been describing a different app.** It opened on
+dictation, and promised three system permissions at a point where Griasa asks
+for four — the calendar request that makes the brief work is asked at launch,
+so a new user met a dialog the guide had not mentioned. It now leads with
+recording a conversation and the promises that come out of it, lists the
+calendar row alongside the other three with what declining costs, and says
+where the MCP endpoint is and that it is off until you switch it on.
+
+## 1.0.5 — 2026-08-31
 
 **Griasa can be read by the AI assistant you already have open.** Switch on
 *Settings → System → AI assistants (MCP)* and Claude Code, Codex, Cursor or
@@ -38,14 +48,6 @@ Two smaller fixes fall out of the same work. An ambiguous name is no longer a
 match: with two colleagues called Ivan the old code silently picked one and
 attached meetings and promises to whoever happened to be first. And an attendee
 who arrives with an address but no display name is shown rather than dropped.
-
-**The welcome guide had been describing a different app.** It opened on
-dictation, and promised three system permissions at a point where Griasa asks
-for four — the calendar request that makes the brief work is asked at launch,
-so a new user met a dialog the guide had not mentioned. It now leads with
-recording a conversation and the promises that come out of it, lists the
-calendar row alongside the other three with what declining costs, and says
-where the MCP endpoint is and that it is off until you switch it on.
 
 ## 1.0.4 — 2026-08-27
 

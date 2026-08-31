@@ -234,6 +234,13 @@ do {
     for (label, body, expected) in [
         ("string id", #"{"jsonrpc":"2.0","id":"abc","method":"ping"}"#, JSONValue.string("abc")),
         ("number id", #"{"jsonrpc":"2.0","id":7,"method":"ping"}"#, JSONValue.number(7)),
+        // 1 and 0 are the two numbers that bridge to Bool through NSNumber, and
+        // they are also the ids every client starts counting from. A live client
+        // sent id 1 and got back true; the check above passed the whole time,
+        // because 7 does not bridge.
+        ("id 1, which bridges to true", #"{"jsonrpc":"2.0","id":1,"method":"ping"}"#, JSONValue.number(1)),
+        ("id 0, which bridges to false", #"{"jsonrpc":"2.0","id":0,"method":"ping"}"#, JSONValue.number(0)),
+        ("a real boolean stays boolean", #"{"jsonrpc":"2.0","id":true,"method":"ping"}"#, JSONValue.bool(true)),
     ] {
         guard case .success(let call) = JSONRPC.decode(Data(body.utf8)) else { continue }
         check(call.id == expected,

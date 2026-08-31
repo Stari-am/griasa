@@ -249,12 +249,17 @@ enum JSONValue: Equatable {
     init(_ any: Any) {
         switch any {
         case let value as String: self = .string(value)
-        case let value as Bool: self = .bool(value)
+        // NSNumber must be examined before Bool, and this order was got wrong
+        // once. JSONSerialization returns every JSON number as an NSNumber, and
+        // `NSNumber(1) as? Bool` succeeds through Objective-C bridging — so a
+        // request carrying `"id": 1` came back with `"id": true`, which no client
+        // can pair with its call. The unit test missed it because it used 7, and
+        // `NSNumber(7) as? Bool` is nil: the hole was exactly the two values that
+        // look like booleans. The type encoding is the only reliable answer.
         case let value as NSNumber:
-            // NSNumber boxes Bool as well; the case above catches it first only
-            // for genuine Swift Bools, so check the type encoding.
             self = String(cString: value.objCType) == "c" ? .bool(value.boolValue)
                                                           : .number(value.doubleValue)
+        case let value as Bool: self = .bool(value)
         case let value as [String: Any]: self = .object(value)
         case let value as [Any]: self = .array(value)
         default: self = .null

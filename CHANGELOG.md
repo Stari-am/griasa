@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.0.5 — 2026-08-28
+
+**Griasa can be read by the AI assistant you already have open.** Switch on
+*Settings → System → AI assistants (MCP)* and Claude Code, Codex, Cursor or
+anything else speaking MCP can ask what was promised, by whom, what the last
+conversation with somebody was about, and what the next meeting holds — without
+opening Griasa.
+
+Eight questions are answered: open promises split into yours and other people's,
+one colleague with their notes and last conversation, meetings by search, one
+meeting, one transcript, the next brief, people, projects. Reachable only from
+this Mac and only with a token, which the settings screen will copy as a ready
+client configuration.
+
+Two things are worth knowing before you turn it on. Audio still never leaves your
+machine — but whatever an assistant reads goes wherever that assistant sends its
+context. That is why the summary of a meeting and the transcript of it are
+separate questions: asking about commitments cannot pull months of conversation
+into a cloud model by accident. And writes are not in this release at all; an
+assistant can read and change nothing.
+
+**The pre-meeting brief works for the other half of your team.** It was showing a
+list of attendees and a Join button, with the last meeting and both promise lists
+missing — and the reason was alphabet. Names stored in Cyrillic could never match
+the Latin ones calendars send, so those colleagues were unrecognised, and every
+part of the brief that needs a recognised person stayed empty.
+
+Names are now transliterated before comparison, which catches the common cases,
+and colleagues have addresses: an invitation's address is remembered against the
+person it belongs to, so the next invitation is recognised by fact rather than by
+comparing spellings. An attendee Griasa cannot place now offers *Who is this?* —
+choose the colleague once, and every later invitation from that address is
+certain.
+
+Two smaller fixes fall out of the same work. An ambiguous name is no longer a
+match: with two colleagues called Ivan the old code silently picked one and
+attached meetings and promises to whoever happened to be first. And an attendee
+who arrives with an address but no display name is shown rather than dropped.
+
 ## 1.0.4 — 2026-08-27
 
 **The pre-meeting brief still never appeared, and 1.0.3 was wrong about why.**

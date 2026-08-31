@@ -22,6 +22,10 @@ struct PrepBrief {
         var knownName: String?
         var notesPreview: String?
         var openCommitments: Int
+        /// The address from the invitation, kept so an unrecognised attendee can
+        /// be linked to a colleague by hand — once — after which every future
+        /// invitation resolves by address instead of by comparing names.
+        var email: String?
     }
 
     struct PastMeeting {
@@ -47,6 +51,11 @@ final class MeetingPrepWatcher: ObservableObject {
 
     private let store = EKEventStore()
     private var timer: Timer?
+    /// The event the current brief was built from, so it can be rebuilt after the
+    /// user links an attendee to somebody. Rebuilding is the honest way to show
+    /// the result: linking one person can fill in the last meeting and both
+    /// commitment lists, which no in-place row edit could produce.
+    private var currentEvent: EKEvent?
     /// Occurrences already shown this run, so a brief fires once per event.
     private var shown: Set<String> = []
 
@@ -94,6 +103,7 @@ final class MeetingPrepWatcher: ObservableObject {
         guard let event = upcomingEvents(from: now, to: horizon)
             .first(where: { isMeeting($0) && !shown.contains(occurrenceKey($0)) }) else { return }
         shown.insert(occurrenceKey(event))
+        currentEvent = event
         state = .brief(buildBrief(for: event))
         HubController.shared.open(.prep, activate: false)
     }
@@ -110,12 +120,31 @@ final class MeetingPrepWatcher: ObservableObject {
             let now = Date()
             let events = upcomingEvents(from: now, to: now.addingTimeInterval(12 * 3600))
             if let event = events.first(where: isMeeting) ?? events.first {
+                currentEvent = event
                 state = .brief(buildBrief(for: event))
             } else {
                 state = .empty("No meetings in the next 12 hours 🎉")
             }
             HubController.shared.open(.prep)
         }
+    }
+
+    /// Binds an invitation address to a colleague, then rebuilds the brief.
+    ///
+    /// This is the reliable half of recognising people. Transliterating names
+    /// catches the easy cases, but ICU's transliteration is not the one people
+    /// use for their own names — "Айк" comes out "Ajk" where the person writes
+    /// "Aik" — so some colleagues can only be joined up by being told once.
+    func link(email: String, to name: String) {
+        PersonStore.shared.addEmail(email, for: name)
+        guard let event = currentEvent else { return }
+        state = .brief(buildBrief(for: event))
+    }
+
+    /// Who can be offered as the answer. The roster plus anyone with a page,
+    /// which is the same set matching already searches.
+    var linkableNames: [String] {
+        PersonStore.shared.allNames.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     private func upcomingEvents(from: Date, to: Date) -> [EKEvent] {
@@ -171,7 +200,8 @@ final class MeetingPrepWatcher: ObservableObject {
                 name: raw,
                 knownName: known,
                 notesPreview: (notesLine?.isEmpty ?? true) ? nil : notesLine,
-                openCommitments: known.map { CommitmentStore.shared.open(for: $0).count } ?? 0))
+                openCommitments: known.map { CommitmentStore.shared.open(for: $0).count } ?? 0,
+                email: address.isEmpty ? nil : address))
         }
 
         // A calendar event with only a call link still deserves a brief —

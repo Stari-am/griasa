@@ -107,10 +107,21 @@ enum PersonIdentity {
                 }
             }
         }
-        guard let name, let matched = matchByName(name, among: candidates.map(\.name)) else {
-            return nil
+        if let name, let matched = matchByName(name, among: candidates.map(\.name)) {
+            return Match(name: matched, confidence: .byName)
         }
-        return Match(name: matched, confidence: .byName)
+        // Last resort: an invitation carrying an address and no usable name.
+        if let email {
+            let pieces = tokensFromLocalPart(of: email)
+            if !pieces.isEmpty {
+                let hits = candidates.map(\.name).filter { candidate in
+                    let other = latinTokens(candidate)
+                    return !other.isEmpty && (other.isSubset(of: pieces) || pieces.isSubset(of: other))
+                }
+                if hits.count == 1 { return Match(name: hits[0], confidence: .byName) }
+            }
+        }
+        return nil
     }
 
     /// "Ivan Petrov" (calendar) ↔ "Ivan" (roster): a match when one name's
@@ -130,11 +141,56 @@ enum PersonIdentity {
     }
 
     static func namesMatching(_ name: String, among known: [String]) -> [String] {
-        let tokens = Set(name.lowercased().split(separator: " ").map(String.init))
+        let tokens = latinTokens(name)
         guard !tokens.isEmpty else { return [] }
         return known.filter { candidate in
-            let other = Set(candidate.lowercased().split(separator: " ").map(String.init))
+            let other = latinTokens(candidate)
             return !other.isEmpty && (other.isSubset(of: tokens) || tokens.isSubset(of: other))
         }
+    }
+
+    /// Names reduced to comparable pieces: transliterated to Latin, stripped of
+    /// diacritics, lower-cased, split on anything that is not a letter or digit.
+    ///
+    /// Transliteration is here because of a measured failure, not a hypothesis.
+    /// In one real roster of 21 colleagues, 11 names were stored in Latin and 10
+    /// in Cyrillic while the calendar delivers Latin — so those 10 people could
+    /// never be recognised from an invitation, and every part of the pre-meeting
+    /// brief that depends on recognising somebody stayed empty for half the team.
+    ///
+    /// It is a partial fix and should not be sold as more. ICU transliteration is
+    /// not the transliteration people use for their own names: "Иван Петров"
+    /// becomes "Ivan Petrov" and matches, but "Айк Саргсян" becomes "Ajk Sargsan"
+    /// where the person spells himself "Aik Sargsian", and no normalising closes
+    /// that. The reliable answer is the address, learned once; this catches the
+    /// easy half without anybody having to do anything.
+    ///
+    /// Colliding more often is acceptable precisely because an ambiguous match is
+    /// not a match: the failure is an attendee shown as unrecognised, never an
+    /// attendee attached to the wrong person.
+    static func latinTokens(_ text: String) -> Set<String> {
+        let latin = (text as NSString).applyingTransform(.toLatin, reverse: false) ?? text
+        let plain = (latin as NSString).applyingTransform(.stripDiacritics, reverse: false) ?? latin
+        return Set(plain.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init))
+    }
+
+    /// The part of an address before the @, as name-like pieces. Corporate
+    /// addresses are usually a transliteration of the name — ivan.petrov@ — which
+    /// makes them the only usable identifier when an invitation carries an
+    /// address and no display name at all.
+    ///
+    /// No special guard on how many pieces come out, and that is deliberate. An
+    /// earlier version refused a local part that produced a single token, on the
+    /// theory that a run with no word boundary invites a wrong answer. A mutation
+    /// test showed the guard caught nothing — and reading why showed it was also
+    /// wrong: because matching is by subset of token sets, a single run only ever
+    /// matches a single-word name it equals exactly. So "petrov@" correctly finds
+    /// a colleague stored as "Petrov", while "ipetrov@" finds nobody, because
+    /// {ipetrov} is not a subset of {ivan, petrov} in either direction. The guard
+    /// was blocking the first case and defending against nothing.
+    static func tokensFromLocalPart(of email: String) -> Set<String> {
+        let address = normalize(email: email)
+        guard let local = address.split(separator: "@").first, !local.isEmpty else { return [] }
+        return latinTokens(String(local))
     }
 }

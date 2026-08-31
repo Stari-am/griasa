@@ -102,6 +102,88 @@ do {
           saw: "resolved to \(String(describing: match))")
 }
 
+// ── Alphabets ────────────────────────────────────────────────────────────────
+
+// The measured failure. A roster half in Latin and half in Cyrillic, and a
+// calendar that delivers Latin: without transliteration those colleagues can
+// never be recognised, and the brief shows a list of names and nothing else.
+do {
+    let candidates = [PersonIdentity.Candidate(name: "Ivan Petrov"),
+                      PersonIdentity.Candidate(name: "Maria Gomez")]
+    let match = PersonIdentity.resolve(name: "Иван Петров", email: nil, among: candidates)
+    check(match?.name == "Ivan Petrov",
+          rule: "a Cyrillic attendee matches the same person stored in Latin",
+          meaning: "in a real roster of 21 colleagues, 10 were stored in Cyrillic while the "
+                 + "calendar sends Latin — half the team was unrecognisable, so every part of "
+                 + "the brief that needs a recognised person stayed empty",
+          saw: "resolved to \(String(describing: match))")
+}
+
+do {
+    let candidates = [PersonIdentity.Candidate(name: "Иван Петров")]
+    let match = PersonIdentity.resolve(name: "Ivan Petrov", email: nil, among: candidates)
+    check(match?.name == "Иван Петров",
+          rule: "the same match works in the other direction",
+          meaning: "which alphabet the roster happens to use must not decide whether the feature "
+                 + "works",
+          saw: "resolved to \(String(describing: match))")
+}
+
+// An invitation with an address and no display name at all. Corporate addresses
+// are usually a transliteration of the name, which makes them the last usable
+// identifier before giving up.
+do {
+    let candidates = [PersonIdentity.Candidate(name: "Иван Петров"),
+                      PersonIdentity.Candidate(name: "Maria Gomez")]
+    let match = PersonIdentity.resolve(name: nil, email: "ivan.petrov@example.com",
+                                       among: candidates)
+    check(match?.name == "Иван Петров",
+          rule: "an address with no display name resolves through its local part",
+          meaning: "some calendars deliver only an address; the alternative is showing an "
+                 + "attendee the app plainly knows as a stranger",
+          saw: "resolved to \(String(describing: match))")
+}
+
+// A run of letters with no boundary is not a subset of a two-word name in either
+// direction, so it resolves to nobody — by the ordinary rule, with no special
+// case. An earlier guard that refused single-token local parts outright caught
+// nothing in mutation testing and blocked the legitimate case below.
+do {
+    let candidates = [PersonIdentity.Candidate(name: "Ivan Petrov")]
+    let match = PersonIdentity.resolve(name: nil, email: "ipetrov@example.com",
+                                       among: candidates)
+    check(match == nil,
+          rule: "an address whose local part runs the name together resolves to nobody",
+          meaning: "\"ipetrov\" could be Petrov, Petrova or a stranger, and a confident wrong "
+                 + "answer is the failure this file exists to prevent",
+          saw: "resolved to \(String(describing: match))")
+}
+
+do {
+    let candidates = [PersonIdentity.Candidate(name: "Petrov"),
+                      PersonIdentity.Candidate(name: "Maria Gomez")]
+    let match = PersonIdentity.resolve(name: nil, email: "petrov@example.com",
+                                       among: candidates)
+    check(match?.name == "Petrov",
+          rule: "an address that exactly equals a one-word name matches it",
+          meaning: "single-name roster entries are common — they are what the app writes down "
+                 + "when somebody introduces themselves by first name only",
+          saw: "resolved to \(String(describing: match))")
+}
+
+// Transliteration makes collisions likelier, which is only acceptable because a
+// collision produces no answer rather than a wrong one.
+do {
+    let candidates = [PersonIdentity.Candidate(name: "Иван Петров"),
+                      PersonIdentity.Candidate(name: "Ivan Petrov")]
+    let match = PersonIdentity.resolve(name: "Ivan Petrov", email: nil, among: candidates)
+    check(match == nil,
+          rule: "transliteration that makes two candidates equal resolves to neither",
+          meaning: "normalising harder increases collisions; the safety property is that a "
+                 + "collision is unresolved, never arbitrary",
+          saw: "resolved to \(String(describing: match))")
+}
+
 // ── Reading a file written before these fields existed ───────────────────────
 
 // Synthetic, so this check is deterministic wherever it runs: exactly the shape

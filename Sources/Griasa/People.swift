@@ -32,15 +32,8 @@ struct PersonAvatar: View {
     }
 }
 
-/// Everything Griasa knows about a colleague beyond the meeting transcripts:
-/// the user's own notes and an AI-written dossier.
-struct Person: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var name: String
-    var notes: String = ""
-    var dossier: String?
-    var dossierDate: Date?
-}
+// `Person` itself lives in PersonIdentity.swift, which imports nothing but
+// Foundation so the model and the matching rules are reachable from test.sh.
 
 @MainActor
 final class PersonStore: ObservableObject {
@@ -84,6 +77,35 @@ final class PersonStore: ObservableObject {
 
     func setNotes(_ notes: String, for name: String) {
         upsert(name: name) { $0.notes = notes }
+    }
+
+    /// Everyone who can be matched against, with whatever addresses are known.
+    /// Roster names with no stored record still appear, so a calendar attendee
+    /// resolves to them by name even before anything has been typed about them.
+    var candidates: [PersonIdentity.Candidate] {
+        allNames.map { name in
+            PersonIdentity.Candidate(name: name, emails: person(named: name)?.emails ?? [])
+        }
+    }
+
+    /// Records an address discovered elsewhere — a calendar attendee, later a
+    /// tracker row. Appends; never replaces. An address the user typed by hand is
+    /// the one they meant, and a discovered one must not quietly displace it.
+    func addEmail(_ email: String, for name: String) {
+        let wanted = PersonIdentity.normalize(email: email)
+        guard !wanted.isEmpty else { return }
+        if let existing = person(named: name),
+           existing.emails.contains(where: { PersonIdentity.normalize(email: $0) == wanted }) {
+            return
+        }
+        upsert(name: name) { $0.emails.append(wanted) }
+    }
+
+    func removeEmail(_ email: String, for name: String) {
+        let wanted = PersonIdentity.normalize(email: email)
+        upsert(name: name) {
+            $0.emails.removeAll { PersonIdentity.normalize(email: $0) == wanted }
+        }
     }
 
     func setDossier(_ dossier: String, for name: String) {

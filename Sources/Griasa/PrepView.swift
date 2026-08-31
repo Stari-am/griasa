@@ -149,6 +149,24 @@ struct PrepView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Open their page")
+            } else if let email = attendee.email {
+                // An attendee the app could not place, and the one control that
+                // fixes it permanently. Without this the brief is a list of
+                // names: everything below it — the last meeting, both promise
+                // lists — appears only for people who were recognised, so an
+                // unrecognised row is the reason the rest of the tab is empty.
+                Menu {
+                    ForEach(watcher.linkableNames, id: \.self) { name in
+                        Button(name) { watcher.link(email: email, to: name) }
+                    }
+                } label: {
+                    Label("Who is this?", systemImage: "person.crop.circle.badge.questionmark")
+                        .font(.caption)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Link this address to a colleague. Every later invitation from "
+                    + "\(email) is then recognised without guessing at names.")
             }
         }
         .padding(.vertical, 2)

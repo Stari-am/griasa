@@ -700,9 +700,40 @@ private struct SnippetsSettings: View {
 
 private struct SystemSettings: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var mcp = MCPServer.shared
     @ObservedObject private var stats = UsageStats.shared
     var body: some View {
         SettingsTab {
+            Section("AI assistants (MCP)") {
+                Toggle("Let assistants on this Mac read Griasa", isOn: $state.mcpEnabled)
+                if state.mcpEnabled {
+                    if mcp.isRunning {
+                        LabeledContent("Endpoint", value: mcp.endpoint)
+                            .font(.caption)
+                        HStack {
+                            Button("Copy client configuration") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(mcp.clientConfiguration, forType: .string)
+                            }
+                            Button("New token") { mcp.rotateToken() }
+                                .help("Invalidates any configuration already handed out")
+                        }
+                    } else if let error = mcp.lastError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    } else {
+                        Text("Starting…").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Text("Claude Code, Codex and anything else speaking MCP can then ask what was "
+                   + "promised, by whom, and what the next meeting is about. Reachable only from "
+                   + "this Mac, and only with the token.\n\nWorth knowing: audio still never "
+                   + "leaves your machine, but whatever an assistant reads goes wherever that "
+                   + "assistant sends its context. Summaries and promises are separate from "
+                   + "transcripts for exactly this reason — asking about commitments cannot pull "
+                   + "months of conversation into a cloud model by accident.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Permissions") {
                 permissionRow("Microphone", granted: Permissions.microphoneGranted,
                               detail: "Dictation and your side of meeting recordings. Without it, all text and screen features (OCR, captures, reminders, presets, projects) still work.")

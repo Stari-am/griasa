@@ -67,6 +67,12 @@ final class AppState: ObservableObject {
     @AppStorage("silenceWatchMinutes") var silenceWatchMinutes: Int = 5
     @AppStorage("silenceReplyMinutes") var silenceReplyMinutes: Int = 2
 
+    /// Lets an AI assistant already running on this Mac read Griasa over MCP.
+    /// Off by default: it opens a door, so switching it on has to be a decision.
+    @AppStorage("mcpEnabled") var mcpEnabled: Bool = false {
+        didSet { mcpEnabled ? MCPServer.shared.start() : MCPServer.shared.stop() }
+    }
+
     /// Optional second home for finished meeting transcripts, so a coding agent
     /// or any tool pointed at that folder can read them. Empty = off, which is
     /// the default: copying meeting notes somewhere else should be a choice.
@@ -150,6 +156,7 @@ final class AppState: ObservableObject {
             onCapture: { action in Task { @MainActor in CaptureController.run(action) } })
         SnippetExpander.shared.start()
         MeetingPrepWatcher.shared.start()
+        if mcpEnabled { MCPServer.shared.start() }
         if autoRecordOnLaunch {
             Task { await startRecording() }
         }

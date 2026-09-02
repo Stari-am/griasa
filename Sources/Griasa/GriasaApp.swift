@@ -25,7 +25,7 @@ enum GriasaMain {
         }
         // `Griasa --people-probe` merges and deletes an invented person against
         // the real stores, then checks nothing real moved.
-        if args.contains("--people-probe") { await MainActor.run { PeopleProbe.run() } }
+        if args.contains("--people-probe") { await PeopleProbe.run() }
         // `Griasa --silence-probe` measures whether the app's own alert beep
         // comes back in through either recorded input, and exits.
         if args.contains("--silence-probe") { await SilenceProbe.run() }

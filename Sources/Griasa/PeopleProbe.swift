@@ -13,7 +13,12 @@ enum PeopleProbe {
     private static let keep = "Probe Survivor ZZ"
     private static let dupe = "Probe Duplicate ZZ"
 
-    static func run() -> Never {
+    /// `async` and called directly rather than through `MainActor.run`. Wrapping
+    /// a never-returning function in that closure makes the compiler warn that
+    /// the call will never be executed, and this project builds with no
+    /// warnings — the enum is already main-actor isolated, so the hop is not
+    /// needed for the stores it touches.
+    static func run() async -> Never {
         let store = PersonStore.shared
         let roster = ParticipantRoster.shared
         var failures = 0

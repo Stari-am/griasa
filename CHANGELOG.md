@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.6 — 2026-09-02
 
 **The silence question was dismissing itself with its own beep.** It appeared,
 sounded the alert that is meant to reach you in another room, and vanished about

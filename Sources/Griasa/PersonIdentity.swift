@@ -49,6 +49,47 @@ struct Person: Identifiable, Codable, Equatable {
         self.emails = emails
         self.handles = handles
     }
+
+    /// Combines two records that turn out to be one human, keeping this one's
+    /// name and identity.
+    ///
+    /// The rules live here, in the file the checks can reach, because a merge is
+    /// destructive: whatever this drops cannot be got back. So notes from both
+    /// sides survive — they are the only part of a record a person typed
+    /// themselves. The dossier does not merge: half of one description followed
+    /// by half of another would read as a single account of somebody and be
+    /// false, so the newer one is kept whole and the older discarded, which is
+    /// safe because a dossier can be generated again from the transcripts.
+    /// Addresses and handles are unioned, since every one of them is a fact
+    /// about where this person can be recognised.
+    func absorbing(_ other: Person) -> Person {
+        var merged = self
+
+        let mine = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let theirs = other.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Identical notes on both duplicates is the common case when the same
+        // thing was typed twice; joining them would double every line.
+        merged.notes = mine == theirs ? mine
+                                      : [mine, theirs].filter { !$0.isEmpty }.joined(separator: "\n\n")
+
+        if let incoming = other.dossier,
+           dossier == nil || (other.dossierDate ?? .distantPast) > (dossierDate ?? .distantPast) {
+            merged.dossier = incoming
+            merged.dossierDate = other.dossierDate
+        }
+
+        var seen = Set(emails.map { PersonIdentity.normalize(email: $0) })
+        for email in other.emails {
+            let key = PersonIdentity.normalize(email: email)
+            guard !key.isEmpty, seen.insert(key).inserted else { continue }
+            merged.emails.append(email)
+        }
+
+        for (system, handle) in other.handles where merged.handles[system] == nil {
+            merged.handles[system] = handle
+        }
+        return merged
+    }
 }
 
 /// Turning an outside identity into a name Griasa already uses.
@@ -65,6 +106,22 @@ enum PersonIdentity {
             text = String(text[text.index(after: open)..<close])
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whether a typed string is worth storing as an address.
+    ///
+    /// Not validation for its own sake: `resolve` falls back to matching the
+    /// local part of an address against a name, so a string with no shape at all
+    /// becomes a way to match the wrong person. One @, something either side,
+    /// and a dot in the domain is as far as this goes — anything stricter starts
+    /// rejecting addresses that exist.
+    static func looksLikeEmail(_ text: String) -> Bool {
+        let candidate = normalize(email: text)
+        let parts = candidate.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2, let local = parts.first, let domain = parts.last else { return false }
+        guard !local.isEmpty, domain.contains("."),
+              !domain.hasPrefix("."), !domain.hasSuffix(".") else { return false }
+        return !candidate.contains(where: { $0 == " " })
     }
 
     /// The minimum a candidate has to offer to be matched against. Deliberately

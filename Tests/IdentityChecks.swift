@@ -232,5 +232,114 @@ do {
     }
 }
 
+// ── Merging two records for one human ────────────────────────────────────────
+
+// Notes are the only part of a person's record that a human typed. A merge that
+// drops half of them destroys the thing nothing else can recreate.
+do {
+    let keep = Person(name: "Petrov", notes: "Owns billing")
+    let dupe = Person(name: "P. Petrov", notes: "Prefers async")
+    let merged = keep.absorbing(dupe)
+    check(merged.notes.contains("Owns billing") && merged.notes.contains("Prefers async"),
+          rule: "a merge keeps the notes from both records",
+          meaning: "notes are hand-written and unrecoverable; a merge that silently keeps one "
+                 + "side loses work the user did and cannot tell they lost",
+          saw: "merged notes: \(merged.notes.debugDescription)")
+    check(merged.name == "Petrov" && merged.id == keep.id,
+          rule: "the surviving record keeps its own name and identity",
+          meaning: "the merge is into a person the user chose; taking the duplicate's name "
+                 + "would rename the wrong side of the operation",
+          saw: "name \(merged.name), id kept: \(merged.id == keep.id)")
+}
+
+// The same note typed twice is what actually happens with a duplicate, and
+// joining it to itself makes every line appear twice.
+do {
+    let keep = Person(name: "Petrov", notes: "Owns billing")
+    let dupe = Person(name: "P. Petrov", notes: "  Owns billing  ")
+    let merged = keep.absorbing(dupe)
+    check(merged.notes == "Owns billing",
+          rule: "identical notes on both sides are not duplicated",
+          meaning: "the duplicate usually holds the same sentence, and doubling it is a visible "
+                 + "mess in the one field the user reads most",
+          saw: "merged notes: \(merged.notes.debugDescription)")
+}
+
+// Addresses are the join key. Losing one loses the ability to recognise the
+// person in a calendar invite; keeping one twice is noise in the UI.
+do {
+    let keep = Person(name: "Petrov", emails: ["petrov@corp.com"])
+    let dupe = Person(name: "P. Petrov", emails: ["PETROV@corp.com", "p.petrov@gmail.com"])
+    let merged = keep.absorbing(dupe)
+    check(merged.emails.count == 2 && merged.emails.contains("p.petrov@gmail.com"),
+          rule: "a merge unions the addresses and keeps no address twice",
+          meaning: "each address is a separate fact about where this person can be recognised, "
+                 + "and the same one in two spellings is still one mailbox",
+          saw: "merged addresses: \(merged.emails)")
+}
+
+// A dossier is AI-written prose. Two of them concatenated would read as one
+// description of a person and be a fabrication, so one has to win whole.
+do {
+    let old = Date(timeIntervalSince1970: 1_000_000)
+    let recent = Date(timeIntervalSince1970: 2_000_000)
+    var keep = Person(name: "Petrov")
+    keep.dossier = "Older account"
+    keep.dossierDate = old
+    var dupe = Person(name: "P. Petrov")
+    dupe.dossier = "Newer account"
+    dupe.dossierDate = recent
+    let merged = keep.absorbing(dupe)
+    check(merged.dossier == "Newer account" && merged.dossierDate == recent,
+          rule: "the newer dossier wins whole, rather than the two being joined",
+          meaning: "a dossier stitched from two sources would describe a person in sentences "
+                 + "that were never written about them together",
+          saw: "kept \(merged.dossier ?? "nil")")
+
+    var stale = Person(name: "Petrov")
+    stale.dossier = "Newer account"
+    stale.dossierDate = recent
+    var older = Person(name: "P. Petrov")
+    older.dossier = "Older account"
+    older.dossierDate = old
+    check(stale.absorbing(older).dossier == "Newer account",
+          rule: "an older dossier does not overwrite a newer one",
+          meaning: "the direction of the merge is the user's choice of which page survives, "
+                 + "not a claim that the duplicate knows more",
+          saw: "kept \(stale.absorbing(older).dossier ?? "nil")")
+}
+
+// A record with no dossier should take the duplicate's rather than end up with
+// nothing — that is half the reason to merge instead of deleting.
+do {
+    var dupe = Person(name: "P. Petrov")
+    dupe.dossier = "The only account there is"
+    let merged = Person(name: "Petrov").absorbing(dupe)
+    check(merged.dossier == "The only account there is",
+          rule: "a missing dossier is filled from the record being absorbed",
+          meaning: "deleting the duplicate would have thrown this away, which is the outcome "
+                 + "merging exists to avoid",
+          saw: "kept \(merged.dossier ?? "nil")")
+}
+
+// ── What may be stored as an address ─────────────────────────────────────────
+
+// resolve() falls back to matching the local part of an address against a name,
+// so a shapeless string becomes a way to match the wrong human.
+do {
+    let accepted = ["petrov@corp.com", "MAILTO:Petrov@Corp.com", "p.petrov@mail.co.uk",
+                    "Ivan Petrov <ivan@x.com>"]
+    let rejected = ["", "petrov", "petrov@", "@corp.com", "petrov@corp",
+                    "two@at@corp.com", "petrov @corp.com", "petrov@.com", "petrov@corp."]
+    let wronglyRejected = accepted.filter { !PersonIdentity.looksLikeEmail($0) }
+    let wronglyAccepted = rejected.filter { PersonIdentity.looksLikeEmail($0) }
+    check(wronglyRejected.isEmpty && wronglyAccepted.isEmpty,
+          rule: "an address is accepted when it has the shape of one, and not otherwise",
+          meaning: "a stored non-address can match a colleague by its local part, quietly "
+                 + "attaching one person's meetings to another",
+          saw: "rejected but valid: \(wronglyRejected); accepted but not addresses: "
+             + "\(wronglyAccepted)")
+}
+
 return failures
 }

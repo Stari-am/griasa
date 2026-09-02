@@ -28,7 +28,12 @@ final class ParticipantRoster: ObservableObject {
         }
     }
 
-    func remove(_ name: String) { names.removeAll { $0 == name } }
+    /// Case-insensitively, like every other name comparison in the app: the
+    /// roster spelling and the spelling being removed come from different
+    /// places and need not agree on capitals.
+    func remove(_ name: String) {
+        names.removeAll { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
 
     /// Part of the rename in `PersonStore.rename`; not meant to be called alone,
     /// or the roster disagrees with the history it came from. Deduplicates,

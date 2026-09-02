@@ -161,6 +161,76 @@ final class PersonStore: ObservableObject {
         return .renamed(meetings: meetings, commitments: commitments)
     }
 
+    // MARK: - Merging and removing
+
+    enum MergeResult {
+        case merged(meetings: Int, commitments: Int)
+        /// The name to merge into is not one this app knows.
+        case unknownTarget
+        case samePerson
+    }
+
+    /// Folds one person into another: the duplicate's meetings, promises,
+    /// addresses and notes move across, and the duplicate stops existing.
+    ///
+    /// This is the operation `rename` refuses to guess at, and it exists because
+    /// two entries for one human is an ordinary accident here — the names are
+    /// typed in a hurry the moment a call ends, so a second spelling makes a
+    /// second person. Before this, the only way out was to delete one entry and
+    /// lose its half of the history with it.
+    func merge(_ name: String, into target: String) -> MergeResult {
+        guard let canonical = allNames.first(where: {
+            $0.caseInsensitiveCompare(target) == .orderedSame
+        }) else { return .unknownTarget }
+        guard name.caseInsensitiveCompare(canonical) != .orderedSame else { return .samePerson }
+
+        // The records are combined first, while both still exist. `absorbing`
+        // decides what survives; the rules are in PersonIdentity, where they are
+        // checked, because this step is the destructive one.
+        if let source = person(named: name) {
+            let survivor = (person(named: canonical) ?? Person(name: canonical)).absorbing(source)
+            people.removeAll { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+            if let index = people.firstIndex(where: {
+                $0.name.caseInsensitiveCompare(canonical) == .orderedSame
+            }) {
+                people[index] = survivor
+            } else {
+                people.append(survivor)
+            }
+            save()
+        }
+
+        // Then everything joined only by the name string. Same three stores as
+        // `rename`, and for the same reason: miss one and the surviving page
+        // loses the meetings or the promises that came with the duplicate.
+        let meetings = HistoryStore.shared.renameParticipant(name, to: canonical)
+        let commitments = CommitmentStore.shared.renameOwner(name, to: canonical)
+        ParticipantRoster.shared.rename(name, to: canonical)
+        return .merged(meetings: meetings, commitments: commitments)
+    }
+
+    /// What a deletion would leave behind, so the dialog can say it out loud
+    /// rather than let the user find out afterwards.
+    func footprint(of name: String) -> (meetings: Int, commitments: Int) {
+        let owned = CommitmentStore.shared.commitments.filter {
+            $0.owner.caseInsensitiveCompare(name) == .orderedSame
+        }
+        return (meetings(with: name).count, owned.count)
+    }
+
+    /// Removes the page and the roster entry, and nothing else.
+    ///
+    /// Deliberately does not touch the meetings or the promises. Who was in a
+    /// meeting is a fact about that meeting, and a promise whose owner has been
+    /// erased is worse than a promise owned by somebody without a page — it
+    /// stops being anybody's. Moving those is what `merge` is for, which is why
+    /// the dialog offers it first.
+    func delete(_ name: String) {
+        people.removeAll { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        ParticipantRoster.shared.remove(name)
+        save()
+    }
+
     // MARK: - Derived from history
 
     /// Meetings this person took part in — tagged entries first, plus a text

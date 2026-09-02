@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.7 — 2026-09-02
+
+**A person's addresses are visible and editable, and a person can be removed.**
+The addresses were being learned silently from calendar invitations and shown
+nowhere, so a wrong one could not be found and a right one could not be added by
+hand — which mattered most for colleagues whose name transliterates differently
+from the way they write it themselves. They now sit on the person's page, one
+line each, with a field to add one and a button to forget one. A typed string
+that is not shaped like an address is refused, because the matching rules fall
+back to comparing the local part against a name, and a shapeless one becomes a
+way to attach one colleague's meetings to another. An address already held by
+somebody else is refused too, and says who has it.
+
+**Two entries for one human can be merged.** This is the ordinary accident here:
+the names are typed in a hurry the moment a call ends, so a second spelling makes
+a second person. Merging moves their meetings, their promises, their addresses
+and their roster entry onto the person you keep, and keeps the notes from both.
+The dossier does not merge — the newer one is kept whole, because half of one
+description followed by half of another would read as a single account of
+somebody and be false.
+
+Deleting is offered as well, underneath, and says what it leaves behind: the page
+goes, the name leaves the list offered after a call, and any recorded meetings
+and promises keep the name without a page behind it. That is why merging comes
+first — reaching for delete to fix a duplicate is how the duplicate's half of the
+history gets thrown away.
+
 ## 1.0.6 — 2026-09-02
 
 **The silence question was dismissing itself with its own beep.** It appeared,

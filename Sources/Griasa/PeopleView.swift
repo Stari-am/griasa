@@ -119,9 +119,10 @@ struct PeopleView: View {
 
 private struct PersonDetailView: View {
     let name: String
-    /// The list owns the selection, so a rename has to tell it which row to
-    /// select — otherwise the sidebar keeps a name that no longer exists.
-    let onRenamed: (String) -> Void
+    /// The list owns the selection, so this page has to say which row to select
+    /// after it changes the person underneath it — otherwise the sidebar keeps a
+    /// name that no longer exists. `nil` means the person is gone.
+    let onChanged: (String?) -> Void
     @ObservedObject private var store = PersonStore.shared
     @ObservedObject private var commitments = CommitmentStore.shared
 
@@ -131,6 +132,9 @@ private struct PersonDetailView: View {
     @State private var renameDraft = ""
     @State private var renameProblem: String?
     @State private var renameNote: String?
+    @State private var emailDraft = ""
+    @State private var emailProblem: String?
+    @State private var removing = false
 
     var body: some View {
         ScrollView {
@@ -165,6 +169,8 @@ private struct PersonDetailView: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
+
+                addressesBox
 
                 let open = commitments.open(for: name)
                 if !open.isEmpty {
@@ -225,6 +231,15 @@ private struct PersonDetailView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("Fix this person's name everywhere — their meetings, their promises and the roster.")
+                    Button {
+                        removing = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Merge this person into somebody else, or delete their page.")
                 }
                 if let met = store.lastMet(name) {
                     Text("Last met \(met.formatted(.relative(presentation: .named)))")
@@ -241,6 +256,194 @@ private struct PersonDetailView: View {
             }
         }
         .popover(isPresented: $renaming, arrowEdge: .bottom) { renamePopover }
+        .popover(isPresented: $removing, arrowEdge: .bottom) { removePopover }
+    }
+
+    /// Addresses, visible and editable.
+    ///
+    /// They are how the same human is recognised in a calendar invitation, and
+    /// later in a tracker — comparing the spelling of a name is the fallback,
+    /// not the mechanism. They were being learned silently from invitations with
+    /// nowhere to look at them, so a wrong one could not be found, and the right
+    /// one could not be added by hand for a colleague whose name transliterates
+    /// differently from the way they write it themselves.
+    private var addressesBox: some View {
+        let emails = store.person(named: name)?.emails ?? []
+        return HubCard(icon: "envelope", title: "Addresses", tint: .blue) {
+            VStack(alignment: .leading, spacing: 6) {
+                if emails.isEmpty {
+                    Text("None yet. One is remembered by itself the first time this person "
+                       + "appears in a calendar invitation — or add it here, and every "
+                       + "invitation from that address is recognised as them from then on.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(emails, id: \.self) { email in
+                    HStack(spacing: 8) {
+                        Text(email)
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 0)
+                        Button {
+                            store.removeEmail(email, for: name)
+                        } label: {
+                            Image(systemName: "minus.circle").font(.system(size: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Forget this address. Invitations from it stop being recognised "
+                            + "as this person.")
+                    }
+                }
+                HStack(spacing: 6) {
+                    TextField("name@company.com", text: $emailDraft)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(addEmail)
+                        .onChange(of: emailDraft) { _, _ in emailProblem = nil }
+                    Button(action: addEmail) { Image(systemName: "plus") }
+                        .disabled(emailDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                if let problem = emailProblem {
+                    Text(problem)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func addEmail() {
+        let typed = emailDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else { return }
+        // Checked rather than accepted, because a stored non-address can still
+        // match a colleague by its local part and attach one person's meetings
+        // to another.
+        guard PersonIdentity.looksLikeEmail(typed) else {
+            emailProblem = "That does not look like an email address."
+            return
+        }
+        if let owner = store.allNames.first(where: { other in
+            other.caseInsensitiveCompare(name) != .orderedSame
+                && (store.person(named: other)?.emails ?? []).contains {
+                    PersonIdentity.normalize(email: $0) == PersonIdentity.normalize(email: typed)
+                }
+        }) {
+            // Two people holding one address is how a calendar invitation ends
+            // up resolving to whichever of them was checked first.
+            emailProblem = "\(owner) already has that address."
+            return
+        }
+        store.addEmail(typed, for: name)
+        emailDraft = ""
+        emailProblem = nil
+    }
+
+    /// The way out of a duplicate.
+    ///
+    /// Merging is offered first and deletion second, because the reason two
+    /// entries exist for one human is a typo, and deleting one of them throws
+    /// away its meetings and its promises — which is exactly what somebody
+    /// reaching for a delete button is trying not to do.
+    private var removePopover: some View {
+        let footprint = store.footprint(of: name)
+        let others = store.allNames
+            .filter { $0.caseInsensitiveCompare(name) != .orderedSame }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Remove \(name)").font(.headline)
+
+            if !others.isEmpty {
+                Text("The same person as somebody else?")
+                    .font(.subheadline.weight(.medium))
+                Text("Two entries for one human is what happens when the name gets typed twice. "
+                   + "Merging moves their meetings, their promises and their addresses across, "
+                   + "and keeps the notes from both.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 280, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Menu("Merge into…") {
+                    ForEach(others, id: \.self) { other in
+                        Button(other) { commitMerge(into: other) }
+                    }
+                }
+                .frame(width: 190)
+                Divider().frame(width: 280)
+            }
+
+            Text(deletionConsequence(footprint))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 280, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Cancel") { removing = false }
+                Button("Delete page", role: .destructive) { commitDelete() }
+            }
+            .frame(width: 280)
+        }
+        .padding(14)
+    }
+
+    /// Says what stays behind, in the numbers this person actually has.
+    private func deletionConsequence(_ footprint: (meetings: Int, commitments: Int)) -> String {
+        var sentence = "Deleting removes this page — the notes, the dossier and the addresses — "
+                     + "and takes the name out of the list offered after a call."
+        var kept: [String] = []
+        if footprint.meetings > 0 {
+            kept.append(footprint.meetings == 1 ? "1 recorded meeting"
+                                                : "\(footprint.meetings) recorded meetings")
+        }
+        if footprint.commitments > 0 {
+            kept.append(footprint.commitments == 1 ? "1 promise" : "\(footprint.commitments) promises")
+        }
+        if kept.isEmpty { return sentence + " Nothing else refers to them." }
+        sentence += " \(kept.joined(separator: " and ")) will keep this name and lose the page "
+                  + "behind it — merge instead if this is the same person as somebody else."
+        return sentence
+    }
+
+    private func commitMerge(into target: String) {
+        switch store.merge(name, into: target) {
+        case .unknownTarget, .samePerson:
+            removing = false
+        case .merged(let meetings, let promises):
+            removing = false
+            let parts = [
+                meetings == 1 ? "1 meeting" : "\(meetings) meetings",
+                promises == 1 ? "1 promise" : "\(promises) promises",
+            ]
+            renameNote = "Merged into \(target) · \(parts.joined(separator: ", ")) moved"
+            forgetNotesDraft()
+            onChanged(target)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                withAnimation(.snappy) { renameNote = nil }
+            }
+        }
+    }
+
+    private func commitDelete() {
+        store.delete(name)
+        forgetNotesDraft()
+        removing = false
+        onChanged(nil)
+    }
+
+    /// Both a merge and a deletion make this page's person stop existing, and
+    /// the notes on it autosave — on a one-second timer and again on disappear,
+    /// where the check is "the draft differs from what is stored". With the
+    /// record gone, what is stored reads as empty, the draft does not, and the
+    /// autosave helpfully creates the person again: the duplicate comes back a
+    /// moment after being merged away, holding nothing but its notes.
+    private func forgetNotesDraft() {
+        saveTask?.cancel()
+        notesDraft = ""
     }
 
     /// Names arrive typed in a hurry, right after a call ends, so getting one
@@ -294,7 +497,7 @@ private struct PersonDetailView: View {
             renameNote = "Renamed · \(parts.joined(separator: ", ")) updated"
             // The row this view was showing is gone; the list picks the new name
             // up on its own, and the note explains why the page changed under you.
-            onRenamed(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines))
+            onChanged(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines))
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(4))
                 withAnimation(.snappy) { renameNote = nil }

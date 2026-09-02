@@ -1,6 +1,39 @@
 # Changelog
 
-## 1.0.5 — 2026-08-28
+## 1.0.6 — 2026-09-02
+
+**The silence question was dismissing itself with its own beep.** It appeared,
+sounded the alert that is meant to reach you in another room, and vanished about
+a second later — then came back a minute later and did it again, never on screen
+long enough to click. The cause was measured rather than guessed: the alert
+sound comes back in through the system-audio capture at -16.9 dBFS, 23 dB above
+the level that counts as somebody talking, so the watch heard itself and
+concluded the meeting had resumed. `excludesCurrentProcessAudio` does not help,
+because macOS does not play the alert as this app's audio.
+
+Sound now has to keep going for four seconds before it counts as a conversation
+resuming. The longest alert sound macOS ships is 2.16 s, so no beep can clear
+that bar — and neither can a notification chime, a cough or a door, all of which
+used to cancel the question just as effectively. A recording is also no longer
+stopped in the middle of a sound: if something is arriving as the countdown ends,
+it gets another moment to turn into speech, because the one thing this feature
+must never do is cut off a meeting that has started again.
+
+Two smaller things found while measuring. "Keep recording" was marked as the
+default action, but the panel is borderless and can never become the key window,
+so Return reached nothing — the button keeps its emphasis and no longer promises
+a key that does not work. And `Griasa --silence-probe` now exists: it plays the
+beep, measures what each input hears, and reports whether the question survives.
+
+**The welcome guide had been describing a different app.** It opened on
+dictation, and promised three system permissions at a point where Griasa asks
+for four — the calendar request that makes the brief work is asked at launch,
+so a new user met a dialog the guide had not mentioned. It now leads with
+recording a conversation and the promises that come out of it, lists the
+calendar row alongside the other three with what declining costs, and says
+where the MCP endpoint is and that it is off until you switch it on.
+
+## 1.0.5 — 2026-08-31
 
 **Griasa can be read by the AI assistant you already have open.** Switch on
 *Settings → System → AI assistants (MCP)* and Claude Code, Codex, Cursor or

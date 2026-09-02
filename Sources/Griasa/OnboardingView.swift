@@ -10,24 +10,28 @@ struct OnboardingView: View {
     @State private var micGranted = Permissions.microphoneGranted
     @State private var axGranted = Permissions.accessibilityGranted
     @State private var screenGranted = Permissions.screenRecordingGranted
+    @State private var calendarGranted = Permissions.calendarGranted
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Welcome to Griasa 🎙")
+                    Text("Welcome to Griasa 👋")
                         .font(.title.bold())
-                    Text("Dictation, meeting notes, and AI actions — all running on your Mac.")
+                    Text("What was promised, by whom, and what you walk into next — kept on this Mac.")
                         .foregroundStyle(.secondary)
                 }
 
                 GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Label("Try it now", systemImage: "1.circle.fill")
                             .font(.headline)
-                        Text("Click into any text field, **hold Right ⌥ (Option)** and speak, then release. Polished text appears where your cursor is. On the very first run, Whisper downloads its speech model in the background — dictation works meanwhile via the Apple recognizer.")
-                        Text("Recording a meeting: menu bar icon → Start Recording. When you stop, you get a Markdown transcript with a summary and action items.")
+
+                        Text("**Record a conversation.** Menu bar icon → Start Recording. Griasa captures your microphone *and* what the Mac is playing, so the other side of a Zoom or Meet call is in the transcript too. When you stop, you get Markdown notes with a summary — and the promises made in that call, split into what you took on and what you are waiting on.")
+                        Text("**Then look at ✅ Commitments and 👥 People.** Everything found in that recording is filed against the person who said it, so a page per colleague builds itself as you record.")
+                        Text("**Before your next call, the 📋 Prep tab opens on its own** a few minutes ahead: who is on it, what each of you owes the other, and what you last discussed with exactly these people. It never takes keyboard focus, so it cannot interrupt what you are typing.")
+                        Text("**Dictation:** click into any text field, **hold Right ⌥ (Option)** and speak, then release. On the very first run Whisper downloads its speech model in the background; dictation works meanwhile via the Apple recognizer.")
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -38,7 +42,7 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Permissions", systemImage: "2.circle.fill")
                             .font(.headline)
-                        Text("Griasa asks for three system permissions. Each unlocks only what's listed — everything else keeps working if you decline.")
+                        Text("Each one unlocks only what is listed against it — everything else keeps working if you decline.")
                             .foregroundStyle(.secondary)
 
                         permissionRow(
@@ -56,8 +60,29 @@ struct OnboardingView: View {
                             granted: screenGranted,
                             pane: "Privacy_ScreenCapture",
                             detail: "System audio in meetings (Zoom, Meet…) and screen OCR. Without it, recordings capture your mic only.")
+                        // Asked for at launch rather than at first use, because the
+                        // brief is on by default and has to know about a meeting
+                        // before the meeting — there is no later moment to ask.
+                        permissionRow(
+                            "Calendar",
+                            granted: calendarGranted,
+                            pane: "Privacy_Calendars",
+                            detail: "The pre-meeting brief, and abbreviations that expand to your real free slots. Read-only: Griasa never writes to your calendar. Without it the Prep tab stays empty — or turn the brief off in Settings → Meetings and you will not be asked again.")
 
                         Text("Reminders access is asked for later, the first time you use “Remind me”.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6)
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Optional: the assistant you already have open", systemImage: "3.circle.fill")
+                            .font(.headline)
+                        Text("Griasa can answer questions from Claude, Codex, Cursor or anything else that speaks MCP — what is open, who owes what, what the next meeting holds — without you opening Griasa. **Off until you switch it on** in Settings → System → AI assistants (MCP), which will also copy a ready configuration for your client.")
+                        Text("Reading only: an assistant can change nothing. But what it reads goes wherever that assistant sends its context, which is why a meeting's summary and its transcript are separate questions — asking about promises cannot pull whole conversations into a cloud model by accident.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -79,6 +104,7 @@ struct OnboardingView: View {
             micGranted = Permissions.microphoneGranted
             axGranted = Permissions.accessibilityGranted
             screenGranted = Permissions.screenRecordingGranted
+            calendarGranted = Permissions.calendarGranted
         }
     }
 

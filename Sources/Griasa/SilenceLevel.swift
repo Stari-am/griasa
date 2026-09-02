@@ -67,6 +67,23 @@ struct SilenceClock {
     /// The question waits this long for an answer before stopping the recording.
     let replyWithin: TimeInterval
 
+    /// Sound has to keep going for this long before it counts as a conversation
+    /// resuming, rather than as one loud noise.
+    ///
+    /// The number comes from a measurement. Every alert sound on macOS is
+    /// between a third of a second and 2.16 s long (Funk, the longest), and the
+    /// question this feature puts on screen plays one of them to reach somebody
+    /// in another room. That beep came straight back in through the
+    /// system-audio capture at -16.9 dBFS — 23 dB above the speech threshold —
+    /// and, being indistinguishable from speech, made the question vanish about
+    /// a second after it appeared, every time, before anyone could read it.
+    /// 4 s clears the longest alert sound with room to spare, and still gets
+    /// out of the way almost at once when people really do start talking.
+    static let resumeAfter: TimeInterval = 4
+    /// A gap longer than this ends the run. Speech pauses between words; it
+    /// does not go quiet for two thirds of a second and remain one sound.
+    static let runGap: TimeInterval = 0.6
+
     enum Decision: Equatable {
         /// Nothing to do — either there is sound, or the silence is still young.
         case keepWatching
@@ -79,15 +96,26 @@ struct SilenceClock {
     /// - Parameters:
     ///   - silentFor: seconds since the last buffer above the speech threshold,
     ///     from either input.
+    ///   - soundRun: how long the most recent unbroken stretch of sound lasted.
     ///   - asking: seconds the question has been on screen, or nil if it isn't.
-    func decide(silentFor: TimeInterval, asking: TimeInterval?) -> Decision {
-        // Sound came back. This is deliberately checked before the countdown:
-        // if the meeting resumes while the question is up, the recording must
-        // survive, and the question must go away on its own. Stopping a
-        // recording that is once again capturing speech would be the worst
-        // failure this feature could have.
-        if silentFor < silenceAfter { return .keepWatching }
-        if let asking { return asking >= replyWithin ? .stopAutomatically : .ask }
+    func decide(silentFor: TimeInterval, soundRun: TimeInterval,
+                asking: TimeInterval?) -> Decision {
+        // A conversation that has genuinely resumed saves the recording, and is
+        // checked before anything else: stopping a recording that is once again
+        // capturing speech would be the worst failure this feature could have.
+        //
+        // "Genuinely" is the part that had to be added. Sound still arriving is
+        // not enough on its own — one noise was enough to cancel the question,
+        // and the loudest noise available was the question's own beep.
+        if silentFor <= Self.runGap, soundRun >= Self.resumeAfter { return .keepWatching }
+        guard let asking else {
+            return silentFor >= silenceAfter ? .ask : .keepWatching
+        }
+        // Do not cut a sound off half way through. If something is arriving
+        // right now, give it another second to turn into a conversation.
+        if asking >= replyWithin {
+            return silentFor <= Self.runGap ? .ask : .stopAutomatically
+        }
         return .ask
     }
 }

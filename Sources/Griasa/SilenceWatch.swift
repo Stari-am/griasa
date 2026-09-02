@@ -24,10 +24,22 @@ final class SilenceWatch {
     /// thing that first constructs this.
     nonisolated private init() {}
 
+    /// When sound last arrived, and when the stretch it belongs to began. The
+    /// second date is what makes a beep distinguishable from a conversation.
+    private struct Heard {
+        var last: Date
+        var runStarted: Date
+        /// Length of the most recent unbroken stretch of sound.
+        var run: TimeInterval { last.timeIntervalSince(runStarted) }
+
+        static func now() -> Heard { let now = Date(); return Heard(last: now, runStarted: now) }
+        static let never = Heard(last: .distantPast, runStarted: .distantPast)
+    }
+
     /// Written from two audio callbacks and read from a timer on the main
-    /// thread. An unfair lock rather than a mutex: a single store, no syscall,
+    /// thread. An unfair lock rather than a mutex: two stores, no syscall,
     /// no chance of a priority inversion parking the audio thread.
-    private nonisolated let lastSound = OSAllocatedUnfairLock(initialState: Date.distantPast)
+    private nonisolated let sound = OSAllocatedUnfairLock(initialState: Heard.never)
 
     private var loop: Task<Void, Never>?
     private var askingSince: Date?
@@ -35,26 +47,46 @@ final class SilenceWatch {
     /// Called from the microphone tap and from the system-audio handler. Cheap
     /// and non-blocking: a sum over the buffer and, at most, one lock.
     nonisolated func heard(_ buffer: AVAudioPCMBuffer) {
-        let frames = Int(buffer.frameLength)
-        guard frames > 0 else { return }
-        var level = AudioLevel.floor
-        if let float = buffer.floatChannelData {
-            level = AudioLevel.dBFS(float[0], count: frames)
-        } else if let int16 = buffer.int16ChannelData {
-            level = AudioLevel.dBFS(int16[0], count: frames)
-        } else {
-            // An unexpected format must not silently mean "silent forever" and
-            // stop somebody's meeting. Treat it as sound.
-            level = 0
+        guard Self.level(of: buffer) >= AudioLevel.speechThreshold else { return }
+        let now = Date()
+        sound.withLock { heard in
+            // A gap ends the run, so the length recorded is the length of one
+            // continuous noise and not of everything since the recording began.
+            if now.timeIntervalSince(heard.last) > SilenceClock.runGap {
+                heard.runStarted = now
+            }
+            heard.last = now
         }
-        guard level >= AudioLevel.speechThreshold else { return }
-        lastSound.withLock { $0 = Date() }
+    }
+
+    /// The level `heard` judges, on its own so a diagnostic can measure exactly
+    /// what the watch measures rather than an approximation of it.
+    nonisolated static func level(of buffer: AVAudioPCMBuffer) -> Float {
+        let frames = Int(buffer.frameLength)
+        guard frames > 0 else { return AudioLevel.floor }
+        if let float = buffer.floatChannelData {
+            return AudioLevel.dBFS(float[0], count: frames)
+        }
+        if let int16 = buffer.int16ChannelData {
+            return AudioLevel.dBFS(int16[0], count: frames)
+        }
+        // An unexpected format must not silently mean "silent forever" and stop
+        // somebody's meeting. Treat it as sound.
+        return 0
+    }
+
+    /// What the watch currently believes, read the way `tick` reads it. Exists
+    /// for `--silence-probe`, so a live check measures the real state two audio
+    /// threads wrote rather than a re-implementation of it.
+    nonisolated func snapshot() -> (silentFor: TimeInterval, soundRun: TimeInterval) {
+        let heard = sound.withLock { $0 }
+        return (Date().timeIntervalSince(heard.last), heard.run)
     }
 
     func start() {
         stop()
         guard AppState.shared.silenceWatchEnabled else { return }
-        lastSound.withLock { $0 = Date() }
+        sound.withLock { $0 = .now() }
         askingSince = nil
         loop = Task { [weak self] in
             while !Task.isCancelled {
@@ -78,10 +110,11 @@ final class SilenceWatch {
 
         let clock = SilenceClock(silenceAfter: Double(state.silenceWatchMinutes) * 60,
                                  replyWithin: Double(state.silenceReplyMinutes) * 60)
-        let silentFor = Date().timeIntervalSince(lastSound.withLock { $0 })
+        let heard = sound.withLock { $0 }
+        let silentFor = Date().timeIntervalSince(heard.last)
         let asking = askingSince.map { Date().timeIntervalSince($0) }
 
-        switch clock.decide(silentFor: silentFor, asking: asking) {
+        switch clock.decide(silentFor: silentFor, soundRun: heard.run, asking: asking) {
         case .keepWatching:
             if askingSince != nil {
                 // Speech resumed on its own; take the question away.
@@ -106,7 +139,7 @@ final class SilenceWatch {
     /// silence produces the same question again rather than never asking twice.
     private func keepRecording() {
         askingSince = nil
-        lastSound.withLock { $0 = Date() }
+        sound.withLock { $0 = .now() }
         SilencePrompt.shared.hide()
     }
 
@@ -133,6 +166,9 @@ final class SilencePrompt: ObservableObject {
     fileprivate var onStop: () -> Void = {}
 
     private var window: NSPanel?
+
+    /// The panel, for `--silence-probe` to click. Not used by the app itself.
+    var probePanel: NSPanel? { window }
 
     func show(silentMinutes: Int, onKeep: @escaping () -> Void, onStop: @escaping () -> Void) {
         self.silentMinutes = silentMinutes
@@ -197,8 +233,13 @@ private struct SilencePromptView: View {
             HStack {
                 Button("Stop and save") { prompt.onStop() }
                 Spacer()
+                // Prominent rather than `.keyboardShortcut(.defaultAction)`:
+                // this panel is borderless, so it can never become the key
+                // window, and a synthetic Return was measured reaching nothing.
+                // Marking it the default action would promise a key that does
+                // not work; this gives the same emphasis and promises nothing.
                 Button("Keep recording") { prompt.onKeep() }
-                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
             }
         }
         .padding(16)

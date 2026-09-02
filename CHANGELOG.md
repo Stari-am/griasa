@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.7 — 2026-09-02
 
 **A person's addresses are visible and editable, and a person can be removed.**
 The addresses were being learned silently from calendar invitations and shown

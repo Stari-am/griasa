@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+**Starting a recording could abort the app.** It happened twice in a week, on
+1.0.6 and again on 1.0.7, and the reason was one line: the microphone tap was
+installed with the format the input node had cached. That value goes stale when
+the audio device changes while nothing is recording — AirPods connecting is
+enough — and AVFoundation then compares it against the live hardware and raises
+an exception. Measured from the crash: the node was reporting 24000 Hz while the
+hardware was at 48000. An exception from a C++ library cannot be caught in
+Swift, so there was nothing to handle and the process aborted on the first click
+of Start Recording.
+
+No format is passed now, which means there is nothing to disagree with the
+hardware. Nothing downstream changed: every consumer already took its format
+from the buffer it was handed, and the accessor that exposed the stale value had
+no callers at all — it is gone rather than corrected. A device that reports no
+channels is now refused with an ordinary error instead of reaching the exception.
+
+**One local speech server, not several.** An abort skips the shutdown path, so
+the `whisper-server` subprocess survived it. The next launch has no handle to
+that orphan and decides whether to start one from a health check with a
+one-second timeout, which a server busy transcribing does not answer in time —
+so a second was launched. Both then held the same port, and requests were split
+between them. On this machine two were listening, one of them started 40 days
+earlier and still carrying that day's vocabulary. Any leftover is now cleared at
+launch, before the first request.
+
 ## 1.0.7 — 2026-09-02
 
 **A person's addresses are visible and editable, and a person can be removed.**

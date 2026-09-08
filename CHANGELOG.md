@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.8 — 2026-09-08
 
 **Starting a recording could abort the app.** It happened twice in a week, on
 1.0.6 and again on 1.0.7, and the reason was one line: the microphone tap was

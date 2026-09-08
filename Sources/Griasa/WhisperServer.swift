@@ -11,6 +11,11 @@ final class WhisperServer: @unchecked Sendable {
     private var launchVocabulary: [String] = []
     private let lock = NSLock()
 
+    /// Swept once, here, because at the moment this object is first built no
+    /// server of ours can exist yet — so anything answering on our port is a
+    /// leftover, and killing it is unambiguous.
+    private init() { killOrphans() }
+
     static var binaryPath: String? {
         for path in ["/opt/homebrew/bin/whisper-server", "/usr/local/bin/whisper-server"]
         where FileManager.default.isExecutableFile(atPath: path) {
@@ -72,6 +77,42 @@ final class WhisperServer: @unchecked Sendable {
             launchVocabulary = vocabulary
         } catch {
             NSLog("Griasa: failed to launch whisper-server: %@", error.localizedDescription)
+        }
+    }
+
+    /// Kills a whisper-server left behind by a previous run.
+    ///
+    /// The app aborted twice in a week on a microphone format mismatch, and an
+    /// abort skips `applicationWillTerminate`, so the child survived. A fresh
+    /// launch has no handle to it, and `ensureRunning` decides whether to start
+    /// one from a health check with a one-second timeout — which a server busy
+    /// transcribing does not answer in time. So the orphan is declared dead and
+    /// a second one is launched. whisper-server sets SO_REUSEPORT, so both then
+    /// hold 127.0.0.1:8178 and the kernel splits transcription requests between
+    /// them. Measured on this machine: two listeners on the same port, one of
+    /// them 40 days old, carrying the glossary it was launched with that day.
+    ///
+    /// Sweeping costs one model load after a crash. Adopting the orphan instead
+    /// would be cheaper and is what the health check already tries to do — but
+    /// it cannot tell one orphan from two, and two is the state that quietly
+    /// sends half your dictation to a server configured weeks ago.
+    ///
+    /// The pattern requires both the binary name and this app's own model file,
+    /// so a whisper-server somebody else is running is left alone.
+    private func killOrphans() {
+        let pkill = Process()
+        pkill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        pkill.arguments = ["-f", "whisper-server.*\(WhisperTranscriber.modelURL.lastPathComponent)"]
+        pkill.standardOutput = FileHandle.nullDevice
+        pkill.standardError = FileHandle.nullDevice
+        do {
+            try pkill.run()
+            pkill.waitUntilExit()
+        } catch {
+            // Nothing to do about it: the worst case is the state we were
+            // already in, and it must not stop a server from starting.
+            NSLog("Griasa: could not check for a leftover whisper-server: %@",
+                  error.localizedDescription)
         }
     }
 

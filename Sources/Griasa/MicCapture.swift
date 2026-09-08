@@ -57,12 +57,6 @@ final class MicCapture {
         }
     }
 
-    /// The native format of the input device. Only valid once the engine has an
-    /// input.
-    var inputFormat: AVAudioFormat {
-        engine.inputNode.outputFormat(forBus: 0)
-    }
-
     func addConsumer(_ id: UUID, _ consumer: @escaping Consumer) throws {
         consumers.withLock { $0[id] = consumer }
         do {
@@ -85,13 +79,33 @@ final class MicCapture {
     private func startIfNeeded() throws {
         guard !running else { return }
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0 else {
+        // The hardware's own format, not the node's cached one. Both are checked
+        // for channels as well as sample rate: a device in a transitional state
+        // reports a rate and no channels, and AVFoundation raises an
+        // NSException for that — which Swift cannot catch, so it is a crash.
+        let hardware = input.inputFormat(forBus: 0)
+        guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
             throw NSError(domain: "Griasa", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: "No microphone input available (check Microphone permission in System Settings → Privacy & Security)."
             ])
         }
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, time in
+        // No format passed, deliberately.
+        //
+        // Passing `input.outputFormat(forBus: 0)` crashed the app twice in a
+        // week. That value is the node's cache, and it goes stale when the input
+        // device changes while nothing is recording — AirPods connecting is
+        // enough. installTap then compares what it was handed against the live
+        // hardware and raises 'Failed to create tap due to format mismatch'
+        // (measured: node said 24000 Hz, hardware was at 48000). An NSException
+        // from a C++ library cannot be caught in Swift, so `try` around this is
+        // worthless and the process aborts on the user's first click of Start
+        // Recording.
+        //
+        // nil means "whatever this bus uses", so there is no format to disagree
+        // with anything. Nothing downstream is affected: every consumer takes
+        // its format from `buffer.format`, which is why the accessor that used
+        // to expose the stale value has been deleted rather than corrected.
+        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, time in
             guard let self else { return }
             let sinks = self.consumers.withLock { $0 }
             for sink in sinks.values { sink(buffer, time) }

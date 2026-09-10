@@ -128,8 +128,9 @@ enum DemoBrief {
                 date: last.date,
                 summary: last.preview,
                 filePath: last.filePath),
-            youPromised: commitments.openMine.filter { names.contains($0.owner) || $0.isMine },
-            theyPromised: commitments.openTheirs.filter { names.contains($0.owner) })
+            // Through the real grouping, so the screenshot shows what a brief
+            // actually shows rather than a hand-built approximation of it.
+            buckets: MeetingPrepWatcher.buckets(forAttendees: names))
         MeetingPrepWatcher.shared.state = .brief(brief)
     }
 }

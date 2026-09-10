@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.9 — 2026-09-10
 
 **Old promises with no date now get asked about.** Most promises never carry a
 date — 245 of the 339 open on this machine — and an undated promise never

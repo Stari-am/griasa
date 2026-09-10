@@ -18,6 +18,8 @@ struct CommitmentsView: View {
                         title: "No commitments yet",
                         message: "After each recorded meeting, promises made by you and your colleagues land here automatically — nothing to set up.")
                 } else {
+                    if !store.suggestedDone.isEmpty { closureBox }
+                    if !store.needsReview.isEmpty { reviewBox }
                     if !store.openMine.isEmpty {
                         section(title: "My promises", systemImage: "person.fill.checkmark",
                                 tint: .blue, items: store.openMine)
@@ -47,6 +49,115 @@ struct CommitmentsView: View {
         }
         .safeAreaInset(edge: .bottom) {
             footer
+        }
+    }
+
+    /// Old promises with no date, which is the shape most of them have.
+    ///
+    /// Measured on this store: 245 of 339 open promises carry no date at all.
+    /// A dated promise surfaces itself when it comes due; an undated one never
+    /// surfaces, so the list only grows. This asks about the oldest of them, a
+    /// few at a time, with no model involved — it is arithmetic on dates, so it
+    /// is instant and works with no provider and no network.
+    private var reviewBox: some View {
+        let due = store.needsReview
+        let shown = Array(due.prefix(8))
+        return HubCard(icon: "calendar.badge.clock",
+                       title: "Still real? · \(due.count)", tint: .yellow) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("No date, and made over a month ago. Nothing here surfaces on its own, "
+                   + "so it is worth a look. Saying it is still open puts it away for "
+                   + "another month.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(shown) { item in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.isMine ? item.text : "\(item.owner): \(item.text)")
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(item.date.formatted(.relative(presentation: .named))
+                                 + (item.sourceTitle.isEmpty ? "" : " · \(item.sourceTitle)"))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        Button("Still open") {
+                            withAnimation(.snappy) { store.markReviewed(item.id) }
+                        }
+                        .controlSize(.small)
+                        Button("Done") {
+                            withAnimation(.snappy) { store.toggleDone(item.id) }
+                        }
+                        .controlSize(.small)
+                        Button {
+                            withAnimation(.snappy) { store.delete(item.id) }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .controlSize(.small)
+                        .help("It was never a commitment — remove it")
+                    }
+                    .padding(.vertical, 2)
+                }
+                if due.count > shown.count {
+                    Text("\(due.count - shown.count) more after these.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Promises a later conversation appears to have closed.
+    ///
+    /// Each row carries the sentence that says so, because that is what makes
+    /// this judgeable in a glance. A suggestion without its evidence is a claim
+    /// the user has to go and verify, which costs more than ticking the box by
+    /// hand would have.
+    private var closureBox: some View {
+        HubCard(icon: "checkmark.circle.badge.questionmark", title: "Looks done", tint: .green) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("A later meeting says these were finished. Nothing was closed — "
+                   + "check the quote and decide.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(store.suggestedDone) { item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.isMine ? item.text : "\(item.owner): \(item.text)")
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let quote = item.suggestedDoneQuote {
+                            Text("“\(quote)”")
+                                .font(.caption)
+                                .italic()
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        HStack(spacing: 8) {
+                            Button("Close it") {
+                                withAnimation(.snappy) { store.acceptSuggestion(item.id) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            Button("Still open") {
+                                withAnimation(.snappy) { store.dismissSuggestion(item.id) }
+                            }
+                            .controlSize(.small)
+                            Spacer(minLength: 0)
+                            Text(item.sourceTitle)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(8)
+                    .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

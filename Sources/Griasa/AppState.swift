@@ -482,9 +482,17 @@ final class AppState: ObservableObject {
                         // Quietly pull out who promised what — the list in the
                         // Commitments tab just grows, nothing pops up.
                         Task {
-                            try? await CommitmentExtractor.extract(
+                            _ = try? await CommitmentExtractor.extract(
                                 markdown: text, participants: participants, myName: myName,
                                 sourceTitle: title, sourceEntryID: entryID)
+                            // Then the opposite direction: which promises does
+                            // this conversation say are already finished. Second,
+                            // so the promises this meeting just produced are on
+                            // the list and can themselves be closed by it — a
+                            // call where something is promised and delivered in
+                            // the same hour is ordinary.
+                            await CommitmentExtractor.detectClosures(
+                                markdown: text, participants: participants)
                         }
                     }
                     if state.openTranscriptWhenReady {

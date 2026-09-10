@@ -55,13 +55,19 @@ struct PrepView: View {
                     }
                 }
 
-                if !brief.youPromised.isEmpty {
-                    commitmentsBox(title: "You promised them", systemImage: "person.fill.checkmark",
-                                   tint: .orange, items: brief.youPromised)
-                }
-                if !brief.theyPromised.isEmpty {
-                    commitmentsBox(title: "They promised you", systemImage: "person.2",
-                                   tint: .purple, items: brief.theyPromised, showOwner: true)
+                // Grouped by why you are being shown them, in a fixed order,
+                // rather than split into mine and theirs. Before a recurring
+                // call, what was promised *in that call* last time matters more
+                // than which direction it points, and a promise involving
+                // nobody in the room is not here at all.
+                ForEach(brief.buckets, id: \.bucket) { group in
+                    commitmentsBox(title: title(for: group.bucket),
+                                   systemImage: symbol(for: group.bucket),
+                                   tint: tint(for: group.bucket),
+                                   items: group.items,
+                                   showOwner: true,
+                                   footnote: footnote(for: group.bucket),
+                                   limit: 6)
                 }
             }
             .padding(16)
@@ -172,11 +178,67 @@ struct PrepView: View {
         .padding(.vertical, 2)
     }
 
+    private func title(for bucket: CommitmentScope.Bucket) -> String {
+        switch bucket {
+        case .overdue: return "Overdue"
+        case .thisMeeting: return "From this meeting before"
+        case .personal: return "One to one"
+        case .general: return "With these people, elsewhere"
+        case .hidden: return ""
+        }
+    }
+
+    private func symbol(for bucket: CommitmentScope.Bucket) -> String {
+        switch bucket {
+        case .overdue: return "exclamationmark.triangle"
+        case .thisMeeting: return "arrow.triangle.2.circlepath"
+        case .personal: return "person.fill.checkmark"
+        case .general: return "person.2"
+        case .hidden: return "eye.slash"
+        }
+    }
+
+    private func tint(for bucket: CommitmentScope.Bucket) -> Color {
+        switch bucket {
+        case .overdue: return .red
+        case .thisMeeting: return .blue
+        case .personal: return .orange
+        case .general: return .purple
+        case .hidden: return .gray
+        }
+    }
+
+    /// Says what a group is, once, under it — so the grouping does not have to
+    /// be guessed from four headings.
+    private func footnote(for bucket: CommitmentScope.Bucket) -> String? {
+        switch bucket {
+        case .overdue: return "Past its date, whichever meeting it came from."
+        case .thisMeeting: return "Promised in an earlier meeting with exactly these people."
+        case .personal: return "From a one-to-one with somebody on this call."
+        case .general: return "Involves somebody on this call, from another meeting."
+        case .hidden: return nil
+        }
+    }
+
     private func commitmentsBox(title: String, systemImage: String, tint: Color,
-                                items: [Commitment], showOwner: Bool = false) -> some View {
-        HubCard(icon: systemImage, title: title, tint: tint) {
+                                items: [Commitment], showOwner: Bool = false,
+                                footnote: String? = nil, limit: Int? = nil) -> some View {
+        // Capped, because grouping alone does not solve the problem it was
+        // asked to solve. On a real store the overdue group came back with
+        // fifteen rows and pushed every other group off the screen — which is
+        // the same wall of text as before, just sorted. The full list is one
+        // click away in Commitments; this is a brief.
+        let shown = limit.map { Array(items.prefix($0)) } ?? items
+        let hidden = items.count - shown.count
+        return HubCard(icon: systemImage, title: title, tint: tint) {
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(items) { item in
+                if let footnote {
+                    Text(footnote)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(shown) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Button {
                             withAnimation(.snappy) { CommitmentStore.shared.toggleDone(item.id) }
@@ -194,6 +256,13 @@ struct PrepView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+                }
+                if hidden > 0 {
+                    Button("\(hidden) more — open Commitments") {
+                        HubController.shared.open(.commitments)
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

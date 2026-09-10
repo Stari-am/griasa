@@ -12,8 +12,15 @@ struct PrepBrief {
     var attendees: [Attendee]
     /// Most recent recorded meeting shared with any of the attendees.
     var lastMeeting: PastMeeting?
-    var youPromised: [Commitment]
-    var theyPromised: [Commitment]
+    /// Open promises that involve somebody in the room, grouped by why you are
+    /// being shown them. A promise involving nobody on this call is not here at
+    /// all — showing every open promise globally is what this replaces.
+    var buckets: [(bucket: CommitmentScope.Bucket, items: [Commitment])]
+
+    /// Kept derived from the buckets so the flat view — and the MCP brief —
+    /// sees the same scoped set rather than a second, wider one.
+    var youPromised: [Commitment] { buckets.flatMap(\.items).filter(\.isMine) }
+    var theyPromised: [Commitment] { buckets.flatMap(\.items).filter { !$0.isMine } }
 
     struct Attendee: Identifiable {
         var id: String { name }
@@ -220,29 +227,53 @@ final class MeetingPrepWatcher: ObservableObject {
 
         let lastMeeting = knownNames.isEmpty ? nil : Self.lastMeeting(with: knownNames)
 
-        let theirs = knownNames.flatMap { CommitmentStore.shared.open(for: $0) }
-        let mine = CommitmentStore.shared.openMine.filter { commitment in
-            knownNames.contains { commitment.text.localizedCaseInsensitiveContains($0) }
-                || sharesMeeting(commitment, with: knownNames)
-        }
-
         return PrepBrief(
             title: event.title ?? "Meeting",
             start: event.startDate, end: event.endDate,
             videoURL: Self.videoURL(in: event),
             attendees: attendees,
             lastMeeting: lastMeeting,
-            youPromised: mine,
-            theyPromised: theirs)
+            buckets: Self.buckets(forAttendees: knownNames))
     }
 
-    /// Did this commitment come from a meeting with any of these people?
-    private func sharesMeeting(_ commitment: Commitment, with names: [String]) -> Bool {
-        guard let entryID = commitment.sourceEntryID,
-              let participants = HistoryStore.shared.entries
-                .first(where: { $0.id == entryID })?.participants else { return false }
-        return participants.contains { p in
-            names.contains { $0.caseInsensitiveCompare(p) == .orderedSame }
+    /// Groups every open promise by why it belongs in front of this meeting.
+    ///
+    /// The rules are in `CommitmentScope`, where they are checked; this is only
+    /// the lookup that gives them what they need — the participants of the
+    /// meeting each promise came out of, which is also what says whether that
+    /// meeting was a one-to-one and whether it was a previous occurrence of
+    /// this one.
+    static func buckets(forAttendees names: [String])
+    -> [(bucket: CommitmentScope.Bucket, items: [Commitment])] {
+        // Built once: a lookup per promise would rescan the whole history for
+        // each one, and half of these meetings have five participants.
+        var participantsByEntry: [UUID: [String]] = [:]
+        for entry in HistoryStore.shared.entries where entry.kind == .meeting {
+            participantsByEntry[entry.id] = entry.participants ?? []
+        }
+
+        let series = CommitmentScope.seriesKey(names)
+        let now = Date()
+        var grouped: [CommitmentScope.Bucket: [Commitment]] = [:]
+        for item in CommitmentStore.shared.commitments where !item.done {
+            let source = item.sourceEntryID.flatMap { participantsByEntry[$0] } ?? []
+            let bucket = CommitmentScope.bucket(
+                .init(owner: item.owner, isMine: item.isMine, dueDate: item.dueDate,
+                      sourceParticipants: source),
+                attendees: names, seriesKey: series, now: now)
+            guard bucket != .hidden else { continue }
+            grouped[bucket, default: []].append(item)
+        }
+        // A fixed order, not dictionary order: overdue first, then the meeting
+        // itself, then what is private, then the rest.
+        let order: [CommitmentScope.Bucket] = [.overdue, .thisMeeting, .personal, .general]
+        return order.compactMap { bucket in
+            guard let items = grouped[bucket], !items.isEmpty else { return nil }
+            // Overdue first by how late it is; everything else newest first.
+            let sorted = bucket == .overdue
+                ? items.sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+                : items.sorted { $0.date > $1.date }
+            return (bucket, sorted)
         }
     }
 

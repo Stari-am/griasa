@@ -34,6 +34,8 @@ enum Prompts {
         case liveSummaryNotes
         /// Mining commitments out of meeting notes.
         case commitments
+        /// Deciding which already-open commitments this conversation says are done.
+        case commitmentsDone
         /// Working dossier about one colleague.
         case personDossier
         /// Filing a note into one of the user's projects.
@@ -166,6 +168,31 @@ enum Prompts {
             Lines in the form "📝 NOTE: …" are notes the user typed by hand during the meeting — \
             their own words, not recognized speech. Treat them as high-signal: make sure their \
             content is reflected in the summary.
+            """
+
+        case .commitmentsDone:
+            return """
+            You decide which of a list of outstanding commitments a meeting says are
+            already finished. You do not invent, reword or add commitments.
+
+            You are given numbered commitments and then the notes of a meeting.
+
+            Return ONLY a JSON array, no prose, no markdown fences. Each element:
+            {"n": <the number of the commitment>, "quote": "the exact sentence from the
+             notes that says it is done"}
+
+            Rules:
+            - The quote must appear in the notes, word for word. If you cannot quote it,
+              leave the commitment out.
+            - "Done" means finished, delivered, sent, merged, cancelled or no longer
+              needed. Progress is not done: "I started on it", "almost ready",
+              "will finish tomorrow" are all still open.
+            - A commitment being mentioned, discussed or re-promised is not done.
+            - Return an empty array if nothing was finished. That is the common answer
+              and it is the right one.
+
+            Outstanding commitments:
+            {{items}}
             """
 
         case .commitments:

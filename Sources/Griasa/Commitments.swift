@@ -239,6 +239,20 @@ enum CommitmentExtractor {
         let quote: String
     }
 
+    /// What one closure question produced, including what was thrown away.
+    ///
+    /// The rejections are counted because "nothing was closed" and "something
+    /// was proposed and my own verification discarded it" look identical from
+    /// the outside, and the second is a bug in this file rather than a fact
+    /// about the meeting.
+    struct Detection {
+        var found: [(id: UUID, quote: String)] = []
+        var proposed = 0
+        var rejectedOutOfRange = 0
+        var rejectedTooShort = 0
+        var rejectedNotInNotes = 0
+    }
+
     /// Asks which of the currently open promises this meeting says are finished,
     /// and records each answer as a suggestion with the sentence that supports it.
     ///
@@ -250,14 +264,42 @@ enum CommitmentExtractor {
     /// comes back subtly wrong, and a wrong id here would attach one promise's
     /// evidence to another.
     @discardableResult
-    static func detectClosures(markdown: String) async -> Int {
-        guard AIFormatter.isConfigured else { return 0 }
+    /// - Returns: what the conversation says is finished, or `nil` when the
+    ///   question could not be asked or the answer could not be read. The
+    ///   distinction is the point: an empty array means "nothing was closed",
+    ///   which is the common and correct answer, while nil means we do not know.
+    ///   Collapsing the two would let a broken provider look like a clean bill
+    ///   of health, and that is exactly the mistake to avoid when judging
+    ///   whether this feature finds anything at all.
+    static func detectClosures(markdown: String, participants: [String] = [],
+                              persist: Bool = true) async -> Detection? {
+        guard AIFormatter.isConfigured else { return nil }
         let open = await MainActor.run { CommitmentStore.shared.commitments.filter { !$0.done } }
-        guard !open.isEmpty else { return 0 }
+        guard !open.isEmpty else { return Detection() }
 
-        // Newest first, capped: the list goes in the prompt, and a store with
-        // hundreds of open promises would crowd out the notes being read.
-        let candidates = Array(open.sorted { $0.date > $1.date }.prefix(60))
+        // Which promises are even candidates, and why this is not simply "the
+        // newest sixty". The list goes into the prompt, so it has to be capped —
+        // this store holds 339 open promises — and a cap on recency alone means
+        // an older meeting can only ever close promises made after it, which is
+        // backwards. Promises that came out of a meeting with the same people
+        // come first, then the rest by recency.
+        // The history lookup happens here, on the main actor, and the ranking
+        // itself takes it as an argument. The first version reached for
+        // MainActor.assumeIsolated inside the ranking, which traps when called
+        // from a nonisolated async function — the process died with SIGTRAP
+        // before a single print reached the terminal.
+        let participantsByEntry = await MainActor.run {
+            var map: [UUID: Set<String>] = [:]
+            for entry in HistoryStore.shared.entries where entry.kind == .meeting {
+                map[entry.id] = Set((entry.participants ?? []).map { $0.lowercased() })
+            }
+            return map
+        }
+        let candidates = Array(CommitmentScope
+            .rankedCandidates(open.map { ($0.id, $0.owner, $0.date, $0.sourceEntryID) },
+                              near: participants, participantsByEntry: participantsByEntry)
+            .prefix(60))
+            .compactMap { id in open.first { $0.id == id } }
         let numbered = candidates.enumerated()
             .map { "\($0.offset + 1). \($0.element.owner): \($0.element.text)" }
             .joined(separator: "\n")
@@ -268,28 +310,42 @@ enum CommitmentExtractor {
         let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
         guard let reply = try? await AIFormatter.complete(
             system: system, user: notes, tier: .smart, maxTokens: 1024,
-            timeout: 90, allowCloudFallback: false) else { return 0 }
+            timeout: 90, allowCloudFallback: false) else { return nil }
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,
               let data = String(reply[start...end]).data(using: .utf8),
               let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else {
-            return 0
+            return nil
         }
 
         let lowerNotes = notes.lowercased()
-        var flagged = 0
+        var result = Detection()
+        result.proposed = closed.count
         for item in closed {
-            guard item.n >= 1, item.n <= candidates.count else { continue }
+            guard item.n >= 1, item.n <= candidates.count else {
+                result.rejectedOutOfRange += 1
+                continue
+            }
             let quote = item.quote.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard quote.count >= 8 else {
+                result.rejectedTooShort += 1
+                continue
+            }
             // The quote has to be in the notes. Without this the evidence can be
             // a plausible sentence the model wrote itself, which is the one
             // thing that would make a suggestion impossible to judge.
-            guard quote.count >= 8, lowerNotes.contains(quote.lowercased()) else { continue }
-            let id = candidates[item.n - 1].id
-            await MainActor.run { CommitmentStore.shared.suggestClosure(id, quote: quote) }
-            flagged += 1
+            guard lowerNotes.contains(quote.lowercased()) else {
+                result.rejectedNotInNotes += 1
+                continue
+            }
+            result.found.append((candidates[item.n - 1].id, quote))
         }
-        return flagged
+        if persist {
+            for hit in result.found {
+                await MainActor.run { CommitmentStore.shared.suggestClosure(hit.id, quote: hit.quote) }
+            }
+        }
+        return result
     }
 }

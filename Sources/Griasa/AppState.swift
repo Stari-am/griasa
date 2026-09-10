@@ -491,7 +491,8 @@ final class AppState: ObservableObject {
                             // the list and can themselves be closed by it — a
                             // call where something is promised and delivered in
                             // the same hour is ordinary.
-                            await CommitmentExtractor.detectClosures(markdown: text)
+                            await CommitmentExtractor.detectClosures(
+                                markdown: text, participants: participants)
                         }
                     }
                     if state.openTranscriptWhenReady {

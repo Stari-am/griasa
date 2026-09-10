@@ -23,6 +23,14 @@ enum GriasaMain {
             print(output?.path ?? "NO_SPEECH")
             exit(output == nil ? 1 : 0)
         }
+        // `Griasa --closure-scan [n]` asks the closure question about the n most
+        // recent meetings and reports counts, changing nothing.
+        if args.contains("--closure-selftest") { await ClosureScan.selfTest() }
+        if let flag = args.firstIndex(of: "--closure-scan") {
+            let limit = args.count > flag + 1 ? Int(args[flag + 1]) ?? 8 : 8
+            await ClosureScan.run(limit: limit,
+                                  fromTranscript: args.contains("--from-transcript"))
+        }
         // `Griasa --people-probe` merges and deletes an invented person against
         // the real stores, then checks nothing real moved.
         if args.contains("--people-probe") { await PeopleProbe.run() }

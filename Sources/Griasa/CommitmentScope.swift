@@ -53,6 +53,41 @@ enum CommitmentScope {
             .filter { !$0.isEmpty })
     }
 
+    // MARK: - Which promises to ask about
+
+    /// Orders open promises for the question "which of these did this meeting
+    /// close": the ones tied to the people in that meeting first, then the rest
+    /// by recency.
+    ///
+    /// Ranking by recency alone was the first version and it is backwards for
+    /// anything but the meeting that just ended — with 339 open promises and a
+    /// cap of 60, an older meeting could only ever be offered promises made
+    /// after it. Both halves keep their own order, so a re-run over the same
+    /// meeting proposes the same candidates.
+    ///
+    /// Takes tuples rather than the store's model, and the history lookup as an
+    /// argument rather than reaching for it, which is what lets this be checked.
+    static func rankedCandidates(
+        _ open: [(id: UUID, owner: String, date: Date, sourceEntryID: UUID?)],
+        near participants: [String],
+        participantsByEntry: [UUID: Set<String>]
+    ) -> [UUID] {
+        let byRecency = open.sorted { $0.date > $1.date }
+        let room = Set(participants
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty })
+        guard !room.isEmpty else { return byRecency.map(\.id) }
+
+        let related = byRecency.filter { item in
+            if room.contains(item.owner.lowercased()) { return true }
+            guard let source = item.sourceEntryID,
+                  let people = participantsByEntry[source] else { return false }
+            return !people.isDisjoint(with: room)
+        }
+        let relatedIDs = Set(related.map(\.id))
+        return related.map(\.id) + byRecency.filter { !relatedIDs.contains($0.id) }.map(\.id)
+    }
+
     // MARK: - Bucketing
 
     /// What the rules need to know about one promise. Deliberately not

@@ -225,5 +225,48 @@ do {
           saw: "\(Scope.bucket(item, attendees: [], seriesKey: nil, now: now))")
 }
 
+// ── Which promises get asked about ───────────────────────────────────────────
+
+// The prompt can only carry a few dozen of 339 open promises. Ranking them by
+// recency alone means an older meeting is only ever offered promises made after
+// it, which is backwards — a meeting can only close something that already
+// existed.
+do {
+    let old = UUID(), recent = UUID(), unrelated = UUID()
+    let entry = UUID()
+    let items: [(id: UUID, owner: String, date: Date, sourceEntryID: UUID?)] = [
+        (recent, "Nikolaev", Date(timeIntervalSince1970: 1_800_000_000), nil),
+        (unrelated, "Nikolaev", Date(timeIntervalSince1970: 1_700_000_000), nil),
+        (old, "Petrov", Date(timeIntervalSince1970: 1_000_000_000), entry),
+    ]
+    let ranked = Scope.rankedCandidates(items, near: ["Petrov"],
+                                        participantsByEntry: [entry: ["petrov"]])
+    check(ranked.first == old,
+          rule: "a promise tied to the people in the room is asked about before newer ones",
+          meaning: "with 339 open promises and room for a few dozen, ranking by date alone "
+                 + "means an old meeting is only ever shown promises made after it — so it "
+                 + "can never close anything",
+          saw: "first ranked is \(ranked.first == old ? "the related one" : "something else")")
+    check(ranked.count == items.count && Set(ranked).count == items.count,
+          rule: "ranking keeps every promise exactly once",
+          meaning: "a promise dropped here is never asked about, and one duplicated wastes "
+                 + "the room the prompt has",
+          saw: "\(ranked.count) ranked, \(Set(ranked).count) distinct, of \(items.count)")
+}
+
+// With nobody identified, recency is all there is — and it must still be in order.
+do {
+    let a = UUID(), b = UUID()
+    let items: [(id: UUID, owner: String, date: Date, sourceEntryID: UUID?)] = [
+        (a, "X", Date(timeIntervalSince1970: 1_000), nil),
+        (b, "Y", Date(timeIntervalSince1970: 2_000), nil),
+    ]
+    check(Scope.rankedCandidates(items, near: [], participantsByEntry: [:]) == [b, a],
+          rule: "with no participants to relate to, the newest promise comes first",
+          meaning: "the fallback has to be deterministic, or the same meeting proposes a "
+                 + "different set of candidates on every run",
+          saw: "\(Scope.rankedCandidates(items, near: [], participantsByEntry: [:]) == [b, a])")
+}
+
 return failures
 }

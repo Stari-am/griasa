@@ -225,6 +225,45 @@ do {
           saw: "\(Scope.bucket(item, attendees: [], seriesKey: nil, now: now))")
 }
 
+// ── What needs a human to look at it ─────────────────────────────────────────
+
+// Undated only. A promise with a date already appears under Overdue when the
+// date passes; asking about it as well shows one item twice for two reasons.
+do {
+    check(!Scope.needsReview(ageDays: 120, hasDueDate: true, reviewedDaysAgo: nil),
+          rule: "a promise with a date is never put up for review",
+          meaning: "it surfaces itself when it comes due, and showing it in two places for "
+                 + "two different reasons is how a list stops being trusted",
+          saw: "\(Scope.needsReview(ageDays: 120, hasDueDate: true, reviewedDaysAgo: nil))")
+}
+
+// The threshold is the number measured off the real store: at 30 days there are
+// 38 to work through, at 14 there would be 137.
+do {
+    let just = Scope.needsReview(ageDays: Scope.reviewAfterDays,
+                                 hasDueDate: false, reviewedDaysAgo: nil)
+    let under = Scope.needsReview(ageDays: Scope.reviewAfterDays - 1,
+                                  hasDueDate: false, reviewedDaysAgo: nil)
+    check(just && !under,
+          rule: "review starts exactly at the threshold and not before",
+          meaning: "the threshold was chosen because it yields a batch somebody works "
+                 + "through rather than another list nobody reads; drifting below it "
+                 + "undoes that",
+          saw: "at \(Scope.reviewAfterDays) days: \(just), one day under: \(under)")
+}
+
+// Saying "still open" has to buy silence, or the answer stops being given.
+do {
+    let asked = Scope.needsReview(ageDays: 200, hasDueDate: false, reviewedDaysAgo: 1)
+    let again = Scope.needsReview(ageDays: 200, hasDueDate: false,
+                                  reviewedDaysAgo: Scope.reviewAfterDays)
+    check(!asked && again,
+          rule: "a promise just confirmed is quiet, and comes back after the same window",
+          meaning: "asking again tomorrow trains the user to ignore the question; never "
+                 + "asking again turns a confirmation into a permanent exemption",
+          saw: "one day after confirming: \(asked), a full window later: \(again)")
+}
+
 // ── Which promises get asked about ───────────────────────────────────────────
 
 // The prompt can only carry a few dozen of 339 open promises. Ranking them by

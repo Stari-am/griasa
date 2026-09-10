@@ -77,6 +77,33 @@ final class CommitmentStore: ObservableObject {
         save()
     }
 
+    /// Open promises old enough, and undated enough, to be worth confirming —
+    /// oldest first, because that is the order in which they stop being true.
+    var needsReview: [Commitment] {
+        let now = Date()
+        func days(since date: Date) -> Int {
+            Calendar.current.dateComponents([.day], from: date, to: now).day ?? 0
+        }
+        return commitments
+            .filter { item in
+                guard !item.done else { return false }
+                return CommitmentScope.needsReview(
+                    ageDays: days(since: item.date),
+                    hasDueDate: item.dueDate != nil,
+                    reviewedDaysAgo: item.reviewedAt.map { days(since: $0) })
+            }
+            .sorted { $0.date < $1.date }
+    }
+
+    /// The user says this is still real. Buys silence for as long as the review
+    /// window, rather than for ever: a promise still open in another month is
+    /// worth asking about again.
+    func markReviewed(_ id: UUID) {
+        guard let index = commitments.firstIndex(where: { $0.id == id }) else { return }
+        commitments[index].reviewedAt = Date()
+        save()
+    }
+
     func toggleDone(_ id: UUID) {
         guard let index = commitments.firstIndex(where: { $0.id == id }) else { return }
         commitments[index].done.toggle()

@@ -53,6 +53,40 @@ enum CommitmentScope {
             .filter { !$0.isEmpty })
     }
 
+    // MARK: - What needs a human to look at it
+
+    /// How old an undated promise gets before it is worth asking about.
+    ///
+    /// Chosen from this store rather than from a feeling. Nothing open here is
+    /// older than 51 days, so the "three months and forgotten" case does not
+    /// exist; and 245 of 339 open promises carry no date at all, which is the
+    /// real reason the list only grows — a dated promise surfaces itself when
+    /// it comes due, and an undated one never surfaces at all. At thirty days
+    /// that leaves 52 to look at, which is a batch somebody will actually work
+    /// through. At fourteen it would be 137, which is another list nobody reads.
+    static let reviewAfterDays = 30
+
+    /// Whether a promise should be put in front of the user to confirm it is
+    /// still real.
+    ///
+    /// Undated only, on purpose: a promise with a date already appears under
+    /// Overdue when the date passes, and asking about it as well would show the
+    /// same item in two places for two different reasons.
+    ///
+    /// - Parameters:
+    ///   - ageDays: how long ago the promise was made.
+    ///   - hasDueDate: whether a real date was resolved for it.
+    ///   - reviewedDaysAgo: how long since the user last said it was still
+    ///     open, or nil if they never have.
+    static func needsReview(ageDays: Int, hasDueDate: Bool,
+                            reviewedDaysAgo: Int?) -> Bool {
+        guard !hasDueDate, ageDays >= reviewAfterDays else { return false }
+        // Saying "still open" has to buy silence for a while, or the same
+        // question comes back tomorrow and the answer stops being given.
+        if let reviewedDaysAgo, reviewedDaysAgo < reviewAfterDays { return false }
+        return true
+    }
+
     // MARK: - Which promises to ask about
 
     /// Orders open promises for the question "which of these did this meeting

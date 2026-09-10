@@ -36,13 +36,17 @@ struct Commitment: Identifiable, Codable, Equatable {
     var suggestedDoneQuote: String?
     var suggestedDoneAt: Date?
 
+    /// When the user last confirmed this is still real, for a promise old
+    /// enough to be worth asking about.
+    var reviewedAt: Date?
+
     var hasClosureSuggestion: Bool { !done && suggestedDoneQuote != nil }
 
     init(id: UUID = UUID(), text: String, owner: String, isMine: Bool,
          dueHint: String? = nil, dueDate: Date? = nil, sourceTitle: String,
          sourceEntryID: UUID? = nil, date: Date = Date(), done: Bool = false,
          doneAt: Date? = nil, suggestedDoneQuote: String? = nil,
-         suggestedDoneAt: Date? = nil) {
+         suggestedDoneAt: Date? = nil, reviewedAt: Date? = nil) {
         self.id = id
         self.text = text
         self.owner = owner
@@ -56,6 +60,7 @@ struct Commitment: Identifiable, Codable, Equatable {
         self.doneAt = doneAt
         self.suggestedDoneQuote = suggestedDoneQuote
         self.suggestedDoneAt = suggestedDoneAt
+        self.reviewedAt = reviewedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -73,5 +78,6 @@ struct Commitment: Identifiable, Codable, Equatable {
         doneAt = try container.decodeIfPresent(Date.self, forKey: .doneAt)
         suggestedDoneQuote = try container.decodeIfPresent(String.self, forKey: .suggestedDoneQuote)
         suggestedDoneAt = try container.decodeIfPresent(Date.self, forKey: .suggestedDoneAt)
+        reviewedAt = try container.decodeIfPresent(Date.self, forKey: .reviewedAt)
     }
 }

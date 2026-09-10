@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+**Old promises with no date now get asked about.** Most promises never carry a
+date — 245 of the 339 open on this machine — and an undated promise never
+surfaces by itself, which is why the list only ever grows. Anything undated and
+made over a month ago is now offered for review, oldest first, eight at a time:
+still open, done, or it was never a commitment. Saying it is still open puts it
+away for another month rather than for ever.
+
+No model is involved. It is arithmetic on dates, so it is instant, works with no
+provider and no network, and cannot be wrong about anything except the calendar.
+
 **The brief before a meeting is now about that meeting.** It used to list every
 open promise involving anybody on the call, globally, with one-to-one follow-ups
 mixed into group meetings — for a call that happens every week, a list nobody

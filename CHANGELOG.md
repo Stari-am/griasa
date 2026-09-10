@@ -3,8 +3,8 @@
 ## 1.0.9 — 2026-09-10
 
 **Old promises with no date now get asked about.** Most promises never carry a
-date — 245 of the 339 open on this machine — and an undated promise never
-surfaces by itself, which is why the list only ever grows. Anything undated and
+date, and an undated promise never surfaces by itself, which is why the list only
+ever grows. Anything undated and
 made over a month ago is now offered for review, oldest first, eight at a time:
 still open, done, or it was never a commitment. Saying it is still open puts it
 away for another month rather than for ever.
@@ -21,13 +21,12 @@ somebody on this call, or with these people from somewhere else. A promise
 involving nobody in the room is not shown at all, and each group is capped with a
 link to the full list.
 
-Two obvious ways to recognise a recurring meeting were ruled out by measuring the
-real store first. Titles never repeat — 49 distinct titles across 49 recorded
-meetings — so a series cannot be identified by name. And matching participants
-loosely, at 60% overlap, joins 39 of 46 meetings into a single cluster of eleven,
-which would make every meeting part of every other meeting's history. Exact
-participant sets do repeat: five of them account for 23 of the meetings, and they
-work on everything already recorded. Neither "one-to-one" nor "which series" is
+Two obvious ways to recognise a recurring meeting were ruled out by measurement
+first. Titles do not repeat between recordings — they are typed after the call —
+so a series cannot be identified by name. And matching participants loosely, at
+60% overlap, collapses unrelated meetings into one large cluster, which would
+make every meeting part of every other meeting's history. An exact participant
+set does repeat, and it works on everything already recorded. Neither "one-to-one" nor "which series" is
 stored on a promise — both follow from the meeting it came out of, so there is
 nothing to migrate and nothing that can drift out of step.
 
@@ -193,10 +192,9 @@ nothing. `release.sh` gained a check, beside the one that compares entitlements
 against the source: a feature that runs on its own and is gated on a permission
 must have a request on the launch path.
 
-**A recording no longer runs all night.** One session here ran from 19:00 to
-05:48 and wrote 8.6 GB before macOS flagged the process for exceeding its
-disk-write limit. Nothing in the app had any opinion about a recording nobody was
-speaking into.
+**A recording no longer runs all night.** A session left running overnight filled
+the disk until macOS flagged the process for exceeding its write limit. Nothing
+in the app had any opinion about a recording nobody was speaking into.
 
 When neither the microphone nor the Mac's own audio has carried speech for a
 while, a small window asks whether to carry on. "Keep recording" restarts the

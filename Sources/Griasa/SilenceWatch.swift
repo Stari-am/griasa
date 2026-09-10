@@ -6,9 +6,9 @@ import os
 /// Watches both recorded inputs and asks whether to carry on when neither has
 /// carried speech for a while.
 ///
-/// This exists because a session ran from 19:00 to 05:48 and wrote 8.6 GB —
-/// macOS flagged the process for exceeding its disk-write limit. Nothing in the
-/// app had any opinion about a recording that nobody was speaking into.
+/// This exists because a session left running overnight filled the disk until
+/// macOS flagged the process for exceeding its write limit. Nothing in the app
+/// had any opinion about a recording that nobody was speaking into.
 ///
 /// The question is a small floating window rather than a system notification,
 /// for two reasons: a notification needs a permission this app does not

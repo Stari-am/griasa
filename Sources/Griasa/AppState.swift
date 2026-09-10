@@ -62,7 +62,7 @@ final class AppState: ObservableObject {
 
     /// A recording nobody is speaking into gets a question, then stops itself.
     /// Defaults on, because the failure it prevents is not subtle: one session
-    /// ran for eleven hours and wrote 8.6 GB before macOS complained.
+    /// ran all night and filled the disk before macOS complained.
     @AppStorage("silenceWatchEnabled") var silenceWatchEnabled: Bool = true
     @AppStorage("silenceWatchMinutes") var silenceWatchMinutes: Int = 5
     @AppStorage("silenceReplyMinutes") var silenceReplyMinutes: Int = 2

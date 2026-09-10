@@ -305,10 +305,9 @@ enum CommitmentExtractor {
         guard !open.isEmpty else { return Detection() }
 
         // Which promises are even candidates, and why this is not simply "the
-        // newest sixty". The list goes into the prompt, so it has to be capped —
-        // this store holds 339 open promises — and a cap on recency alone means
-        // an older meeting can only ever close promises made after it, which is
-        // backwards. Promises that came out of a meeting with the same people
+        // newest sixty". The list goes into the prompt, so it has to be capped,
+        // and a cap on recency alone means an older meeting can only ever close
+        // promises made after it, which is backwards. Promises that came out of a meeting with the same people
         // come first, then the rest by recency.
         // The history lookup happens here, on the main actor, and the ranking
         // itself takes it as an argument. The first version reached for

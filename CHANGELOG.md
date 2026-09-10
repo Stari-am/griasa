@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+**The brief before a meeting is now about that meeting.** It used to list every
+open promise involving anybody on the call, globally, with one-to-one follow-ups
+mixed into group meetings — for a call that happens every week, a list nobody
+reads. Promises are now grouped by why you are being shown them: overdue,
+promised in an earlier meeting with exactly these people, from a one-to-one with
+somebody on this call, or with these people from somewhere else. A promise
+involving nobody in the room is not shown at all, and each group is capped with a
+link to the full list.
+
+Two obvious ways to recognise a recurring meeting were ruled out by measuring the
+real store first. Titles never repeat — 49 distinct titles across 49 recorded
+meetings — so a series cannot be identified by name. And matching participants
+loosely, at 60% overlap, joins 39 of 46 meetings into a single cluster of eleven,
+which would make every meeting part of every other meeting's history. Exact
+participant sets do repeat: five of them account for 23 of the meetings, and they
+work on everything already recorded. Neither "one-to-one" nor "which series" is
+stored on a promise — both follow from the meeting it came out of, so there is
+nothing to migrate and nothing that can drift out of step.
+
+**And promises can now close themselves — with your agreement.** The pass that
+already reads finished meeting notes gets a second question: which of the open
+promises does this conversation say are done? Each answer must come with the
+sentence from the notes that says so, and that sentence is checked against the
+notes word for word — evidence the model wrote itself would be the one thing that
+makes a suggestion impossible to judge.
+
+Nothing is closed automatically. A detection appears as "Looks done" with its
+quote, and one button closes it while the other says it is still open. The errors
+here are not symmetric: wrongly closing a promise means forgetting something you
+owe and hearing about it from the person you owed it to, while wrongly leaving one
+open costs a line of noise.
+
 ## 1.0.8 — 2026-09-08
 
 **Starting a recording could abort the app.** It happened twice in a week, on

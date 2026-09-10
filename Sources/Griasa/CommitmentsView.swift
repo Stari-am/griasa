@@ -18,6 +18,7 @@ struct CommitmentsView: View {
                         title: "No commitments yet",
                         message: "After each recorded meeting, promises made by you and your colleagues land here automatically — nothing to set up.")
                 } else {
+                    if !store.suggestedDone.isEmpty { closureBox }
                     if !store.openMine.isEmpty {
                         section(title: "My promises", systemImage: "person.fill.checkmark",
                                 tint: .blue, items: store.openMine)
@@ -47,6 +48,56 @@ struct CommitmentsView: View {
         }
         .safeAreaInset(edge: .bottom) {
             footer
+        }
+    }
+
+    /// Promises a later conversation appears to have closed.
+    ///
+    /// Each row carries the sentence that says so, because that is what makes
+    /// this judgeable in a glance. A suggestion without its evidence is a claim
+    /// the user has to go and verify, which costs more than ticking the box by
+    /// hand would have.
+    private var closureBox: some View {
+        HubCard(icon: "checkmark.circle.badge.questionmark", title: "Looks done", tint: .green) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("A later meeting says these were finished. Nothing was closed — "
+                   + "check the quote and decide.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(store.suggestedDone) { item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.isMine ? item.text : "\(item.owner): \(item.text)")
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let quote = item.suggestedDoneQuote {
+                            Text("“\(quote)”")
+                                .font(.caption)
+                                .italic()
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        HStack(spacing: 8) {
+                            Button("Close it") {
+                                withAnimation(.snappy) { store.acceptSuggestion(item.id) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            Button("Still open") {
+                                withAnimation(.snappy) { store.dismissSuggestion(item.id) }
+                            }
+                            .controlSize(.small)
+                            Spacer(minLength: 0)
+                            Text(item.sourceTitle)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(8)
+                    .background(.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

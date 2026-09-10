@@ -1,25 +1,8 @@
-import Foundation
 import SwiftUI
 
-/// One promise made in a meeting — the user's own ("My promises") or someone
-/// else's ("Waiting on others"), so follow-ups don't get lost.
-struct Commitment: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var text: String
-    /// Display name of whoever made the promise.
-    var owner: String
-    var isMine: Bool
-    /// The phrasing of the deadline as spoken ("by Friday"), when any.
-    var dueHint: String?
-    /// The deadline resolved to a real date, when the model was confident.
-    var dueDate: Date?
-    /// Meeting the promise came from; empty for manually added items.
-    var sourceTitle: String
-    var sourceEntryID: UUID?
-    var date = Date()
-    var done = false
-    var doneAt: Date?
-}
+// `Commitment` itself lives in CommitmentModel.swift, which imports nothing
+// but Foundation, so its decoder is reachable from test.sh — the file it reads
+// is the one whose loss would take every promise with it.
 
 /// Persistent list of commitments, extracted from meetings or added by hand.
 @MainActor
@@ -57,6 +40,41 @@ final class CommitmentStore: ObservableObject {
         commitments.insert(commitment, at: 0)
         save()
         return true
+    }
+
+    /// Promises a later conversation appears to have closed, newest first.
+    var suggestedDone: [Commitment] {
+        commitments.filter(\.hasClosureSuggestion)
+            .sorted { ($0.suggestedDoneAt ?? .distantPast) > ($1.suggestedDoneAt ?? .distantPast) }
+    }
+
+    /// Records that a conversation says this promise is finished, with the
+    /// sentence that says so. Does not close it: see `acceptSuggestion`.
+    func suggestClosure(_ id: UUID, quote: String) {
+        guard let index = commitments.firstIndex(where: { $0.id == id }),
+              !commitments[index].done else { return }
+        commitments[index].suggestedDoneQuote = quote
+        commitments[index].suggestedDoneAt = Date()
+        save()
+    }
+
+    func acceptSuggestion(_ id: UUID) {
+        guard let index = commitments.firstIndex(where: { $0.id == id }) else { return }
+        commitments[index].done = true
+        commitments[index].doneAt = Date()
+        // The quote stays: it is the record of why this was closed, and the only
+        // way to tell a decision from a mistake a month later.
+        save()
+    }
+
+    /// The user disagrees. The suggestion is cleared rather than remembered as
+    /// rejected — the next meeting is allowed to make the case again, and
+    /// keeping a "do not ask" flag would need a reason this doesn't have.
+    func dismissSuggestion(_ id: UUID) {
+        guard let index = commitments.firstIndex(where: { $0.id == id }) else { return }
+        commitments[index].suggestedDoneQuote = nil
+        commitments[index].suggestedDoneAt = nil
+        save()
     }
 
     func toggleDone(_ id: UUID) {
@@ -214,5 +232,64 @@ enum CommitmentExtractor {
                 parsed.reduce(0) { CommitmentStore.shared.add($1) ? $0 + 1 : $0 }
             }
         }
+    }
+
+    private struct ClosedItem: Decodable {
+        let n: Int
+        let quote: String
+    }
+
+    /// Asks which of the currently open promises this meeting says are finished,
+    /// and records each answer as a suggestion with the sentence that supports it.
+    ///
+    /// Returns how many were flagged. Runs after extraction, off the path that
+    /// produces the transcript, so a failure here costs nothing that was needed.
+    ///
+    /// The model is asked to answer with the *number* of a commitment rather
+    /// than its id: a UUID echoed back through a language model is a UUID that
+    /// comes back subtly wrong, and a wrong id here would attach one promise's
+    /// evidence to another.
+    @discardableResult
+    static func detectClosures(markdown: String) async -> Int {
+        guard AIFormatter.isConfigured else { return 0 }
+        let open = await MainActor.run { CommitmentStore.shared.commitments.filter { !$0.done } }
+        guard !open.isEmpty else { return 0 }
+
+        // Newest first, capped: the list goes in the prompt, and a store with
+        // hundreds of open promises would crowd out the notes being read.
+        let candidates = Array(open.sorted { $0.date > $1.date }.prefix(60))
+        let numbered = candidates.enumerated()
+            .map { "\($0.offset + 1). \($0.element.owner): \($0.element.text)" }
+            .joined(separator: "\n")
+
+        var notes = markdown
+        if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
+
+        let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
+        guard let reply = try? await AIFormatter.complete(
+            system: system, user: notes, tier: .smart, maxTokens: 1024,
+            timeout: 90, allowCloudFallback: false) else { return 0 }
+
+        guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
+              start < end,
+              let data = String(reply[start...end]).data(using: .utf8),
+              let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else {
+            return 0
+        }
+
+        let lowerNotes = notes.lowercased()
+        var flagged = 0
+        for item in closed {
+            guard item.n >= 1, item.n <= candidates.count else { continue }
+            let quote = item.quote.trimmingCharacters(in: .whitespacesAndNewlines)
+            // The quote has to be in the notes. Without this the evidence can be
+            // a plausible sentence the model wrote itself, which is the one
+            // thing that would make a suggestion impossible to judge.
+            guard quote.count >= 8, lowerNotes.contains(quote.lowercased()) else { continue }
+            let id = candidates[item.n - 1].id
+            await MainActor.run { CommitmentStore.shared.suggestClosure(id, quote: quote) }
+            flagged += 1
+        }
+        return flagged
     }
 }

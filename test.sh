@@ -16,6 +16,7 @@ swiftc -O \
   Sources/Griasa/PartialStabilizer.swift \
   Sources/Griasa/SilenceLevel.swift \
   Sources/Griasa/PersonIdentity.swift \
+  Sources/Griasa/CommitmentModel.swift \
   Sources/Griasa/CommitmentScope.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
@@ -23,6 +24,7 @@ swiftc -O \
   Tests/IdentityChecks.swift \
   Tests/MCPChecks.swift \
   Tests/ScopeChecks.swift \
+  Tests/CommitmentChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

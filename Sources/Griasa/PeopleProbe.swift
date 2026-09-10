@@ -90,7 +90,45 @@ enum PeopleProbe {
               "the roster is back to its original size",
               "\(rosterBefore) names before, \(roster.names.count) after")
 
-        print(failures == 0 ? "\npeople probe: all passed" : "\npeople probe: \(failures) failed")
+        // ── The closure suggestion lifecycle, against the real store ────────
+        let promises = CommitmentStore.shared
+        let before = promises.commitments.count
+        let probe = Commitment(text: "Probe promise ZZ", owner: keep, isMine: false,
+                               sourceTitle: "Probe meeting ZZ")
+        _ = promises.add(probe)
+
+        promises.suggestClosure(probe.id, quote: "shipped it on Tuesday")
+        let flagged = promises.commitments.first { $0.id == probe.id }
+        check(flagged?.suggestedDoneQuote == "shipped it on Tuesday" && flagged?.done == false,
+              "a detected closure is recorded with its quote and does not close anything",
+              "quote \(String(describing: flagged?.suggestedDoneQuote)), done \(flagged?.done ?? true)")
+        check(promises.suggestedDone.contains { $0.id == probe.id },
+              "the suggestion appears in the list the panel reads",
+              "it does not")
+
+        promises.dismissSuggestion(probe.id)
+        let dismissed = promises.commitments.first { $0.id == probe.id }
+        check(dismissed?.suggestedDoneQuote == nil && dismissed?.done == false,
+              "dismissing clears the suggestion and leaves the promise open",
+              "quote \(String(describing: dismissed?.suggestedDoneQuote)), done \(dismissed?.done ?? true)")
+
+        promises.suggestClosure(probe.id, quote: "shipped it on Tuesday")
+        promises.acceptSuggestion(probe.id)
+        let accepted = promises.commitments.first { $0.id == probe.id }
+        check(accepted?.done == true && accepted?.doneAt != nil
+              && accepted?.suggestedDoneQuote != nil,
+              "accepting closes the promise and keeps the quote as the reason",
+              "done \(accepted?.done ?? false), quote kept \(accepted?.suggestedDoneQuote != nil)")
+        check(!promises.suggestedDone.contains { $0.id == probe.id },
+              "a closed promise stops being suggested",
+              "it is still suggested")
+
+        promises.delete(probe.id)
+        check(promises.commitments.count == before,
+              "no real promise was added or lost",
+              "\(before) before, \(promises.commitments.count) after")
+
+        print(failures == 0 ? "\nprobe: all passed" : "\nprobe: \(failures) failed")
         exit(failures == 0 ? 0 : 1)
     }
 }

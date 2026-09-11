@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.10 — 2026-09-11
 
 **The "who was on this call" question has a search box, and ticks what it can
 work out for itself.** The roster grows past what fits in the list, and scrolling

@@ -25,6 +25,11 @@ enum GriasaMain {
         }
         // `Griasa --closure-scan [n]` asks the closure question about the n most
         // recent meetings and reports counts, changing nothing.
+        if let flag = args.firstIndex(of: "--attendance-probe") {
+            let limit = args.count > flag + 1 ? Int(args[flag + 1]) ?? 8 : 8
+            await MainActor.run { }
+            await PeopleProbe.attendance(limit: limit)
+        }
         if args.contains("--closure-selftest") { await ClosureScan.selfTest() }
         if let flag = args.firstIndex(of: "--closure-scan") {
             let limit = args.count > flag + 1 ? Int(args[flag + 1]) ?? 8 : 8

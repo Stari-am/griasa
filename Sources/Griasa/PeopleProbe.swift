@@ -18,6 +18,47 @@ enum PeopleProbe {
     /// the call will never be executed, and this project builds with no
     /// warnings — the enum is already main-actor isolated, so the hop is not
     /// needed for the stores it touches.
+    /// `--attendance-probe`: for each of the most recent recordings, works out
+    /// which calendar event it overlapped and how many roster names that would
+    /// tick. Counts only — no names, no titles.
+    static func attendance(limit: Int) async -> Never {
+        let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Griasa Recordings", isDirectory: true)
+        let folders = ((try? FileManager.default.contentsOfDirectory(
+            at: root, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.hasDirectoryPath }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+            .prefix(limit)
+
+        print("calendar access: \(Permissions.calendarGranted)")
+        print("roster: \(PersonStore.shared.candidates.count) known people")
+        print("recordings to check: \(folders.count)\n")
+
+        var matched = 0, ticked = 0
+        for (index, folder) in folders.enumerated() {
+            guard let window = AppState.window(of: folder) else {
+                print("  \(index + 1). folder name is not a timestamp — skipped")
+                continue
+            }
+            let minutes = Int(window.upperBound.timeIntervalSince(window.lowerBound) / 60)
+            let events = MeetingPrepWatcher.events(overlapping: window)
+            guard let event = MeetingAttendance.event(for: window, among: events) else {
+                print("  \(index + 1). \(minutes) min, \(events.count) overlapping events — no match")
+                continue
+            }
+            matched += 1
+            let names = MeetingAttendance.preselected(
+                from: event, roster: PersonStore.shared.candidates)
+            ticked += names.count
+            print("  \(index + 1). \(minutes) min, \(events.count) overlapping events — "
+                + "matched one with \(event.attendees.count) attendees, "
+                + "\(names.count) already on the roster")
+        }
+        print("\nrecordings matched to an event: \(matched) of \(folders.count)")
+        print("names that would be ticked in total: \(ticked)")
+        exit(0)
+    }
+
     static func run() async -> Never {
         let store = PersonStore.shared
         let roster = ParticipantRoster.shared

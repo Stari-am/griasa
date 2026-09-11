@@ -225,6 +225,22 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// When a recorded folder was made and when it was last written, from the
+    /// folder itself. Returns nil rather than guessing if the name is not the
+    /// timestamp the recorder writes.
+    static func window(of folder: URL) -> ClosedRange<Date>? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        guard let start = formatter.date(from: folder.lastPathComponent) else { return nil }
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let end = contents
+            .compactMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey])
+                                 .contentModificationDate }
+            .max() ?? start
+        return start...max(start, end)
+    }
+
     private func installHotkey() {
         hotkey = HotkeyMonitor(key: hotkeyChoice,
                                onPress: { [weak self] in Task { @MainActor in self?.beginDictation() } },
@@ -423,6 +439,9 @@ final class AppState: ObservableObject {
         let folder = await recorder.stop()
         recorder.onSystemBuffer = nil
         isRecording = false
+        // Kept before it is cleared: the participants question uses it to find
+        // the calendar event this recording overlapped.
+        let recordingWindow = recordingStartedAt.map { $0...Date() }
         recordingStartedAt = nil
 
         guard transcribeRecordings, let folder else { return }
@@ -438,7 +457,7 @@ final class AppState: ObservableObject {
         // Ask who was on the call, so the AI can name the speakers — unless
         // disabled or there's no provider to attribute with.
         if askParticipants, AIFormatter.isConfigured {
-            ParticipantsPrompt.shared.ask { [weak self] names in
+            ParticipantsPrompt.shared.ask(recording: recordingWindow) { [weak self] names in
                 ParticipantRoster.shared.remember(names)
                 self?.runMeetingPipeline(folder: folder, participants: names,
                                         notes: meetingNotes, autoStopNote: autoStopNote)
@@ -539,7 +558,11 @@ final class AppState: ObservableObject {
             return
         }
         if askParticipants, AIFormatter.isConfigured {
-            ParticipantsPrompt.shared.ask { [weak self] names in
+            // Re-processing a folder recorded earlier: its name is the moment
+            // the recording started, and the newest file in it is roughly when
+            // it stopped. Worth the guess — this is the case where the user has
+            // had time to forget who was on the call.
+            ParticipantsPrompt.shared.ask(recording: Self.window(of: folder)) { [weak self] names in
                 ParticipantRoster.shared.remember(names)
                 self?.runMeetingPipeline(folder: folder, participants: names, notes: [])
             }

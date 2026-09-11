@@ -56,7 +56,7 @@ final class MeetingPrepWatcher: ObservableObject {
 
     @Published var state: PrepState = .empty("No meeting selected yet.")
 
-    private let store = EKEventStore()
+    fileprivate let store = EKEventStore()
     private var timer: Timer?
     /// The event the current brief was built from, so it can be rebuilt after the
     /// user links an attendee to somebody. Rebuilding is the honest way to show
@@ -152,6 +152,27 @@ final class MeetingPrepWatcher: ObservableObject {
     /// which is the same set matching already searches.
     var linkableNames: [String] {
         PersonStore.shared.allNames.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    /// Calendar events overlapping a finished recording, reduced to what the
+    /// attendance rules need. Empty without calendar access, which is the same
+    /// as having no guess — the panel then behaves exactly as it always did.
+    static func events(overlapping window: ClosedRange<Date>) -> [MeetingAttendance.Event] {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
+        let store = MeetingPrepWatcher.shared.store
+        let predicate = store.predicateForEvents(withStart: window.lowerBound,
+                                                 end: window.upperBound, calendars: nil)
+        return store.events(matching: predicate)
+            .filter { !$0.isAllDay }
+            .map { event in
+                MeetingAttendance.Event(
+                    title: event.title ?? "",
+                    start: event.startDate,
+                    end: event.endDate,
+                    attendees: (event.attendees ?? [])
+                        .filter { !$0.isCurrentUser && $0.participantType == .person }
+                        .map { .init(name: $0.name, email: $0.url.absoluteString) })
+            }
     }
 
     private func upcomingEvents(from: Date, to: Date) -> [EKEvent] {

@@ -65,8 +65,29 @@ final class ParticipantsPrompt {
     static let shared = ParticipantsPrompt()
     private var completion: (([String]) -> Void)?
 
-    func ask(completion: @escaping ([String]) -> Void) {
+    /// Names already ticked when the question appears, and the event they came
+    /// from. Worked out once, when the question is asked, rather than in the
+    /// view: the view is rebuilt whenever anything on it changes, and a guess
+    /// that recomputes would undo the user's own ticks as they made them.
+    private(set) var preselected: [String] = []
+    private(set) var preselectedFrom: String?
+
+    func ask(recording window: ClosedRange<Date>?,
+             completion: @escaping ([String]) -> Void) {
         self.completion = completion
+        preselected = []
+        preselectedFrom = nil
+        if let window {
+            let events = MeetingPrepWatcher.events(overlapping: window)
+            if let event = MeetingAttendance.event(for: window, among: events) {
+                let names = MeetingAttendance.preselected(
+                    from: event, roster: PersonStore.shared.candidates)
+                if !names.isEmpty {
+                    preselected = names
+                    preselectedFrom = event.title.isEmpty ? nil : event.title
+                }
+            }
+        }
         HubController.shared.open(.participants)
     }
 
@@ -86,6 +107,19 @@ struct WhoIsWhoView: View {
 
     @State private var selected: Set<String> = []
     @State private var newName = ""
+    @State private var search = ""
+    @State private var preselectedFrom: String?
+
+    /// The roster, filtered by the search box. A name already ticked stays in
+    /// the list whatever is typed: hiding a tick makes it invisible, and an
+    /// invisible tick is a name on a transcript that nobody chose.
+    private var visible: [String] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return roster.names }
+        return roster.names.filter {
+            $0.localizedCaseInsensitiveContains(query) || selected.contains($0)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -106,9 +140,30 @@ struct WhoIsWhoView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                HStack(spacing: 8) {
+                    TextField("Search", text: $search)
+                        .textFieldStyle(.roundedBorder)
+                    Text(selected.isEmpty ? "none selected"
+                                          : "\(selected.count) selected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                if let preselectedFrom {
+                    Label("Ticked from “\(preselectedFrom)” in your calendar — check it.",
+                          systemImage: "calendar")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
-                        ForEach(roster.names, id: \.self) { name in
+                        if visible.isEmpty {
+                            Text("Nobody matches “\(search)”.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(visible, id: \.self) { name in
                             Toggle(name, isOn: Binding(
                                 get: { selected.contains(name) },
                                 set: { on in
@@ -144,6 +199,14 @@ struct WhoIsWhoView: View {
         }
         .padding(16)
         .frame(maxWidth: 440, maxHeight: 460)
+        .onAppear {
+            // Read once. The guess belongs to the question being asked, not to
+            // every redraw — recomputing here would put back a tick the user had
+            // just cleared.
+            let prompt = ParticipantsPrompt.shared
+            selected = Set(prompt.preselected)
+            preselectedFrom = prompt.preselectedFrom
+        }
     }
 
     private func addName() {

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+**The "who was on this call" question has a search box, and ticks what it can
+work out for itself.** The roster grows past what fits in the list, and scrolling
+for one name after every meeting is the kind of small friction that ends with the
+question being skipped. It filters as you type, and a name you have already
+ticked stays visible whatever you type — a tick you cannot see is a name on a
+transcript that nobody chose.
+
+It also looks at the calendar. If a meeting overlapped the recording, the people
+on that invitation who are already on your list are ticked when the question
+appears, with a line saying which meeting they came from, because boxes that tick
+themselves without explanation are worse than boxes you tick by hand. Only people
+already on the list: a large invitation carries a long tail of names that were
+never worth remembering, and adding them would make the question harder to
+answer, not easier.
+
+The event is chosen by how much time it shares with the recording, not by how
+near it starts, and an overlap under a minute does not count — back-to-back calls
+are normal, and the meeting that ended as yours began would otherwise tick an
+entirely different set of people. Without calendar access, or with no matching
+event, the question is exactly what it always was.
+
 ## 1.0.9 — 2026-09-10
 
 **Old promises with no date now get asked about.** Most promises never carry a

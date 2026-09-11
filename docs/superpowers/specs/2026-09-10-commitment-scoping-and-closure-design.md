@@ -16,20 +16,20 @@ Three things, from use rather than from a wish list:
 
 ## What the data says
 
-Measured on the real store (46 recorded meetings) before designing, because two
-of the obvious designs are refuted by it:
+Measured against a real store before designing, because two of the obvious
+designs are refuted by it. The measurements were run in place and the counts stay
+there; what is recorded here is what they showed:
 
-- **49 distinct titles across 49 meetings — no repeats.** So a recurring meeting
-  cannot be identified by its title. Titles are typed after the call and are
-  never the same twice.
-- **Participant sets do repeat: 5 sets cover 23 meetings.** Half of all recorded
-  meetings are a recurrence of one of five groups. Exact set match works, and
-  works retroactively on everything already recorded.
-- **Fuzzy participant matching is useless here.** At 60% overlap, 113 pairs match
-  and 39 of 46 meetings join one cluster of eleven. It would merge every meeting
-  with every other.
-- **8 meetings have exactly one other participant**, so a one-to-one is
-  recognisable by counting, with nothing new to store.
+- **Titles do not repeat.** Every recorded meeting had a distinct title, so a
+  recurring meeting cannot be identified by name — titles are typed after the
+  call and are never the same twice.
+- **Participant sets do repeat.** A substantial share of meetings are a
+  recurrence of the same small group. Exact set match works, and works
+  retroactively on everything already recorded.
+- **Fuzzy participant matching is useless here.** At 60% overlap almost every
+  meeting joins one large cluster. It would merge every meeting with every other.
+- **One-to-ones are recognisable by counting participants**, with nothing new to
+  store.
 
 ## Design
 
@@ -44,7 +44,7 @@ Neither "this is a one-to-one" nor "this belongs to a series" becomes a field on
 
 This matters beyond tidiness. Adding a field to `Commitment` means writing its
 decoder by hand — the synthesized one throws on a missing key and takes the whole
-file with it — and migrating 46 meetings' worth of records. Deriving costs
+file with it — and migrating every record already stored. Deriving costs
 nothing and cannot fall out of sync with the meeting it describes. Commitments
 added by hand have no source and land in *General*.
 

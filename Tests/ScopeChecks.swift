@@ -65,16 +65,17 @@ do {
           saw: "\(String(describing: a)) vs \(String(describing: b))")
 }
 
-// The measured refutation, kept as a rule: matching loosely joined 39 of 46 real
-// meetings into one cluster, so a set that merely overlaps is NOT the series.
+// The measured refutation, kept as a rule: matching loosely joined almost every
+// real meeting into one cluster, so a set that merely overlaps is NOT the series.
 do {
     let four = Scope.seriesKey(["Petrov", "Ivanova", "Sidorov", "Kuznetsov"])
     let three = Scope.seriesKey(["Petrov", "Ivanova", "Sidorov"])
     check(four != three,
           rule: "a participant set that only overlaps is a different series",
-          meaning: "measured on the real store: at 60% overlap, 39 of 46 meetings collapse "
-                 + "into a single cluster of eleven, and every meeting becomes every other "
+          meaning: "measured against a real store: at 60% overlap almost every meeting "
+                 + "collapses into one cluster, and every meeting becomes every other "
                  + "meeting's history",
+
           saw: "four-person key equals three-person key: \(four == three)")
 }
 
@@ -237,8 +238,8 @@ do {
           saw: "\(Scope.needsReview(ageDays: 120, hasDueDate: true, reviewedDaysAgo: nil))")
 }
 
-// The threshold is the number measured off the real store: at 30 days there are
-// 38 to work through, at 14 there would be 137.
+// The threshold came from measurement: thirty days leaves a batch somebody works
+// through, two weeks leaves several times as many.
 do {
     let just = Scope.needsReview(ageDays: Scope.reviewAfterDays,
                                  hasDueDate: false, reviewedDaysAgo: nil)
@@ -266,10 +267,9 @@ do {
 
 // ── Which promises get asked about ───────────────────────────────────────────
 
-// The prompt can only carry a few dozen of 339 open promises. Ranking them by
-// recency alone means an older meeting is only ever offered promises made after
-// it, which is backwards — a meeting can only close something that already
-// existed.
+// The prompt can only carry a few dozen open promises. Ranking them by recency
+// alone means an older meeting is only ever offered promises made after it,
+// which is backwards — a meeting can only close something that already existed.
 do {
     let old = UUID(), recent = UUID(), unrelated = UUID()
     let entry = UUID()
@@ -282,9 +282,9 @@ do {
                                         participantsByEntry: [entry: ["petrov"]])
     check(ranked.first == old,
           rule: "a promise tied to the people in the room is asked about before newer ones",
-          meaning: "with 339 open promises and room for a few dozen, ranking by date alone "
-                 + "means an old meeting is only ever shown promises made after it — so it "
-                 + "can never close anything",
+          meaning: "with more open promises than the prompt can carry, ranking by date "
+                 + "alone means an old meeting is only ever shown promises made after it — "
+                 + "so it can never close anything",
           saw: "first ranked is \(ranked.first == old ? "the related one" : "something else")")
     check(ranked.count == items.count && Set(ranked).count == items.count,
           rule: "ranking keeps every promise exactly once",

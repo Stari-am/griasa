@@ -54,11 +54,11 @@ struct CommitmentsView: View {
 
     /// Old promises with no date, which is the shape most of them have.
     ///
-    /// Measured on this store: 245 of 339 open promises carry no date at all.
-    /// A dated promise surfaces itself when it comes due; an undated one never
-    /// surfaces, so the list only grows. This asks about the oldest of them, a
-    /// few at a time, with no model involved — it is arithmetic on dates, so it
-    /// is instant and works with no provider and no network.
+    /// Most open promises carry no date at all. A dated promise surfaces itself
+    /// when it comes due; an undated one never surfaces, so the list only grows.
+    /// This asks about the oldest of them, a few at a time, with no model
+    /// involved — it is arithmetic on dates, so it is instant and works with no
+    /// provider and no network.
     private var reviewBox: some View {
         let due = store.needsReview
         let shown = Array(due.prefix(8))

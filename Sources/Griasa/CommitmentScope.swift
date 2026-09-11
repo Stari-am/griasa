@@ -33,11 +33,11 @@ enum CommitmentScope {
 
     /// The identity of a recurring meeting: its exact participant set.
     ///
-    /// Exact, not similar. Measured on 46 real meetings: 49 titles across 49
-    /// meetings never repeat, so titles are useless as an identity, while five
-    /// exact participant sets account for 23 of the meetings. Matching at 60%
-    /// overlap instead joins 39 of those 46 into a single cluster of eleven,
-    /// which would put every meeting in every other meeting's "this meeting".
+    /// Exact, not similar. Measured against a real store: titles never repeat
+    /// between recordings, so they are useless as an identity, while the same
+    /// exact participant set accounts for a large share of meetings. Matching at
+    /// 60% overlap instead joins almost everything into one cluster, which would
+    /// put every meeting in every other meeting's "this meeting".
     ///
     /// Returns nil when there is nothing to key on, so a caller cannot
     /// accidentally treat two participant-less meetings as the same series.
@@ -57,13 +57,13 @@ enum CommitmentScope {
 
     /// How old an undated promise gets before it is worth asking about.
     ///
-    /// Chosen from this store rather than from a feeling. Nothing open here is
-    /// older than 51 days, so the "three months and forgotten" case does not
-    /// exist; and 245 of 339 open promises carry no date at all, which is the
-    /// real reason the list only grows — a dated promise surfaces itself when
-    /// it comes due, and an undated one never surfaces at all. At thirty days
-    /// that leaves 52 to look at, which is a batch somebody will actually work
-    /// through. At fourteen it would be 137, which is another list nobody reads.
+    /// Chosen by measuring a real store rather than from a feeling. Two things
+    /// that measurement showed: hardly anything open was old enough for the
+    /// "three months and forgotten" case to exist, and most open promises carry
+    /// no date at all — which is the real reason the list only grows, because a
+    /// dated promise surfaces itself when it comes due and an undated one never
+    /// surfaces. Thirty days left a batch somebody will actually work through;
+    /// two weeks left several times as many, which is another list nobody reads.
     static let reviewAfterDays = 30
 
     /// Whether a promise should be put in front of the user to confirm it is
@@ -94,10 +94,10 @@ enum CommitmentScope {
     /// by recency.
     ///
     /// Ranking by recency alone was the first version and it is backwards for
-    /// anything but the meeting that just ended — with 339 open promises and a
-    /// cap of 60, an older meeting could only ever be offered promises made
-    /// after it. Both halves keep their own order, so a re-run over the same
-    /// meeting proposes the same candidates.
+    /// anything but the meeting that just ended: once there are more open
+    /// promises than fit in the prompt, an older meeting can only ever be
+    /// offered promises made after it. Both halves keep their own order, so a
+    /// re-run over the same meeting proposes the same candidates.
     ///
     /// Takes tuples rather than the store's model, and the history lookup as an
     /// argument rather than reaching for it, which is what lets this be checked.

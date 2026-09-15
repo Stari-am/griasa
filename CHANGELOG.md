@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+**Screenshots are taken against an invented team, not moved-aside real data.**
+`GRIASA_STORE` points history, commitments, people, projects and the participant
+roster at another directory, so `Support/shoot-docs.sh` can fill one with a
+made-up company and photograph every tab in `docs/`. The roster is the part that
+needed the work: it lives in UserDefaults, which no environment variable can
+redirect, so with the override set it reads from a file beside the other stores
+instead — swapping only the JSON files used to leave real colleagues visible in
+the sidebar of nearly every screen.
+
+A run with `--shoot` now also declines to claim the hotkeys, bind the MCP port or
+start a speech server. It loads the stores, draws one window and exits, and all
+three of those belong to whichever Griasa is actually in use on the Mac — one of
+them was sweeping that app's speech server away on the way past.
+
+The site and the README describe the app as it now is: the brief grouped by why
+each promise is being shown, closure from evidence, the monthly review of undated
+promises, addresses and merging on a person's page, and the MCP endpoint, which
+was not mentioned anywhere on the site at all.
+
 ## 1.0.10 — 2026-09-11
 
 **The "who was on this call" question has a search box, and ticks what it can

@@ -71,9 +71,7 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var working: Set<UUID> = []
 
     private let maxEntries = 500
-    private let fileURL: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Griasa/history.json")
+    private let fileURL: URL = StoreRoot.file("history.json")
 
     init() { load() }
 

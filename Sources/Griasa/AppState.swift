@@ -144,6 +144,14 @@ final class AppState: ObservableObject {
     }
 
     func bootstrap() {
+        // A screenshot run loads the stores, draws one window and exits. It has
+        // no business claiming the hotkeys, binding the MCP port or starting a
+        // speech server — all of which belong to whichever Griasa the person at
+        // this Mac is actually using, and one of which sweeps the other's
+        // subprocess away on the way past.
+        // The prep watcher stays stopped too: it would poll the calendar and
+        // replace the brief the screenshot is of.
+        if AppDelegate.shotPath != nil { return }
         Permissions.requestAll()
         installHotkey()
         setupWhisper()

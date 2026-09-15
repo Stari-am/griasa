@@ -41,17 +41,17 @@ Free, and nothing is held back: there is no license check, and under GPL-3.0 the
 
 Think of it the way you think of WinRAR: the trial never ends and it keeps working whether or not you pay. WinRAR apparently makes real money like that, which leaves the mystery nobody has solved in thirty years — *somebody* pays. Feel free to be one of the somebodies.
 
-![The Griasa hub with one recorded meeting open: summary, key points, open questions, per-person action items and a timestamped transcript](docs/screenshot-history.png)
+![The Griasa hub with one recorded meeting open: summary, key points, per-person action items and a timestamped transcript](docs/screenshot-history.png)
 
-*One recorded meeting after it ended. Nothing in that pane was typed by hand.*
+*One recorded meeting after it ended. Nothing in that pane was typed by hand — and everybody in these screenshots is invented, per `Support/shoot-docs.sh`.*
 
-![The Commitments tab, split into My promises and Waiting on others, each item with a due date and the meeting it came from](docs/screenshot-commitments.png)
+![The Commitments tab: a Looks done card proposing two closures with the sentence that says so, a Still real? card asking about three undated promises over a month old, then My promises](docs/screenshot-commitments.png)
 
-*The same meetings read a different way: what you owe, and what you are owed.*
+*The two things that make the list shrink: evidence that something was finished, and a question about what has carried no date for a month. Underneath, what you owe and what you are owed.*
 
-![The pre-meeting brief: who is on the call with each person's open-promise count, what the last meeting was about, and both lists of promises](docs/screenshot-prep.png)
+![The pre-meeting brief: who is on the call with each person's open-promise count, what the last meeting was about, and promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere](docs/screenshot-prep.png)
 
-*Five minutes before a call, without taking keyboard focus. Built from local data only.*
+*Five minutes before a call, without taking keyboard focus. Grouped by why you are being shown each promise; one involving nobody in the room is not shown at all. Built from local data only.*
 
 ## How dictation behaves
 

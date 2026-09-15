@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import CoreGraphics
 
 @main
 enum GriasaMain {
@@ -142,6 +143,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let size = AppDelegate.shotSize { HubController.shared.resize(to: size) }
             }
             if let path = AppDelegate.shotPath {
+                // The window opens under wherever the pointer happens to be, and
+                // a row lit up by a hover is not what the app looks like.
+                CGWarpMouseCursorPosition(CGPoint(x: 4, y: 4))
                 // Long enough for the stores to load, the Settings scene to
                 // appear and SwiftUI to lay out; short enough that a failed
                 // shot is obvious rather than a hang.

@@ -11,9 +11,7 @@ final class CommitmentStore: ObservableObject {
 
     @Published private(set) var commitments: [Commitment] = []
 
-    private let fileURL: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Griasa/commitments.json")
+    private let fileURL: URL = StoreRoot.file("commitments.json")
 
     init() { load() }
 

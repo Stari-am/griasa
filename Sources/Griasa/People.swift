@@ -43,9 +43,7 @@ final class PersonStore: ObservableObject {
     /// Names currently generating a dossier, for inline spinners.
     @Published var generating: Set<String> = []
 
-    private let fileURL: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Griasa/people.json")
+    private let fileURL: URL = StoreRoot.file("people.json")
 
     init() { load() }
 

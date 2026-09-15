@@ -180,8 +180,8 @@
 
 <figure class="shot">
   <img src="screenshot-history.png" width="1280" height="880"
-       alt="The Griasa hub: a list of recorded meetings and dictations on the left, and one meeting opened on the right with a summary, key points, open questions, per-person action items and a timestamped transcript.">
-  <figcaption>One recorded meeting, after it ended: summary, key points, the questions nobody could answer, who took what on, and the transcript with names and timecodes. Nothing here was typed by hand.</figcaption>
+       alt="The Griasa hub: a list of recorded meetings and dictations on the left, and one meeting opened on the right with a summary, key points, per-person action items and a timestamped transcript.">
+  <figcaption>One recorded meeting, after it ended: summary, key points, who took what on, and the cleaned transcript with names and timecodes. Nothing here was typed by hand. (Everybody in these screenshots is invented — the app is pointed at a made-up team for exactly this purpose.)</figcaption>
 </figure>
 
 <p>Speech recognition runs on the Mac itself — Apple's recognizer or a local <code>whisper.cpp</code> model. Only the optional text-cleanup step can reach a language model, and only if you turn it on.</p>
@@ -193,8 +193,11 @@
 <ul>
   <li><b>Record a meeting</b> from system audio and the microphone together, and get a transcript with speaker names and your own live notes woven in.</li>
   <li><b>Commitments</b> are pulled out of that transcript automatically — who took what on and by when — split into what you promised and what you are waiting on. One click sends any of them to Apple Reminders.</li>
-  <li><b>A page per person</b>, built from the meeting roster with no setup: every meeting with them, their open promises, and an on-demand dossier written from the transcripts they appear in.</li>
-  <li><b>A brief before the call.</b> Minutes before a calendar event, what you last discussed, what each of you promised, and a button that opens the Zoom or Meet link and starts recording in one go.</li>
+  <li><b>A brief before the call.</b> Minutes before a calendar event: who is on it, what you last discussed, and the open promises grouped by <i>why</i> you are being shown them — overdue, promised in an earlier meeting with exactly these people, from a one-to-one with somebody on this call, or with these people from somewhere else. A promise involving nobody in the room is not shown at all. One button opens the Zoom or Meet link and starts recording.</li>
+  <li><b>A conversation can close a promise</b> — once you agree. When a later meeting says something was finished, it has to quote the sentence that says so, and that sentence is checked against the notes word for word. Nothing is ever closed without a click.</li>
+  <li><b>Old promises get asked about.</b> Anything undated and made over a month ago is offered for review, oldest first: still open, done, or it was never a commitment. No model is involved — it is arithmetic on dates, so it works offline and cannot be wrong about anything except the calendar.</li>
+  <li><b>A page per person</b>, built from the meeting roster with no setup: every meeting with them, their open promises, the addresses they are known by, and an on-demand dossier written from the transcripts they appear in. Two entries for one human — the ordinary accident, since names get typed in a hurry — merge into one.</li>
+  <li><b>The assistant you already have open can read all of it.</b> Claude Code, Codex, Cursor, anything that speaks MCP: what is open and with whom, what the last conversation with somebody was about, what the next meeting holds. Local endpoint, token, read-only.</li>
   <li><b>Remind me, from anything on screen</b> (⌃⌥⌘R). Select a line in Slack, Telegram, Mail or a browser — or drag a rectangle over a part of the screen that isn't selectable at all — and a small menu opens at the cursor: in 20 minutes, an hour, three hours, tomorrow at nine, next Monday, a date picker, or <i>from the text</i>, where the model reads the deadline out of the sentence itself. It lands in Apple Reminders, so it reaches your phone and watch.</li>
   <li><b>Typed abbreviations</b> that expand in place, anywhere, with live values rather than static text.</li>
   <li><b>Hold a key and talk.</b> The words appear in whatever app has focus — Telegram, Slack, a terminal, a browser field — while you are still speaking.</li>
@@ -207,18 +210,20 @@
 <p class="quiet">The part that is actually hard to copy is not on the list. It is that these are one thing: the reminder you make during a call, the promises extracted from that same call, the page for the person who made them, and the brief that greets you before the next meeting with them all point at the same people and the same history. Five separate apps would need five integrations and would still lose the joins, because a join is not a feature any one of them owns.</p>
 
 <figure class="shot">
-  <img src="screenshot-commitments.png" width="1080" height="800"
-       alt="The Commitments tab, split into My promises and Waiting on others, each item showing its due date, the meeting it came from and who made the promise.">
-  <figcaption>The same meetings, read a different way: what you owe, and what you are owed. The split is the point — a flat list of action items is a list nobody owns.</figcaption>
+  <img src="screenshot-commitments.png" width="1080" height="1002"
+       alt="The Commitments tab. A green Looks done card proposes closing two promises, each quoting the sentence from a later meeting that says it was finished, with Close it and Still open buttons. Below it a Still real? card asks about three undated promises made over a month ago, then the list of My promises.">
+  <figcaption>The two things that make the list shrink. <b>Looks done</b>: a later conversation said these were finished, and had to quote the sentence — nothing is closed until you click. <b>Still real?</b>: no date, over a month old, so nothing was ever going to surface it on its own. Underneath, the ordinary split — what you owe, and what you are owed.</figcaption>
 </figure>
 
 <h2>What the standard AI apps don't do</h2>
 
 <ul>
   <li><b>A reminder that remembers where it came from.</b> Every item records the app and window it was created in — the Slack channel, the Telegram chat — and in a browser it carries the tab's URL with a text anchor, so one click on the reminder scrolls you back to the exact paragraph three days later. Rectangle captures keep the clipped image too. Other tools save the words; the thing you actually need at the deadline is the context, and reconstructing "where did I read this" is the work nobody accounts for.</li>
+  <li><b>The list is built to shrink, not only to grow.</b> "I'll send it by Friday" becomes a dated item assigned to the person who said it, deduplicated against what is already open. Then three things work against the pile: the brief before a meeting shows only what that meeting is about, a later conversation can propose closing something and must quote the evidence, and anything old and undated gets asked about. Undated is the case that matters — a promise with a date surfaces itself when the date passes, and a promise without one never surfaces at all.</li>
+  <li><b>Nothing closes itself.</b> A detection arrives as "Looks done", with its quote and two buttons. The errors are not symmetric: wrongly closing a promise means forgetting something you owe and hearing about it from the person you owed it to, while wrongly leaving one open costs a line of noise. Anything that quietly resolves your obligations is optimising the wrong side of that.</li>
+  <li><b>Your own assistant can query it.</b> Switch on <i>Settings → System → AI assistants (MCP)</i> and the tools you already have open answer from your meeting history: open promises split into yours and theirs, one colleague with their notes and last conversation, meetings by search, one meeting, one transcript, the next brief, people, projects. Summary and transcript are deliberately separate questions, so asking about commitments cannot pull months of conversation into a cloud model by accident. Reads only — an assistant can change nothing.</li>
   <li><b>Abbreviations expand to real data.</b> <code>{slots:3}</code> becomes three genuinely free slots read from your calendar; <code>{commitments}</code> becomes your actually-open promises. Not a template you fill in afterwards.</li>
   <li><b>You can ask a model mid-sentence, in someone else's window.</b> Type <code>;ai what's the capital of Armenia ;;</code> inside a chat composer and the question is replaced in place by the answer. No window switch, no paste.</li>
-  <li><b>The meeting turns into obligations, not just a summary.</b> "I'll send it by Friday" becomes a dated item assigned to the person who said it, deduplicated against what is already open, exportable as tasks that Todoist, Things and Linear split into individual rows.</li>
   <li><b>It uses the AI subscription you already pay for.</b> If the <code>claude</code> or <code>codex</code> CLI is installed and logged in, Griasa answers through it — no API key, no second subscription. Or point it at Ollama and the whole thing runs with nothing leaving the Mac.</li>
   <li><b>It types into other people's apps, not into its own box.</b> Most assistants give you a text area and a copy button. Griasa puts the words where your cursor already is, as you speak, and never overwrites what you typed yourself.</li>
 </ul>
@@ -226,15 +231,15 @@
 <p class="quiet">Some of this will arrive in the operating system, and the inline model answer is the obvious candidate — a rebuilt Siri should do exactly that, and probably will. What does not arrive that way is a record of what was promised, by whom, across months of calls, tied to the people you actually work with. Operating systems ship features; so do the startups shipping the same three. Nobody ships the joins between them, because the joins are somebody's job rather than a product category.</p>
 
 <figure class="shot">
-  <img src="screenshot-people.png" width="1080" height="800"
-       alt="A page for one colleague: notes that save themselves, an on-demand AI dossier, and every meeting held with that person.">
-  <figcaption>A page per colleague appears on its own, built from the meeting roster — no setup step, no contact to create.</figcaption>
+  <img src="screenshot-people.png" width="1080" height="820"
+       alt="A page for one colleague: notes that save themselves, the addresses she is known by, what she has promised, an on-demand AI dossier, and every meeting held with her.">
+  <figcaption>A page per colleague appears on its own, built from the meeting roster — no setup step, no contact to create. The addresses are how an invitation is recognised as her next time; two entries for one human merge, which is the accident that actually happens when names are typed the minute a call ends.</figcaption>
 </figure>
 
 <figure class="shot">
-  <img src="screenshot-prep.png" width="1000" height="980"
-       alt="The pre-meeting brief: the meeting about to start, who is on the call with each person's open-promise count, what the last meeting with them was about, and both lists of promises.">
-  <figcaption>Five minutes before a call, without taking keyboard focus: who is on it, what you last discussed, and both directions of what was promised. Assembled from local data only — no request stands between you and a meeting that starts in five minutes.</figcaption>
+  <img src="screenshot-prep.png" width="1000" height="1000"
+       alt="The pre-meeting brief: the meeting about to start, who is on the call with each person's open-promise count and your note about them, what the last meeting with them was about, then promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere.">
+  <figcaption>Five minutes before a call, without taking keyboard focus. The groups are the point: <b>overdue</b>, then <b>from this meeting before</b> — an earlier call with exactly these people — then what came out of a <b>one-to-one</b> with somebody in the room, then everything else involving them. A promise involving nobody here is not shown at all. Assembled from local data only: no request stands between you and a meeting that starts in five minutes.</figcaption>
 </figure>
 
 <h2>What leaves your Mac, and what doesn't</h2>
@@ -243,16 +248,28 @@
   <li><b>Audio never leaves it.</b> Transcription is local — Apple's recognizer or <code>whisper.cpp</code>. There is no Griasa server and no account to create.</li>
   <li><b>Text goes only to the provider you configure</b> — Anthropic, OpenAI, Gemini, or a local model via Ollama or LM Studio, in which case nowhere at all. If a local model fails, the app asks before it ever sends anything to a cloud key.</li>
   <li><b>Or use the subscription you already have.</b> With the <code>claude</code> or <code>codex</code> CLI installed and logged in, there is no API key at all.</li>
-  <li><b>Every permission is auditable and optional.</b> Microphone, screen recording, accessibility — each one says what still works if you decline it, and the code that asks is right there. Even a strict "no cloud recorders" IT policy has a compliant mode: local Whisper plus a local model.</li>
+  <li><b>The calendar is read, never written.</b> Griasa reads events to know a meeting is about to start and who was invited to it. It creates nothing, changes nothing, and declining the permission costs you the brief and the pre-ticked participants — nothing else.</li>
+  <li><b>What an assistant reads, it takes with it.</b> The MCP endpoint is local and needs a token, but whatever your assistant reads goes wherever that assistant sends its context. That is why the summary of a meeting and the transcript of it are separate questions — asking about commitments cannot drag months of conversation into a cloud model by accident — and why the endpoint is read-only and off until you switch it on.</li>
+  <li><b>Every permission is auditable and optional.</b> Microphone, screen recording, accessibility, calendar — each one says what still works if you decline it, and the code that asks is right there. Even a strict "no cloud recorders" IT policy has a compliant mode: local Whisper plus a local model.</li>
 </ul>
 
 <h2>Why this is harder than it looks</h2>
 
-<p>Dictation looks like a small app: capture audio, call a recognizer, insert the text. Every one of those three steps hid a problem that only appears once real people use it.</p>
+<p>Dictation looks like a small app: capture audio, call a recognizer, insert the text. Every one of those three steps hid a problem that only appears once real people use it — and the meeting side has turned out no gentler. A few of them, because the shape repeats.</p>
 
 <div class="case">
   <h3>Typing live means never being allowed to take a word back</h3>
   <p>A recognizer revises its guess constantly — "тестирую" becomes "тестируй" becomes "тестирую" again. Retype the line each time and you delete whatever the user typed in between. <b>The fix was a policy, not a patch:</b> commit only the words two successive hypotheses agree on, append and never rewrite, and when they disagree, stall rather than invent. The naive version passed a casual test and ate a sentence the first time someone typed during a pause.</p>
+</div>
+
+<div class="case">
+  <h3>The question cancelled itself with its own alert</h3>
+  <p>A recording left running after everyone leaves is a common way to lose an hour of disk and a week of confidence, so a long silence raises "still recording — keep going?" and sounds the alert that is meant to reach you in the next room. It appeared, beeped, and vanished about a second later, every time. The alert comes back in through the system-audio capture at −16.9 dBFS, which is 23 dB above the level that counts as somebody talking, <b>so the watch heard itself and concluded the meeting had resumed.</b> The obvious flag for this, <code>excludesCurrentProcessAudio</code>, does nothing — macOS does not play the alert as this app's audio. Sound now has to continue for four seconds before it counts as a conversation, which no alert macOS ships can clear, and neither can a cough or a door.</p>
+</div>
+
+<div class="case">
+  <h3>The microphone's answer goes stale while nobody is listening</h3>
+  <p>Starting a recording aborted the app outright, twice in a week. One line: the tap was installed with the audio format the input node had cached, and that value goes stale whenever the audio device changes while nothing is recording — a pair of AirPods connecting is enough. Measured from the crash report, the node was reporting 24 kHz against hardware running at 48. AVFoundation compares the two and raises a C++ exception, <b>which Swift cannot catch</b>, so there was nothing to handle and the process died on the first click of Start Recording. The fix was to stop passing a format at all — there is then nothing to disagree with the hardware — and the accessor that exposed the stale value turned out to have no callers, so it was deleted rather than corrected.</p>
 </div>
 
 <div class="case">
@@ -285,6 +302,10 @@
   <p>Everything Whisper supports, around a hundred, including mixed-language speech — dictate in your own language with English technical terms and both come out right.</p></details>
 <details><summary>Why does it need microphone, screen recording and accessibility permissions?</summary>
   <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional and the app tells you what stops working if you decline. It's all in the source.</p></details>
+<details><summary>Can Claude Code or Codex read my meetings?</summary>
+  <p>Yes, once you switch on <i>Settings → System → AI assistants (MCP)</i>. Eight questions are answered — open promises, a colleague, meetings by search, one meeting, one transcript, the next brief, people, projects — over an endpoint that listens only on this Mac and only with a token, which the settings screen copies out as a ready client configuration. Reads only: an assistant can change nothing.</p></details>
+<details><summary>Does it write to my calendar?</summary>
+  <p>No. It reads events, so it knows a meeting is about to start and who was invited; it never creates or edits one. Reminders are different — those are created, but only when you ask for one.</p></details>
 <details><summary>Do I need an AI subscription?</summary>
   <p>Never to Griasa. You bring an API key — typically cents a day — or run local models with Ollama for nothing, or let it use the Claude or ChatGPT subscription you already pay for.</p></details>
 <details><summary>What do I get for the $29 that I don't get for free?</summary>

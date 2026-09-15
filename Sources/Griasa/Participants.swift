@@ -16,10 +16,19 @@ final class ParticipantRoster: ObservableObject {
 
     init() {
         myName = UserDefaults.standard.string(forKey: "myDisplayName") ?? ""
-        if let data = UserDefaults.standard.data(forKey: Self.key),
+        if let data = Self.storedData(),
            let decoded = try? JSONDecoder().decode([String].self, from: data) {
             names = decoded
         }
+    }
+
+    /// UserDefaults normally, a file beside the other stores when they have been
+    /// redirected: `GRIASA_STORE` cannot reach UserDefaults, and a roster of real
+    /// colleagues appearing in a screenshot of invented ones is exactly the
+    /// mistake this override exists to make impossible.
+    private static func storedData() -> Data? {
+        guard StoreRoot.isOverridden else { return UserDefaults.standard.data(forKey: key) }
+        return try? Data(contentsOf: StoreRoot.file("roster.json"))
     }
 
     func remember(_ newNames: [String]) {
@@ -46,7 +55,10 @@ final class ParticipantRoster: ObservableObject {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(names) {
+        guard let data = try? JSONEncoder().encode(names) else { return }
+        if StoreRoot.isOverridden {
+            try? data.write(to: StoreRoot.file("roster.json"))
+        } else {
             UserDefaults.standard.set(data, forKey: Self.key)
         }
     }

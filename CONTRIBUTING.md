@@ -82,15 +82,25 @@ cleaned up in one pass; please don't reintroduce it.
 author's own copy of this app holds real recorded meetings with real colleagues.
 When contributing:
 
-- Never commit a screenshot taken against real data. Invent people and meetings.
-  `Griasa --open <tab> --shoot out.png --size WxH` makes reproducible captures.
-- Remember that names also live in **UserDefaults**, not only in the JSON files —
-  the participant roster is stored there, and it appears in the People tab and the
-  sidebar of nearly every screen. A screenshot taken after swapping only the JSON
-  files still shows real colleagues. This has happened; check every image by eye
-  before it goes anywhere.
-- `~/Library/Application Support/Griasa/` holds history, commitments, people and
-  projects. Back it up before running anything that writes there.
+- Never commit a screenshot taken against real data. `Support/shoot-docs.sh`
+  regenerates every image in `docs/` from an invented team, and is the only way
+  they should be made.
+- It works by pointing the app somewhere else: `GRIASA_STORE=<dir>` moves history,
+  commitments, people, projects and the participant roster into that directory, so
+  nothing real is swapped out of the way and there is nothing to put back. A run
+  with `--shoot` also declines to claim the hotkeys, bind the MCP port or start a
+  speech server, so it is safe to take while the real Griasa is running.
+- The roster is the part that used to catch people out: it lives in
+  **UserDefaults**, which no environment variable can redirect, so it reads from a
+  file beside the other stores whenever `GRIASA_STORE` is set. Before that existed,
+  a screenshot taken after swapping only the JSON files still showed real
+  colleagues — it happened. Check every image by eye anyway.
+- `Griasa --open <tab> --shoot out.png --size WxH` is the underlying capture, and
+  `--demo-brief` fills the Prep tab without a calendar event. The hub cannot be
+  made taller than the screen, so a tab that does not fit is cropped at the bottom.
+- Without the override, `~/Library/Application Support/Griasa/` holds history,
+  commitments, people and projects. Back it up before running anything that writes
+  there.
 
 ## Reporting a bug
 

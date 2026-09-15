@@ -36,9 +36,7 @@ final class ProjectStore: ObservableObject {
     /// Last known name per project, to detect renames and move the MD folder.
     private var knownNames: [UUID: String] = [:]
 
-    private let fileURL: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Griasa/projects.json")
+    private let fileURL: URL = StoreRoot.file("projects.json")
 
     init() {
         if let data = try? Data(contentsOf: fileURL),

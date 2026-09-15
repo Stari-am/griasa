@@ -24,10 +24,7 @@ final class MCPServer: ObservableObject {
     private var connections: [ObjectIdentifier: NWConnection] = [:]
     private var token: String = ""
 
-    private var configURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Griasa/mcp.json")
-    }
+    private var configURL: URL { StoreRoot.file("mcp.json") }
 
     var endpoint: String { "http://127.0.0.1:\(port)/mcp" }
     var currentToken: String { token }

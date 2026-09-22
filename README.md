@@ -1,57 +1,90 @@
-# Griasa — what was promised, by whom, and what you walk into next
+<div align="center">
 
-A native macOS menu-bar app (Swift/SwiftUI, no dependencies) for the part of a
-manager's week that no tool holds: who owed what, when it was last raised, and
-what is about to walk through the door.
+<img src="docs/apple-touch-icon.png" alt="" width="84" height="84">
 
-1. **Meetings into obligations** — records your microphone **and** everything the
-   Mac plays (the other side of a Zoom/Meet/FaceTime call) into timestamped
-   session folders, transcribes them on-device, and pulls out who promised what,
-   split into what you took on and what you are waiting on.
-2. **A page per person, and a brief before the call** — every meeting with them,
-   their open promises, and, minutes before a calendar event, what you last
-   discussed with exactly these people.
-3. **Small things, in place, in other people's apps** — a reminder made from
-   anything on screen that remembers *where* it came from; abbreviations that
-   expand to live calendar slots rather than static text; a model answer that
-   replaces your question inside the field you were already typing in.
-4. **Dictation** — hold a hotkey, speak, release: transcribed on-device, cleaned
-   up by AI (filler words removed, punctuation fixed, tone matched to the app
-   you are typing into), inserted at the cursor of whatever app is frontmost.
-   Where the project started, and now the least interesting thing in it.
+# Griasa
+
+**A promise with a date turns up when the date passes. One without a date never turns up at all.**
+
+Griasa records your meetings on your own Mac, works out who promised what, and puts
+the second kind in front of you before your next call with the person you owe.
+A menu-bar app, not a service.
+
+[**Download for macOS**](https://github.com/Stari-am/griasa/releases/latest) ·
+[**The project page**](https://stari-am.github.io/griasa/) ·
+[What changed](CHANGELOG.md)
+
+![Latest release](https://img.shields.io/github/v/release/Stari-am/griasa?label=release&color=d9822b)
+![License](https://img.shields.io/badge/license-GPL--3.0-2f4374)
+![Platform](https://img.shields.io/badge/macOS-14%2B-555)
+![Dependencies](https://img.shields.io/badge/dependencies-none-2f4374)
+
+</div>
+
+![The pre-meeting brief: who is on the call with each person's open-promise count, what the last meeting was about, and promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere](docs/screenshot-prep.png)
+
+<div align="center"><sub>Five minutes before a call, without taking keyboard focus. Everybody in these screenshots is invented — the app is pointed at a made-up team to photograph it, with <code>Support/shoot-docs.sh</code>.</sub></div>
+
+## What it does
+
+**Before the call.** Minutes before a calendar event, a panel appears with who is
+on it and what you last discussed. Open promises are grouped by *why* you are
+being shown them — overdue, promised in an earlier call with exactly these
+people, from a one-to-one with somebody in the room, or with these people from
+somewhere else. A promise involving nobody in the room is not shown at all. One
+button opens the Zoom or Meet link and starts recording.
+
+**During.** Your microphone and everything the Mac plays are captured as two
+tracks, which is what lets the transcript say who was speaking. Make a reminder
+from anything on screen (⌃⌥⌘R) and it remembers the app, window and browser tab
+it came from. Hold a key and talk, and the words land in whatever app has focus.
+
+**After.** Promises are pulled out of the transcript — who took what on and by
+when — split into what you owe and what you are owed. A later conversation can
+*propose* closing one, and has to quote the sentence that says it was finished;
+nothing closes itself. Anything old and undated gets asked about, because that is
+the kind that never surfaces on its own. Every colleague gets a page built from
+the meeting roster, with no setup step.
+
+**And your own assistant can read it.** Claude Code, Codex, Cursor — anything
+speaking MCP — over a local, token-protected, read-only endpoint.
 
 Everything runs at once: you can dictate while a conversation is being recorded.
+Most of the pieces are small, and Apple could ship several of them tomorrow. What
+is hard to copy is that they are one thing — the reminder made during a call, the
+promises extracted from that same call, the page for the person who made them and
+the brief before the next meeting with them all point at the same people and the
+same history. Separate apps would need separate integrations and would still lose
+the joins, because a join is not a feature any one of them owns.
 
-Most of these features are small — a day of work each, and Apple could ship
-several of them tomorrow. What is hard to copy is that they are one thing. The
-reminder made during a call, the promises extracted from that same call, the page
-for the person who made them and the brief before the next meeting with them all
-point at the same people and the same history. Separate apps would need separate
-integrations and would still lose the joins, because a join is not a feature any
-one of them owns.
+**[The project page](https://stari-am.github.io/griasa/) has the rest: more
+screenshots, what leaves your Mac and what doesn't, the engineering that turned
+out harder than it looked, and the questions people actually ask.**
 
-Made for anyone tired of installing a separate app for every small thing — and
-paying each one its own subscription.
+## Privacy, in four lines
+
+- **Audio never leaves your Mac.** Transcription is local — Apple's recognizer or `whisper.cpp`. There is no Griasa server and no account.
+- **Text goes only to the provider you configure** — Anthropic, OpenAI, Gemini, or a local model via Ollama or LM Studio, in which case nowhere at all.
+- **The calendar is read, never written.** Reminders are created, but only when you ask for one.
+- **Every permission is optional**, and the app says what stops working if you decline it.
 
 ## Download
 
-**[Download the latest release — signed, notarized, universal](https://github.com/Stari-am/griasa/releases/latest)** · [what it does and what building it took](https://stari-am.github.io/griasa/)
+**[Download the latest release — signed, notarized, universal](https://github.com/Stari-am/griasa/releases/latest)**, or `./build.sh` to compile it yourself.
 
 Free, and nothing is held back: there is no license check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
 
 Think of it the way you think of WinRAR: the trial never ends and it keeps working whether or not you pay. WinRAR apparently makes real money like that, which leaves the mystery nobody has solved in thirty years — *somebody* pays. Feel free to be one of the somebodies.
 
-![The Griasa hub with one recorded meeting open: summary, key points, per-person action items and a timestamped transcript](docs/screenshot-history.png)
-
-*One recorded meeting after it ended. Nothing in that pane was typed by hand — and everybody in these screenshots is invented, per `Support/shoot-docs.sh`.*
-
 ![The Commitments tab: a Looks done card proposing two closures with the sentence that says so, a Still real? card asking about three undated promises over a month old, then My promises](docs/screenshot-commitments.png)
 
-*The two things that make the list shrink: evidence that something was finished, and a question about what has carried no date for a month. Underneath, what you owe and what you are owed.*
+<div align="center"><sub>The two things that make the list shrink: evidence that something was finished, and a question about what has carried no date for a month.</sub></div>
 
-![The pre-meeting brief: who is on the call with each person's open-promise count, what the last meeting was about, and promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere](docs/screenshot-prep.png)
+---
 
-*Five minutes before a call, without taking keyboard focus. Grouped by why you are being shown each promise; one involving nobody in the room is not shown at all. Built from local data only.*
+# Documentation
+
+Everything below is for running, building and changing it.
 
 ## How dictation behaves
 

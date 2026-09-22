@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Griasa — meetings, promises and follow-through in one macOS app</title>
-<meta name="description" content="A native macOS menu-bar app that remembers what was promised in your meetings, by whom, and hands you a brief before the next one. Records and transcribes on your own Mac; also types what you say into any app. Built by Hayk Sargsyan.">
+<title>Griasa — what was promised, by whom, and what happens next</title>
+<meta name="description" content="A native macOS menu-bar app that records your meetings on your own Mac, works out who promised what, and hands you a brief before the next call. Free, open source, no account, no server.">
 
 <!-- Link previews. Without these, posting the URL anywhere — LinkedIn, X,
      Telegram, Slack — renders a bare link with no title, text or image. og:image
@@ -19,322 +19,425 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="The Griasa app icon">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Griasa — dictation, meetings and follow-through, on your own Mac">
-<meta name="twitter:description" content="Types what you say into any macOS app, and turns recorded meetings into who-owes-what. Speech recognition stays on your Mac. Free and open source.">
+<meta name="twitter:title" content="Griasa — meetings, promises and follow-through, on your own Mac">
+<meta name="twitter:description" content="Records the call, works out who promised what, and hands you a brief before the next one. Speech recognition stays on your Mac. Free and open source.">
 <meta name="twitter:image" content="https://stari-am.github.io/griasa/og.png">
 
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
+  /* Cool paper rather than the warm cream every one of these pages seems to
+     use, and the accent is apricot — the third stripe of the Armenian flag,
+     which is where the app's name comes from. No webfont: this page makes zero
+     third-party requests on purpose, since the whole argument is that nothing
+     about you leaves your machine. The type is the same one the app is set in. */
   :root {
-    --bg: #fdfcfa;
-    --fg: #1c1a17;
-    --muted: #6a635a;
-    --rule: #e3ded6;
-    --accent: #9a4a1e;
-    --card: #f6f3ee;
+    --paper: #f1f2f4;
+    --raised: #ffffff;
+    --ink: #15181d;
+    --ink-soft: #5b626d;
+    --rule: #d8dce1;
+    --rule-soft: #e6e9ed;
+    --apricot: #b3620f;
+    --apricot-flat: #d9822b;
+    --indigo: #2f4374;
+    --shadow: 0 1px 2px rgba(20, 24, 32, .06), 0 12px 32px -12px rgba(20, 24, 32, .18);
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #161513;
-      --fg: #ece8e1;
-      --muted: #9b938a;
-      --rule: #2e2b27;
-      --accent: #e59b6a;
-      --card: #1e1c19;
+      --paper: #10131a;
+      --raised: #171b23;
+      --ink: #e6e9ee;
+      --ink-soft: #949caa;
+      --rule: #262c36;
+      --rule-soft: #1e232b;
+      --apricot: #f0a857;
+      --apricot-flat: #f0a857;
+      --indigo: #93a6de;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 18px 40px -16px rgba(0, 0, 0, .7);
     }
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation: none !important; transition: none !important; }
+  }
   body {
     margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    font: 1.0625rem/1.7 var(--ui);
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 46rem; margin: 0 auto; padding: 0 1.4rem; }
-  header { padding: 5rem 0 3rem; }
-  h1 {
-    font-size: clamp(2.4rem, 7vw, 3.6rem);
-    line-height: 1.05;
-    letter-spacing: -0.025em;
-    margin: 0 0 0.6rem;
-    font-weight: 680;
-  }
-  .tagline { font-size: clamp(1.1rem, 3vw, 1.3rem); color: var(--muted); margin: 0 0 1.6rem; }
-  .meta { font-size: 0.86rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; }
-  .meta a { color: var(--accent); }
-  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
-  h2 {
-    font-size: 1.05rem;
-    text-transform: uppercase;
-    letter-spacing: 0.09em;
-    color: var(--muted);
-    font-weight: 620;
-    margin: 4rem 0 0.4rem;
-    padding-top: 1.6rem;
-    border-top: 1px solid var(--rule);
-  }
-  .lede { font-size: 1.12rem; margin: 0 0 1.4rem; }
-  ul { padding-left: 0; list-style: none; margin: 1.4rem 0; }
-  li { margin: 0 0 0.85rem; padding-left: 1.15rem; position: relative; }
-  li::before {
-    content: "";
-    position: absolute;
-    left: 0; top: 0.62em;
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.55;
-  }
+  a { color: var(--indigo); text-decoration-thickness: 1px; text-underline-offset: 2px; }
   b { font-weight: 640; }
-  code { font-family: var(--mono); font-size: 0.88em; background: var(--card); padding: 0.1em 0.32em; border-radius: 4px; }
-  .case { border-left: 2px solid var(--rule); padding: 0.15rem 0 0.15rem 1.25rem; margin: 1.9rem 0; }
-  .case h3 { font-size: 1.04rem; margin: 0 0 0.4rem; font-weight: 640; }
-  .case p { margin: 0; color: var(--muted); }
-  .case p b { color: var(--fg); font-weight: 600; }
-  .quiet { color: var(--muted); }
-  .links { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 1.8rem 0 0; align-items: center; }
-  /* Ko-fi's own button asset, served from this repo rather than their CDN: same
-     official artwork, but the page still makes zero third-party requests. */
-  .links a.kofi { padding: 0; border: 0; line-height: 0; display: inline-flex; }
-  .links a.kofi img { height: 36px; width: auto; display: block; border-radius: 6px; }
-  .links a {
-    display: inline-block;
-    padding: 0.55rem 1.05rem;
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    text-decoration: none;
-    font-size: 0.95rem;
+  code {
+    font-family: var(--mono); font-size: 0.86em;
+    background: var(--rule-soft); padding: 0.12em 0.36em; border-radius: 4px;
   }
-  .links a:hover { border-color: var(--accent); }
-  .links-kofi { margin: 1.8rem 0 0; }
-  .links-kofi + .links { margin-top: 0.7rem; }
-  .support { color: var(--fg); font-size: 1.05rem; }
-  .support b { color: var(--accent); font-weight: 660; }
-  footer { margin: 4.5rem 0 5rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
-  footer a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--apricot-flat); outline-offset: 3px; border-radius: 3px; }
 
-  /* Screenshots are captured in light appearance; on the dark page a bare
-     white window glares, so it sits on a muted plate with a rule around it. */
+  .wrap { width: 100%; max-width: 68rem; margin: 0 auto; padding: 0 1.5rem; }
+  .narrow { max-width: 42rem; }
 
-  /* The ask and the two buttons sit in the first screen: someone who arrives
-     ready to try it should not have to reach the bottom to find the download. */
-  .top-cta { margin: 1.9rem 0 0.4rem; }
-  details {
-    border-top: 1px solid var(--rule);
-    padding: 0.85rem 0;
+  /* The app lives in the menu bar, so the page wears one: a thin strip, a
+     hairline under it, nothing in it that isn't a place to go. */
+  .bar {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--rule);
   }
-  details summary {
-    cursor: pointer;
-    font-weight: 600;
-    list-style: none;
+  .bar .wrap {
+    display: flex; align-items: center; gap: 1.4rem;
+    height: 46px; font-size: 0.9rem;
   }
-  details summary::-webkit-details-marker { display: none; }
-  details summary::before {
-    content: "+ ";
-    color: var(--accent);
+  .bar .name {
+    font-weight: 620; letter-spacing: -0.01em; color: var(--ink); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+  }
+  .bar .name img { width: 21px; height: 21px; border-radius: 5px; display: block; }
+  .bar nav { margin-left: auto; display: flex; gap: 1.3rem; }
+  .bar nav a { color: var(--ink-soft); text-decoration: none; }
+  .bar nav a:hover { color: var(--ink); }
+  @media (max-width: 40rem) { .bar nav a.optional { display: none; } }
+
+  /* Hero */
+  .hero { padding: 4.5rem 0 1rem; }
+  .hero .wrap { display: grid; gap: 3rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  @media (min-width: 62rem) {
+    .hero .wrap { grid-template-columns: 1.02fr 1fr; gap: 3.5rem; align-items: center; }
+  }
+  h1 {
+    font-size: clamp(2.15rem, 5.2vw, 3.5rem);
+    line-height: 1.06;
+    letter-spacing: -0.032em;
     font-weight: 700;
+    margin: 0 0 1.1rem;
+    text-wrap: balance;
   }
-  details[open] summary::before { content: "\2212 "; }
-  details p { color: var(--muted); margin: 0.7rem 0 0.2rem; }
-  figure.shot { margin: 30px 0; }
-  figure.shot img {
+  .hero p.lede { font-size: 1.15rem; color: var(--ink-soft); margin: 0 0 1.9rem; max-width: 34rem; }
+  .hero p.lede b { color: var(--ink); font-weight: 600; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center; }
+  .button {
+    display: inline-block; padding: 0.66rem 1.2rem; border-radius: 9px;
+    font-size: 0.97rem; font-weight: 580; text-decoration: none;
+    border: 1px solid transparent;
+  }
+  .button.primary { background: var(--apricot-flat); color: #1b1206; }
+  .button.primary:hover { filter: brightness(1.06); }
+  .button.quiet { border-color: var(--rule); color: var(--ink); background: var(--raised); }
+  .button.quiet:hover { border-color: var(--ink-soft); }
+  .terms { margin: 1.1rem 0 0; font-size: 0.9rem; color: var(--ink-soft); max-width: 32rem; }
+
+  /* Screenshots sit on a plate with a real edge, not a soft grey blur under
+     everything. One shadow, used only where something is meant to look like a
+     window lying on the page. */
+  .shot { margin: 0; }
+  .shot img {
     display: block; width: 100%; height: auto;
-    border: 1px solid var(--rule); border-radius: 10px; background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--raised);
+    box-shadow: var(--shadow);
   }
-  figure.shot figcaption {
-    margin-top: 10px; font-size: 0.86rem; color: var(--muted); line-height: 1.5;
+  .shot figcaption {
+    margin: 0.85rem 0 0; font-size: 0.88rem; line-height: 1.55; color: var(--ink-soft);
   }
-  @media (prefers-color-scheme: dark) {
-    figure.shot img { border-color: #3a3630; }
+  .shot figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* The working day: three rows, screenshot swapping sides. */
+  .phase { padding: 4.2rem 0; border-top: 1px solid var(--rule-soft); }
+  .phase .wrap { display: grid; gap: 2.4rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 62rem) {
+    .phase .wrap { grid-template-columns: 1fr 1.08fr; gap: 3.4rem; align-items: center; }
+    .phase.mirrored .words { order: 2; }
   }
+  .when {
+    font-size: 0.92rem; color: var(--apricot); font-weight: 600;
+    margin: 0 0 0.35rem;
+  }
+  h2 {
+    font-size: clamp(1.5rem, 2.6vw, 1.95rem);
+    line-height: 1.18; letter-spacing: -0.02em; font-weight: 660;
+    margin: 0 0 0.9rem; text-wrap: balance;
+  }
+  .phase p, .plain p { margin: 0 0 1rem; }
+  .phase p:last-child, .plain p:last-child { margin-bottom: 0; }
+
+  ul.points { list-style: none; padding: 0; margin: 1.3rem 0 0; }
+  ul.points li {
+    position: relative; padding-left: 1.5rem; margin: 0 0 0.8rem;
+    font-size: 0.99rem;
+  }
+  ul.points li:last-child { margin-bottom: 0; }
+  ul.points li::before {
+    content: ""; position: absolute; left: 0.1rem; top: 0.66em;
+    width: 0.5rem; height: 1px; background: var(--apricot-flat);
+  }
+
+  /* Long-form sections keep a reading measure of their own. */
+  .plain { padding: 4.2rem 0; border-top: 1px solid var(--rule-soft); }
+  .plain h2 { margin-bottom: 1.1rem; }
+
+  ul.prose { list-style: none; padding: 0; margin: 1.5rem 0 0; }
+  ul.prose li {
+    padding: 0 0 1.1rem 0; margin: 0 0 1.1rem;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  ul.prose li:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+
+  /* Engineering notes: a hanging headline, ruled off, because each one is a
+     separate incident rather than a step in anything. */
+  .note { padding: 1.3rem 0; border-top: 1px solid var(--rule-soft); }
+  .note:first-of-type { border-top: 1px solid var(--rule); }
+  .note h3 { font-size: 1.04rem; font-weight: 640; margin: 0 0 0.45rem; letter-spacing: -0.012em; }
+  .note p { margin: 0; color: var(--ink-soft); }
+  .note p b { color: var(--ink); font-weight: 600; }
+
+  details { border-top: 1px solid var(--rule-soft); padding: 0.9rem 0; }
+  details:first-of-type { border-top: 1px solid var(--rule); }
+  details summary { cursor: pointer; font-weight: 600; list-style: none; padding-right: 1.5rem; position: relative; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after {
+    content: "+"; position: absolute; right: 0; top: 0;
+    color: var(--apricot); font-weight: 700;
+  }
+  details[open] summary::after { content: "\2212"; }
+  details p { color: var(--ink-soft); margin: 0.75rem 0 0; }
+
+  /* Closing band: the only place the page raises its voice. */
+  .close {
+    background: var(--raised);
+    border-top: 1px solid var(--rule);
+    padding: 3.6rem 0 3.4rem;
+  }
+  .close h2 { margin-bottom: 0.8rem; }
+  .close p { color: var(--ink-soft); margin: 0 0 1.6rem; }
+  .close p b { color: var(--ink); font-weight: 620; }
+  .support { margin: 1.6rem 0 0; display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+  .support span { font-size: 0.9rem; color: var(--ink-soft); }
+  .kofi { display: inline-flex; line-height: 0; }
+  .kofi img { height: 34px; width: auto; border-radius: 6px; display: block; }
+
+  footer { border-top: 1px solid var(--rule-soft); padding: 2.6rem 0 4rem; font-size: 0.9rem; color: var(--ink-soft); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 1.2rem 2.4rem; align-items: baseline; }
+  /* The name is Armenian and means what the app does. Set once, at size,
+     because it is the only ornament on the page that is also an explanation. */
+  .signature { font-size: 2.1rem; line-height: 1; color: var(--ink); letter-spacing: -0.01em; }
+  .signature span { color: var(--ink-soft); font-size: 0.86rem; letter-spacing: 0; display: block; margin-top: 0.5rem; }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-<header>
-  <h1>Griasa</h1>
-  <p class="tagline">One macOS menu-bar app that keeps track of what was promised, by whom, and what you walk into next.</p>
-  <div class="meta">
-    <span>Native Swift · macOS 14+</span>
-    <span>GPL-3.0</span>
-    <a href="https://github.com/Stari-am/griasa">Source on GitHub</a>
+<header class="bar">
+  <div class="wrap">
+    <a class="name" href="#top"><img src="apple-touch-icon.png" alt="" width="21" height="21">Griasa</a>
+    <nav>
+      <a class="optional" href="#how">How it works</a>
+      <a class="optional" href="#privacy">Privacy</a>
+      <a href="https://github.com/Stari-am/griasa">Source</a>
+      <a href="https://github.com/Stari-am/griasa/releases/latest">Download</a>
+    </nav>
   </div>
 </header>
 
-<p class="lede">The work a manager loses is not the words — it is who owed what, and when it was last raised. So Griasa records the call, extracts who promised what, keeps a page per colleague, and hands you a brief before the next meeting with them. It also types what you say into any app, which is where it started and is now the least interesting thing about it.</p>
+<main id="top">
 
-<div class="top-cta">
-  <p class="support"><b>$29 makes my day — but any amount does</b>, and none is fine too. The app is free either way: there is no license check, and under GPL-3.0 there could not be a meaningful one.</p>
-  <div class="links links-kofi">
-    <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1>A promise with a date turns up when the date passes. One without a date never turns up at all.</h1>
+      <p class="lede">Griasa records your meetings on your own Mac, works out who promised what, and puts the second kind in front of you before your next call with the person you owe. <b>It is a menu-bar app, not a service.</b></p>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/Stari-am/griasa/releases/latest">Download for macOS</a>
+        <a class="button quiet" href="https://github.com/Stari-am/griasa">Read the source</a>
+      </div>
+      <p class="terms">Free, signed and notarized, macOS 14 or later. No account to create, no server to trust, and audio that never leaves the machine.</p>
+    </div>
+    <figure class="shot">
+      <img src="screenshot-prep.png" width="1000" height="1000" fetchpriority="high"
+           alt="The pre-meeting brief: the meeting about to start, who is on the call with each person's open-promise count and your note about them, what the last meeting with them was about, then promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere.">
+      <figcaption>Five minutes before a call, without taking keyboard focus. Everybody in these screenshots is invented — the app is pointed at a made-up team to photograph it.</figcaption>
+    </figure>
   </div>
-  <div class="links">
-    <a href="https://github.com/Stari-am/griasa/releases/latest">Download — free, signed, notarized</a>
-    <a href="https://github.com/Stari-am/griasa">Read the source</a>
+</section>
+
+<section class="phase" id="how">
+  <div class="wrap">
+    <div class="words">
+      <p class="when">Before the call</p>
+      <h2>The brief is about this meeting, not about everything you have ever owed anybody</h2>
+      <p>Minutes before a calendar event, a panel appears with who is on it and what you last discussed. The promises are grouped by <i>why</i> you are being shown them, and one involving nobody in the room is not shown at all.</p>
+      <ul class="points">
+        <li><b>Overdue</b>, whichever meeting it came from — a date that has passed outranks tidy grouping.</li>
+        <li><b>From this meeting before</b>: promised in an earlier call with exactly these people.</li>
+        <li><b>One to one</b>: from a private conversation with somebody in the room.</li>
+        <li><b>With these people, elsewhere</b>: everything else that involves them.</li>
+        <li>A button opens the Zoom or Meet link and starts recording in one go.</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <img src="screenshot-people.png" width="1080" height="820" loading="lazy"
+           alt="A page for one colleague: notes that save themselves, the addresses she is known by, what she has promised, an on-demand AI dossier, and every meeting held with her.">
+      <figcaption>A page per colleague appears on its own, built from the meeting roster. The addresses are how the next calendar invitation is recognised as her; two entries for one human merge, which is the accident that actually happens when names are typed the minute a call ends.</figcaption>
+    </figure>
   </div>
-</div>
+</section>
 
-<figure class="shot">
-  <img src="screenshot-history.png" width="1280" height="880"
-       alt="The Griasa hub: a list of recorded meetings and dictations on the left, and one meeting opened on the right with a summary, key points, per-person action items and a timestamped transcript.">
-  <figcaption>One recorded meeting, after it ended: summary, key points, who took what on, and the cleaned transcript with names and timecodes. Nothing here was typed by hand. (Everybody in these screenshots is invented — the app is pointed at a made-up team for exactly this purpose.)</figcaption>
-</figure>
+<section class="phase mirrored">
+  <div class="wrap">
+    <div class="words">
+      <p class="when">During</p>
+      <h2>It records both sides, and it is listening to the screen as well as the room</h2>
+      <p>The microphone and everything the Mac is playing are captured as two tracks, which is what lets the transcript say who was speaking. Type a note mid-call and it is woven in at its timecode.</p>
+      <ul class="points">
+        <li><b>Remind me, from anything on screen</b> (⌃⌥⌘R). Select a line in Slack, Telegram, Mail or a browser — or drag a rectangle over something that isn't selectable at all — and pick a time, or let the model read the deadline out of the sentence. It lands in Apple Reminders, so it reaches your phone.</li>
+        <li>Every reminder remembers the app, window and browser tab it came from, so one click three days later scrolls you back to the paragraph.</li>
+        <li><b>Hold a key and talk</b> and the words appear in whatever app has focus, while you are still speaking.</li>
+        <li><b>Typed abbreviations</b> that expand in place with live values — <code>{slots:3}</code> becomes three genuinely free slots from your calendar.</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <img src="screenshot-history.png" width="1280" height="880" loading="lazy"
+           alt="The Griasa hub with one recorded meeting open: summary, key points, per-person action items and a timestamped transcript, with every recording and dictation listed on the left.">
+      <figcaption>One recorded meeting after it ended: summary, key points, who took what on, and the cleaned transcript with names and timecodes. Nothing in that pane was typed by hand.</figcaption>
+    </figure>
+  </div>
+</section>
 
-<p>Speech recognition runs on the Mac itself — Apple's recognizer or a local <code>whisper.cpp</code> model. Only the optional text-cleanup step can reach a language model, and only if you turn it on.</p>
+<section class="phase">
+  <div class="wrap">
+    <div class="words">
+      <p class="when">After</p>
+      <h2>A list that only grows is a list nobody opens</h2>
+      <p>Promises are pulled out of the transcript automatically — who took what on and by when — and split into what you owe and what you are owed. Then three things work against the pile.</p>
+      <ul class="points">
+        <li><b>A later conversation can propose closing one</b>, and has to quote the sentence that says it was finished. The quote is checked against the notes word for word.</li>
+        <li><b>Nothing closes itself.</b> Wrongly closing a promise means forgetting something you owe and hearing about it from the person you owed it to; wrongly leaving one open costs a line of noise. Those errors are not the same size.</li>
+        <li><b>Anything old and undated gets asked about</b> — still open, done, or it was never a commitment. No model involved: it is arithmetic on dates, so it works offline.</li>
+        <li>One click sends any of them to Apple Reminders, or exports the lot as rows Todoist, Things and Linear will split up.</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <img src="screenshot-commitments.png" width="1080" height="1002" loading="lazy"
+           alt="The Commitments tab. A Looks done card proposes closing two promises, each quoting the sentence from a later meeting that says it was finished, with Close it and Still open buttons. Below it a Still real? card asks about three undated promises made over a month ago, then the list of My promises.">
+      <figcaption><b>Looks done</b> carries its evidence and two buttons. <b>Still real?</b> asks about what has had no date for over a month, because nothing was ever going to surface it on its own.</figcaption>
+    </figure>
+  </div>
+</section>
 
-<p class="quiet">It started for a plain reason: the cloud meeting recorders everyone recommends were not allowed on my work machine, and the alternative was taking notes by hand while trying to actually run the call. Everything after that came from the same place — an app for every small thing, each with its own subscription, and none of them talking to each other.</p>
+<section class="plain">
+  <div class="wrap narrow">
+    <h2>What the standard AI apps don't do</h2>
+    <ul class="prose">
+      <li><b>Your own assistant can query it.</b> Switch on <i>Settings → System → AI assistants (MCP)</i> and Claude Code, Codex or Cursor answer from your meeting history: open promises split into yours and theirs, one colleague with their notes and last conversation, meetings by search, one transcript, the next brief. Summary and transcript are deliberately separate questions, so asking about commitments cannot pull months of conversation into a cloud model by accident. Reads only — an assistant can change nothing.</li>
+      <li><b>You can ask a model mid-sentence, in someone else's window.</b> Type <code>;ai what's the capital of Armenia ;;</code> inside a chat composer and the question is replaced in place by the answer. No window switch, no paste.</li>
+      <li><b>It uses the AI subscription you already pay for.</b> If the <code>claude</code> or <code>codex</code> CLI is installed and logged in, Griasa answers through it — no API key, no second subscription. Or point it at Ollama and the whole thing runs with nothing leaving the Mac.</li>
+      <li><b>It types into other people's apps, not into its own box.</b> Most assistants give you a text area and a copy button. Griasa puts the words where your cursor already is, as you speak, and never overwrites what you typed yourself.</li>
+    </ul>
+    <p style="margin-top:1.6rem">Most of the pieces are small. Any competent engineer could build any one of them in a day, and Apple could ship several with a snap of the fingers — worth saying plainly, because they could, and they have not. The part that is hard to copy is that these are one thing: the reminder you make during a call, the promises extracted from that same call, the page for the person who made them, and the brief that greets you before the next meeting with them all point at the same people and the same history. Five separate apps would need five integrations and would still lose the joins, because a join is not a feature any one of them owns.</p>
+  </div>
+</section>
 
-<h2>What it does, in one place</h2>
+<section class="plain" id="privacy">
+  <div class="wrap narrow">
+    <h2>What leaves your Mac, and what doesn't</h2>
+    <ul class="prose">
+      <li><b>Audio never leaves it.</b> Transcription is local — Apple's recognizer or <code>whisper.cpp</code>. There is no Griasa server and no account to create.</li>
+      <li><b>Text goes only to the provider you configure</b> — Anthropic, OpenAI, Gemini, or a local model via Ollama or LM Studio, in which case nowhere at all. If a local model fails, the app asks before it ever sends anything to a cloud key.</li>
+      <li><b>The calendar is read, never written.</b> Events tell it a meeting is about to start and who was invited. It creates nothing and changes nothing.</li>
+      <li><b>What an assistant reads, it takes with it.</b> The MCP endpoint is local and needs a token, but whatever your assistant reads goes wherever that assistant sends its context. That is why it is read-only and off until you switch it on.</li>
+      <li><b>Every permission is auditable and optional.</b> Microphone, screen recording, accessibility, calendar — each one says what still works if you decline it, and the code that asks is right there. Even a strict "no cloud recorders" IT policy has a compliant mode: local Whisper plus a local model.</li>
+    </ul>
+  </div>
+</section>
 
-<ul>
-  <li><b>Record a meeting</b> from system audio and the microphone together, and get a transcript with speaker names and your own live notes woven in.</li>
-  <li><b>Commitments</b> are pulled out of that transcript automatically — who took what on and by when — split into what you promised and what you are waiting on. One click sends any of them to Apple Reminders.</li>
-  <li><b>A brief before the call.</b> Minutes before a calendar event: who is on it, what you last discussed, and the open promises grouped by <i>why</i> you are being shown them — overdue, promised in an earlier meeting with exactly these people, from a one-to-one with somebody on this call, or with these people from somewhere else. A promise involving nobody in the room is not shown at all. One button opens the Zoom or Meet link and starts recording.</li>
-  <li><b>A conversation can close a promise</b> — once you agree. When a later meeting says something was finished, it has to quote the sentence that says so, and that sentence is checked against the notes word for word. Nothing is ever closed without a click.</li>
-  <li><b>Old promises get asked about.</b> Anything undated and made over a month ago is offered for review, oldest first: still open, done, or it was never a commitment. No model is involved — it is arithmetic on dates, so it works offline and cannot be wrong about anything except the calendar.</li>
-  <li><b>A page per person</b>, built from the meeting roster with no setup: every meeting with them, their open promises, the addresses they are known by, and an on-demand dossier written from the transcripts they appear in. Two entries for one human — the ordinary accident, since names get typed in a hurry — merge into one.</li>
-  <li><b>The assistant you already have open can read all of it.</b> Claude Code, Codex, Cursor, anything that speaks MCP: what is open and with whom, what the last conversation with somebody was about, what the next meeting holds. Local endpoint, token, read-only.</li>
-  <li><b>Remind me, from anything on screen</b> (⌃⌥⌘R). Select a line in Slack, Telegram, Mail or a browser — or drag a rectangle over a part of the screen that isn't selectable at all — and a small menu opens at the cursor: in 20 minutes, an hour, three hours, tomorrow at nine, next Monday, a date picker, or <i>from the text</i>, where the model reads the deadline out of the sentence itself. It lands in Apple Reminders, so it reaches your phone and watch.</li>
-  <li><b>Typed abbreviations</b> that expand in place, anywhere, with live values rather than static text.</li>
-  <li><b>Hold a key and talk.</b> The words appear in whatever app has focus — Telegram, Slack, a terminal, a browser field — while you are still speaking.</li>
-  <li><b>Capture from any window</b> — the same selection or rectangle also becomes plain text via OCR, or a reply drafted from the conversation actually visible on screen.</li>
-  <li><b>Projects</b> that everything files itself into, and which you can then ask questions about across your own history.</li>
-</ul>
+<section class="plain">
+  <div class="wrap narrow">
+    <h2>Why this is harder than it looks</h2>
+    <p>Dictation looks like a small app: capture audio, call a recognizer, insert the text. Every one of those three steps hid a problem that only appears once real people use it — and the meeting side has turned out no gentler.</p>
 
-<p>Most of these are small. Any competent engineer could build any one of them in a day, and Apple could ship several with a snap of the fingers — worth saying plainly, because they could, and they have not. Each serves somebody with a full calendar rather than a segment that moves a metric, and none of them demos on a stage.</p>
+    <div class="note">
+      <h3>The question cancelled itself with its own alert</h3>
+      <p>A recording left running after everyone leaves is a common way to lose an hour of disk and a week of confidence, so a long silence raises "still recording — keep going?" and sounds the alert meant to reach you in the next room. It appeared, beeped, and vanished a second later, every time. The alert comes back in through the system-audio capture at −16.9 dBFS, 23 dB above the level that counts as somebody talking, <b>so the watch heard itself and concluded the meeting had resumed.</b> The obvious flag for this, <code>excludesCurrentProcessAudio</code>, does nothing — macOS does not play the alert as this app's audio.</p>
+    </div>
 
-<p class="quiet">The part that is actually hard to copy is not on the list. It is that these are one thing: the reminder you make during a call, the promises extracted from that same call, the page for the person who made them, and the brief that greets you before the next meeting with them all point at the same people and the same history. Five separate apps would need five integrations and would still lose the joins, because a join is not a feature any one of them owns.</p>
+    <div class="note">
+      <h3>The microphone's answer goes stale while nobody is listening</h3>
+      <p>Recordings started coming out with no microphone track at all. An audio engine caches the format of the input device it first saw, so once a Bluetooth headset arrives the tap is built for a device that is no longer attached — and it fails in two ways, of which the second is the dangerous one. Measured from the log: with the engine at 48 kHz against hardware at 24 kHz, starting it threw an error; in another attempt <b>it reported success and then delivered nothing at all.</b> Nothing thrown, nothing logged, half a conversation recorded. The engine is now built at the moment the microphone is opened, and the first sound is waited for.</p>
+    </div>
 
-<figure class="shot">
-  <img src="screenshot-commitments.png" width="1080" height="1002"
-       alt="The Commitments tab. A green Looks done card proposes closing two promises, each quoting the sentence from a later meeting that says it was finished, with Close it and Still open buttons. Below it a Still real? card asks about three undated promises made over a month ago, then the list of My promises.">
-  <figcaption>The two things that make the list shrink. <b>Looks done</b>: a later conversation said these were finished, and had to quote the sentence — nothing is closed until you click. <b>Still real?</b>: no date, over a month old, so nothing was ever going to surface it on its own. Underneath, the ordinary split — what you owe, and what you are owed.</figcaption>
-</figure>
+    <div class="note">
+      <h3>Typing live means never being allowed to take a word back</h3>
+      <p>A recognizer revises its guess constantly — "тестирую" becomes "тестируй" becomes "тестирую" again. Retype the line each time and you delete whatever the user typed in between. <b>The fix was a policy, not a patch:</b> commit only the words two successive hypotheses agree on, append and never rewrite, and when they disagree, stall rather than invent.</p>
+    </div>
 
-<h2>What the standard AI apps don't do</h2>
+    <div class="note">
+      <h3>The accessibility APIs lie</h3>
+      <p>The clean way to replace text in another app is the accessibility API. Slack <b>declares</b> its composer writable and then silently ignores the write. Telegram declares it read-only, and reports emoji back as <code>U+FFFC</code>. Measured across three apps before designing anything — which is why synthetic keystrokes are the primary path and the tidy API is only an optimization for apps that tell the truth.</p>
+    </div>
 
-<ul>
-  <li><b>A reminder that remembers where it came from.</b> Every item records the app and window it was created in — the Slack channel, the Telegram chat — and in a browser it carries the tab's URL with a text anchor, so one click on the reminder scrolls you back to the exact paragraph three days later. Rectangle captures keep the clipped image too. Other tools save the words; the thing you actually need at the deadline is the context, and reconstructing "where did I read this" is the work nobody accounts for.</li>
-  <li><b>The list is built to shrink, not only to grow.</b> "I'll send it by Friday" becomes a dated item assigned to the person who said it, deduplicated against what is already open. Then three things work against the pile: the brief before a meeting shows only what that meeting is about, a later conversation can propose closing something and must quote the evidence, and anything old and undated gets asked about. Undated is the case that matters — a promise with a date surfaces itself when the date passes, and a promise without one never surfaces at all.</li>
-  <li><b>Nothing closes itself.</b> A detection arrives as "Looks done", with its quote and two buttons. The errors are not symmetric: wrongly closing a promise means forgetting something you owe and hearing about it from the person you owed it to, while wrongly leaving one open costs a line of noise. Anything that quietly resolves your obligations is optimising the wrong side of that.</li>
-  <li><b>Your own assistant can query it.</b> Switch on <i>Settings → System → AI assistants (MCP)</i> and the tools you already have open answer from your meeting history: open promises split into yours and theirs, one colleague with their notes and last conversation, meetings by search, one meeting, one transcript, the next brief, people, projects. Summary and transcript are deliberately separate questions, so asking about commitments cannot pull months of conversation into a cloud model by accident. Reads only — an assistant can change nothing.</li>
-  <li><b>Abbreviations expand to real data.</b> <code>{slots:3}</code> becomes three genuinely free slots read from your calendar; <code>{commitments}</code> becomes your actually-open promises. Not a template you fill in afterwards.</li>
-  <li><b>You can ask a model mid-sentence, in someone else's window.</b> Type <code>;ai what's the capital of Armenia ;;</code> inside a chat composer and the question is replaced in place by the answer. No window switch, no paste.</li>
-  <li><b>It uses the AI subscription you already pay for.</b> If the <code>claude</code> or <code>codex</code> CLI is installed and logged in, Griasa answers through it — no API key, no second subscription. Or point it at Ollama and the whole thing runs with nothing leaving the Mac.</li>
-  <li><b>It types into other people's apps, not into its own box.</b> Most assistants give you a text area and a copy button. Griasa puts the words where your cursor already is, as you speak, and never overwrites what you typed yourself.</li>
-</ul>
+    <div class="note">
+      <h3>Local speech models get stuck in loops</h3>
+      <p>One spoken sentence came back seven times in a row. That is a known failure mode of greedy decoding, and no amount of prompt tuning fixes it. It took an entropy threshold, a cap on carried context, and a collapser that can tell human emphasis — "no, no, no" — from a decoder going in circles.</p>
+    </div>
 
-<p class="quiet">Some of this will arrive in the operating system, and the inline model answer is the obvious candidate — a rebuilt Siri should do exactly that, and probably will. What does not arrive that way is a record of what was promised, by whom, across months of calls, tied to the people you actually work with. Operating systems ship features; so do the startups shipping the same three. Nobody ships the joins between them, because the joins are somebody's job rather than a product category.</p>
+    <div class="note">
+      <h3>Shipping it is its own engineering problem</h3>
+      <p>An unsigned disk image passes Apple's notarization, accepts a stapled ticket, and reports success at every step — then Gatekeeper refuses it on the customer's Mac, because notarization is not a signature. <b>Failures that only appear after both round trips to Apple are the expensive kind</b>, so the release script now verifies the way a stranger's Mac will, and refuses to call a build shippable when it isn't.</p>
+    </div>
+  </div>
+</section>
 
-<figure class="shot">
-  <img src="screenshot-people.png" width="1080" height="820"
-       alt="A page for one colleague: notes that save themselves, the addresses she is known by, what she has promised, an on-demand AI dossier, and every meeting held with her.">
-  <figcaption>A page per colleague appears on its own, built from the meeting roster — no setup step, no contact to create. The addresses are how an invitation is recognised as her next time; two entries for one human merge, which is the accident that actually happens when names are typed the minute a call ends.</figcaption>
-</figure>
+<section class="plain">
+  <div class="wrap narrow">
+    <h2>Questions people actually ask</h2>
+    <details><summary>Does it work offline?</summary>
+      <p>Dictation always — Whisper runs locally. Every AI feature too, if you point it at Ollama or LM Studio. With a cloud key, only the text of that one request is sent.</p></details>
+    <details><summary>Which languages?</summary>
+      <p>Everything Whisper supports, around a hundred, including mixed-language speech — dictate in your own language with English technical terms and both come out right.</p></details>
+    <details><summary>Can Claude Code or Codex read my meetings?</summary>
+      <p>Yes, once you switch on <i>Settings → System → AI assistants (MCP)</i>. Eight questions are answered over an endpoint that listens only on this Mac and only with a token, which the settings screen copies out as a ready client configuration. Reads only.</p></details>
+    <details><summary>Does it write to my calendar?</summary>
+      <p>No. It reads events, so it knows a meeting is about to start and who was invited; it never creates or edits one. Reminders are different — those are created, but only when you ask for one.</p></details>
+    <details><summary>Why does it need microphone, screen recording and accessibility permissions?</summary>
+      <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional and the app tells you what stops working if you decline. It's all in the source.</p></details>
+    <details><summary>Do I need an AI subscription?</summary>
+      <p>Never to Griasa. You bring an API key — typically cents a day — or run local models with Ollama for nothing, or let it use the Claude or ChatGPT subscription you already pay for.</p></details>
+    <details><summary>What do I get for the $29 that I don't get for free?</summary>
+      <p>Nothing, and that's deliberate. The download is the same app either way: no locked features, no license check, and under GPL-3.0 there could not be a meaningful one — anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours.</p>
+      <p>Which puts Griasa squarely in the WinRAR tradition: the trial never ends, the reminder stays polite, and the thing keeps working forever whether or not you ever pay. WinRAR reportedly does perfectly well on that arrangement, which leaves the question nobody has answered in thirty years — <i>who are the people who actually pay?</i> You could be one of them.</p></details>
+    <details><summary>Refunds?</summary>
+      <p>Just ask, and it's returned with no questions. Since nothing is gated behind the payment, you keep using the app either way.</p></details>
+  </div>
+</section>
 
-<figure class="shot">
-  <img src="screenshot-prep.png" width="1000" height="1000"
-       alt="The pre-meeting brief: the meeting about to start, who is on the call with each person's open-promise count and your note about them, what the last meeting with them was about, then promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere.">
-  <figcaption>Five minutes before a call, without taking keyboard focus. The groups are the point: <b>overdue</b>, then <b>from this meeting before</b> — an earlier call with exactly these people — then what came out of a <b>one-to-one</b> with somebody in the room, then everything else involving them. A promise involving nobody here is not shown at all. Assembled from local data only: no request stands between you and a meeting that starts in five minutes.</figcaption>
-</figure>
+<section class="close">
+  <div class="wrap narrow">
+    <h2>Use it for a week before you decide anything</h2>
+    <p>The build is free, signed and notarized — download it and it opens with a double-click. The source is all here too, under GPL-3.0, and <code>./build.sh</code> produces the same app if you would rather compile it yourself. <b>$29 makes my day, any amount does, and none is fine too.</b></p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/Stari-am/griasa/releases/latest">Download for macOS</a>
+      <a class="button quiet" href="https://github.com/Stari-am/griasa">Read the source</a>
+      <a class="button quiet" href="https://github.com/Stari-am/griasa/blob/main/CHANGELOG.md">What changed</a>
+    </div>
+    <p class="support"><span>If it earns its place:</span><a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="kofi.png" alt="Support Griasa on Ko-fi"></a></p>
+  </div>
+</section>
 
-<h2>What leaves your Mac, and what doesn't</h2>
-
-<ul>
-  <li><b>Audio never leaves it.</b> Transcription is local — Apple's recognizer or <code>whisper.cpp</code>. There is no Griasa server and no account to create.</li>
-  <li><b>Text goes only to the provider you configure</b> — Anthropic, OpenAI, Gemini, or a local model via Ollama or LM Studio, in which case nowhere at all. If a local model fails, the app asks before it ever sends anything to a cloud key.</li>
-  <li><b>Or use the subscription you already have.</b> With the <code>claude</code> or <code>codex</code> CLI installed and logged in, there is no API key at all.</li>
-  <li><b>The calendar is read, never written.</b> Griasa reads events to know a meeting is about to start and who was invited to it. It creates nothing, changes nothing, and declining the permission costs you the brief and the pre-ticked participants — nothing else.</li>
-  <li><b>What an assistant reads, it takes with it.</b> The MCP endpoint is local and needs a token, but whatever your assistant reads goes wherever that assistant sends its context. That is why the summary of a meeting and the transcript of it are separate questions — asking about commitments cannot drag months of conversation into a cloud model by accident — and why the endpoint is read-only and off until you switch it on.</li>
-  <li><b>Every permission is auditable and optional.</b> Microphone, screen recording, accessibility, calendar — each one says what still works if you decline it, and the code that asks is right there. Even a strict "no cloud recorders" IT policy has a compliant mode: local Whisper plus a local model.</li>
-</ul>
-
-<h2>Why this is harder than it looks</h2>
-
-<p>Dictation looks like a small app: capture audio, call a recognizer, insert the text. Every one of those three steps hid a problem that only appears once real people use it — and the meeting side has turned out no gentler. A few of them, because the shape repeats.</p>
-
-<div class="case">
-  <h3>Typing live means never being allowed to take a word back</h3>
-  <p>A recognizer revises its guess constantly — "тестирую" becomes "тестируй" becomes "тестирую" again. Retype the line each time and you delete whatever the user typed in between. <b>The fix was a policy, not a patch:</b> commit only the words two successive hypotheses agree on, append and never rewrite, and when they disagree, stall rather than invent. The naive version passed a casual test and ate a sentence the first time someone typed during a pause.</p>
-</div>
-
-<div class="case">
-  <h3>The question cancelled itself with its own alert</h3>
-  <p>A recording left running after everyone leaves is a common way to lose an hour of disk and a week of confidence, so a long silence raises "still recording — keep going?" and sounds the alert that is meant to reach you in the next room. It appeared, beeped, and vanished about a second later, every time. The alert comes back in through the system-audio capture at −16.9 dBFS, which is 23 dB above the level that counts as somebody talking, <b>so the watch heard itself and concluded the meeting had resumed.</b> The obvious flag for this, <code>excludesCurrentProcessAudio</code>, does nothing — macOS does not play the alert as this app's audio. Sound now has to continue for four seconds before it counts as a conversation, which no alert macOS ships can clear, and neither can a cough or a door.</p>
-</div>
-
-<div class="case">
-  <h3>The microphone's answer goes stale while nobody is listening</h3>
-  <p>Starting a recording aborted the app outright, twice in a week. One line: the tap was installed with the audio format the input node had cached, and that value goes stale whenever the audio device changes while nothing is recording — a pair of AirPods connecting is enough. Measured from the crash report, the node was reporting 24 kHz against hardware running at 48. AVFoundation compares the two and raises a C++ exception, <b>which Swift cannot catch</b>, so there was nothing to handle and the process died on the first click of Start Recording. The fix was to stop passing a format at all — there is then nothing to disagree with the hardware — and the accessor that exposed the stale value turned out to have no callers, so it was deleted rather than corrected.</p>
-</div>
-
-<div class="case">
-  <h3>The order of results is not guaranteed</h3>
-  <p>Dispatching each partial result onto the main actor as its own task looks correct and is not: nothing promises they arrive in the order they were sent. Two transposed partials and the app's model of the text field no longer describes the text field — <b>and every edit after that is computed against a fiction.</b> Ordering had to be carried explicitly, in a queue under a lock.</p>
-</div>
-
-<div class="case">
-  <h3>The accessibility APIs lie</h3>
-  <p>The clean way to replace text in another app is the accessibility API. Slack <b>declares</b> its composer writable and then silently ignores the write. Telegram declares it read-only, and reports emoji back as <code>U+FFFC</code>. Measured across three apps before designing anything — which is why synthetic keystrokes are the primary path and the tidy API is only an optimization for apps that tell the truth.</p>
-</div>
-
-<div class="case">
-  <h3>Local speech models get stuck in loops</h3>
-  <p>One spoken sentence came back seven times in a row. That is a known failure mode of greedy decoding, and no amount of prompt tuning fixes it. It took an entropy threshold, a cap on carried context, and a collapser that can tell human emphasis — "no, no, no" — from a decoder going in circles.</p>
-</div>
-
-<div class="case">
-  <h3>Shipping it is its own engineering problem</h3>
-  <p>An unsigned disk image passes Apple's notarization, accepts a stapled ticket, and reports success at every step — then Gatekeeper refuses it on the customer's Mac, because notarization is not a signature. <b>Failures that only appear after both round trips to Apple are the expensive kind</b>, so the release script now verifies the way a stranger's Mac will, and refuses to call a build shippable when it isn't.</p>
-</div>
-
-<p>Also, for the record: macOS ties privacy permissions to an app's signature, so an unstable signing identity silently resets them on every rebuild; and <code>NSLog</code> reaches nowhere at all from an app launched by the Finder, which means the error paths were invisible exactly when they mattered.</p>
-
-<h2>Questions people actually ask</h2>
-
-<details><summary>Does it work offline?</summary>
-  <p>Dictation always — Whisper runs locally. Every AI feature too, if you point it at Ollama or LM Studio. With a cloud key, only the text of that one request is sent.</p></details>
-<details><summary>Which languages?</summary>
-  <p>Everything Whisper supports, around a hundred, including mixed-language speech — dictate in your own language with English technical terms and both come out right.</p></details>
-<details><summary>Why does it need microphone, screen recording and accessibility permissions?</summary>
-  <p>Microphone for dictation, screen recording for meeting audio and region capture, accessibility for reading selected text and typing results into other apps. Each is optional and the app tells you what stops working if you decline. It's all in the source.</p></details>
-<details><summary>Can Claude Code or Codex read my meetings?</summary>
-  <p>Yes, once you switch on <i>Settings → System → AI assistants (MCP)</i>. Eight questions are answered — open promises, a colleague, meetings by search, one meeting, one transcript, the next brief, people, projects — over an endpoint that listens only on this Mac and only with a token, which the settings screen copies out as a ready client configuration. Reads only: an assistant can change nothing.</p></details>
-<details><summary>Does it write to my calendar?</summary>
-  <p>No. It reads events, so it knows a meeting is about to start and who was invited; it never creates or edits one. Reminders are different — those are created, but only when you ask for one.</p></details>
-<details><summary>Do I need an AI subscription?</summary>
-  <p>Never to Griasa. You bring an API key — typically cents a day — or run local models with Ollama for nothing, or let it use the Claude or ChatGPT subscription you already pay for.</p></details>
-<details><summary>What do I get for the $29 that I don't get for free?</summary>
-  <p>Nothing, and that's deliberate. The download is the same app either way: no locked features, no license check, and under GPL-3.0 there could not be a meaningful one — anyone with the source may legally remove such a check and share the result. The money pays for the Apple developer account and the hours.</p>
-  <p>Which puts Griasa squarely in the WinRAR tradition: the trial never ends, the reminder stays polite, and the thing keeps working forever whether or not you ever pay. WinRAR reportedly does perfectly well on that arrangement, which leaves the question nobody has answered in thirty years — <i>who are the people who actually pay?</i> You could be one of them.</p></details>
-<details><summary>Refunds?</summary>
-  <p>Just ask, and it's returned with no questions. Since nothing is gated behind the payment, you keep using the app either way.</p></details>
-
-<h2>Try it, read it, or support it</h2>
-
-<p>The build is free and signed — download it and it opens with a double-click. The source is all here too, under GPL-3.0, and <code>./build.sh</code> produces the same app if you would rather compile it yourself. There is no license check; under this license there could not be a meaningful one.</p>
-
-<p class="support"><b>$29 makes my day — but any amount does</b>, and none is fine too. Use it for a week before you decide.</p>
-
-<div class="links links-kofi">
-  <a class="kofi" href="https://ko-fi.com/V7F224UOGS"><img src="kofi.png" alt="Buy Me a Coffee at ko-fi.com"></a>
-</div>
-
-<div class="links">
-  <a href="https://github.com/Stari-am/griasa/releases/latest">Download — free</a>
-  <a href="https://github.com/Stari-am/griasa">Read the source</a>
-  <a href="https://github.com/Stari-am/griasa/blob/main/CHANGELOG.md">What changed</a>
-</div>
+</main>
 
 <footer>
-  Built by Hayk Sargsyan · <a href="mailto:hayk@stari.am">hayk@stari.am</a> · <a href="https://stari.am">stari.am</a><br>
-  Griasa — <span lang="hy">գրի</span> + <span lang="hy">ասա</span>, "write" and "say".
+  <div class="wrap">
+    <p class="signature" lang="hy">գրի ասա<span lang="en">Armenian: "write", "say". The dictation is where the project started, and is now the least interesting thing in it.</span></p>
+    <p style="margin:0">Built by Hayk Sargsyan<br><a href="mailto:hayk@stari.am">hayk@stari.am</a> · <a href="https://stari.am">stari.am</a></p>
+  </div>
 </footer>
 
-</div>
 </body>
 </html>

@@ -9,9 +9,23 @@ dist/
 transcripts/
 *.caf
 
+# Everything under /docs is the published website: a file left there is served
+# at stari-am.github.io/griasa. Design notes are written while an argument is
+# still being had, and are nobody else's documentation — they stay local.
+docs/superpowers/
+
 # Local tooling state
 .claude/
 .DS_Store
+.vscode/
+.idea/
+
+# Edit and patch leftovers, which look like source until you open them.
+*.bak
+*.orig
+*.rej
+*.log
+
 # Xcode's per-user state: window layout, selected scheme. Machine-specific, and
 # .xcuserstate churns on every window move.
 .swiftpm/

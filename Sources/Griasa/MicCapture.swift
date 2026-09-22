@@ -21,7 +21,13 @@ final class MicCapture {
 
     typealias Consumer = (AVAudioPCMBuffer, AVAudioTime) -> Void
 
-    private let engine = AVAudioEngine()
+    /// Rebuilt at every start, deliberately — see `startIfNeeded`.
+    private var engine = AVAudioEngine()
+
+    /// The configuration-change registration for the current engine. Held so it
+    /// can be taken off the old one: a notification about an engine that has
+    /// been replaced would restart a capture that is already running on another.
+    private var configurationObserver: NSObjectProtocol?
 
     /// Every engine mutation is serialised here: installTap, removeTap, start
     /// and stop happen on one thread, in order, never overlapping each other.
@@ -43,14 +49,17 @@ final class MicCapture {
     /// when `engine.start()` had thrown.
     private var running = false
 
-    private init() {
-        // Sleep and wake, AirPods connecting, plugging into a dock: the input
-        // device changes, the engine stops itself, and the format the tap was
-        // installed with stops matching. Untreated, the recording goes silent
-        // with no error and the next teardown removes a tap the engine no
-        // longer owns. The crash arrived at 04:37, which is exactly when this
-        // happens without anybody touching the machine.
-        NotificationCenter.default.addObserver(
+    private init() { observeConfigurationChanges() }
+
+    /// Sleep and wake, AirPods connecting, plugging into a dock: the input
+    /// device changes and the engine stops itself. Untreated, the recording goes
+    /// silent with no error and the next teardown removes a tap the engine no
+    /// longer owns.
+    private func observeConfigurationChanges() {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+        }
+        configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
         ) { [weak self] _ in
             self?.queue.async { self?.restartAfterConfigurationChange() }
@@ -78,33 +87,57 @@ final class MicCapture {
 
     private func startIfNeeded() throws {
         guard !running else { return }
+
+        // A new engine every time, and this is the whole fix.
+        //
+        // An `AVAudioEngine` caches its input node's format and does not let go
+        // of it. Keeping one for the life of the app means that after any input
+        // device change — AirPods connecting is the everyday one — the node
+        // still describes the device that was there at launch. `installTap` with
+        // no format takes the node's idea, so the tap is built for a device that
+        // is no longer attached, and **no audio arrives at all**.
+        //
+        // Measured on this machine, both shapes of the same fault: with the node
+        // at 48 kHz against hardware at 24 kHz, `start()` threw -10868; in a
+        // second attempt it returned successfully and delivered zero buffers for
+        // three seconds. A fresh engine built at the moment of use reads the
+        // device that is actually there, and records. Building one costs
+        // microseconds and happens once per recording or dictation.
+        engine = AVAudioEngine()
+        observeConfigurationChanges()
         let input = engine.inputNode
-        // The hardware's own format, not the node's cached one. Both are checked
-        // for channels as well as sample rate: a device in a transitional state
-        // reports a rate and no channels, and AVFoundation raises an
-        // NSException for that — which Swift cannot catch, so it is a crash.
+
         let hardware = input.inputFormat(forBus: 0)
-        guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
+        guard AudioFormatMatch.usable(rate: hardware.sampleRate,
+                                      channels: hardware.channelCount) else {
             throw NSError(domain: "Griasa", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: "No microphone input available (check Microphone permission in System Settings → Privacy & Security)."
             ])
         }
-        // No format passed, deliberately.
-        //
-        // Passing `input.outputFormat(forBus: 0)` crashed the app twice in a
-        // week. That value is the node's cache, and it goes stale when the input
-        // device changes while nothing is recording — AirPods connecting is
-        // enough. installTap then compares what it was handed against the live
-        // hardware and raises 'Failed to create tap due to format mismatch'
-        // (measured: node said 24000 Hz, hardware was at 48000). An NSException
-        // from a C++ library cannot be caught in Swift, so `try` around this is
-        // worthless and the process aborts on the user's first click of Start
-        // Recording.
-        //
-        // nil means "whatever this bus uses", so there is no format to disagree
-        // with anything. Nothing downstream is affected: every consumer takes
-        // its format from `buffer.format`, which is why the accessor that used
-        // to expose the stale value has been deleted rather than corrected.
+
+        // With a fresh engine these two agree. They are compared anyway, because
+        // when they disagree the tap records silence and says nothing — and a
+        // meeting recorded with one side missing is only discovered afterwards,
+        // when there is nothing left to do about it. Refusing is worse than
+        // recording and better than pretending.
+        let node = input.outputFormat(forBus: 0)
+        guard AudioFormatMatch.agree(rate: hardware.sampleRate, channels: hardware.channelCount,
+                                     otherRate: node.sampleRate, otherChannels: node.channelCount) else {
+            throw NSError(domain: "Griasa", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: """
+                The microphone changed while Griasa was not listening and the audio engine \
+                still describes the old one (hardware \(Int(hardware.sampleRate)) Hz, \
+                engine \(Int(node.sampleRate)) Hz). Nothing would be recorded from it.
+                """
+            ])
+        }
+
+        // No format passed, deliberately: nil means "whatever this bus uses", so
+        // there is nothing to disagree with. Passing the node's cached format
+        // crashed the app twice in a week — `installTap` raises an NSException
+        // for a mismatch, and an NSException from a C++ library cannot be caught
+        // in Swift, so `try` around it is worthless. Nothing downstream is
+        // affected: every consumer takes its format from `buffer.format`.
         input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, time in
             guard let self else { return }
             let sinks = self.consumers.withLock { $0 }

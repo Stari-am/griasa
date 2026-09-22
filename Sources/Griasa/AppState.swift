@@ -416,12 +416,13 @@ final class AppState: ObservableObject {
     func startRecording() async {
         guard !isRecording else { return }
         do {
+            recorder.onMicFailure = { [weak self] message in
+                Task { @MainActor in self?.lastError = message }
+            }
             try await recorder.start()
             isRecording = true
             recordingStartedAt = Date()
-            lastError = recorder.micUnavailable
-                ? "Recording without a microphone — only the other side of the call will be captured. Check Microphone permission in System Settings → Privacy & Security."
-                : nil
+            lastError = recorder.micFailure
             if liveNotesEnabled {
                 LiveNotesController.shared.start(vocabulary: vocabularyList,
                                                  myName: ParticipantRoster.shared.myName,

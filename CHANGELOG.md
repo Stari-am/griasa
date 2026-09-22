@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+**The microphone was not being recorded at all, and nothing said so.** Recordings
+were coming out with no microphone track on them — the meeting captured with only
+the other side of the call. The cause is one cached value. `AVAudioEngine` remembers the format of the input device it first saw, and
+Griasa kept a single engine for the life of the app, so after any input device
+change — a Bluetooth headset arriving is the everyday one — the engine still
+described the microphone that was there at launch. The tap is then built for a
+device that is no longer attached and **no audio arrives at all**.
+
+Read out of the system log and then reproduced on demand, it fails in two different
+ways, and the second is the dangerous one: with the engine at 48 kHz against
+hardware at 24 kHz, `start()` threw -10868; in another attempt it returned
+successfully and then delivered nothing for three seconds. Nothing thrown,
+nothing logged, half a conversation recorded.
+
+A new engine is now built at the moment the microphone is opened, which reads the
+device that is actually there. The two formats are compared anyway before the tap
+goes on, because recording silence is worse than refusing. And the first sound is
+waited for: a tap that opens and stays silent is now reported in the menu like
+any other failure, instead of being discovered when the transcript turns out to
+have one voice in it.
+
+Two consequences of the same fault are fixed with it. A device that changed
+*during* a recording left a microphone track a few seconds long — the file's
+format is fixed by its first buffer, and every later write was refused — so the
+track now resamples into the format it was opened with and stays one continuous
+recording. And the silence question was firing a minute into meetings where
+somebody was talking the whole time: it only ever heard the system-audio track,
+because the microphone side was never arriving.
+
+Speaker attribution was collateral damage rather than a separate problem. "You"
+is the microphone track and "Them" is everything else; with no microphone track
+there was no "You" at all, and every voice in the room arrived through one
+channel with nothing to separate them by.
+
+`Griasa --mic-probe [seconds]` opens the microphone the way a recording does and
+says what arrived — the question the app could not answer for itself.
+
 **Screenshots are taken against an invented team, not moved-aside real data.**
 `GRIASA_STORE` points history, commitments, people, projects and the participant
 roster at another directory, so `Support/shoot-docs.sh` can fill one with a

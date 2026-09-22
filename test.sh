@@ -19,6 +19,7 @@ swiftc -O \
   Sources/Griasa/CommitmentModel.swift \
   Sources/Griasa/CommitmentScope.swift \
   Sources/Griasa/MeetingAttendance.swift \
+  Sources/Griasa/AudioFormatMatch.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -27,6 +28,7 @@ swiftc -O \
   Tests/ScopeChecks.swift \
   Tests/CommitmentChecks.swift \
   Tests/AttendanceChecks.swift \
+  Tests/AudioFormatChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

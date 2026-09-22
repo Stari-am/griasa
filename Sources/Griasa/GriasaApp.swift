@@ -39,6 +39,13 @@ enum GriasaMain {
         }
         // `Griasa --people-probe` merges and deletes an invented person against
         // the real stores, then checks nothing real moved.
+        // `Griasa --mic-probe [seconds]` opens the microphone the way a recording
+        // does and reports what arrived, for the question this app could not
+        // answer for weeks: is it actually hearing you?
+        if let flag = args.firstIndex(of: "--mic-probe") {
+            let seconds = args.count > flag + 1 ? Double(args[flag + 1]) ?? 5 : 5
+            await MicProbe.run(seconds: seconds)
+        }
         if args.contains("--people-probe") { await PeopleProbe.run() }
         // `Griasa --silence-probe` measures whether the app's own alert beep
         // comes back in through either recorded input, and exits.

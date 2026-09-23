@@ -20,8 +20,10 @@ enum MeetingTranscriber {
             // Whisper detects the language itself and is far more accurate than
             // the Apple recognizer. Run the tracks sequentially — each process
             // loads the full model into memory.
-            mic = await WhisperTranscriber.transcribeSegments(audio: micURL, vocabulary: vocabulary)
-            system = await WhisperTranscriber.transcribeSegments(audio: systemURL, vocabulary: vocabulary)
+            mic = await WhisperTranscriber.transcribeSegments(audio: micURL, vocabulary: vocabulary,
+                                                                meeting: true)
+            system = await WhisperTranscriber.transcribeSegments(audio: systemURL, vocabulary: vocabulary,
+                                                                meeting: true)
         } else {
             async let micTask = FileTranscriber.transcribeSegments(
                 audio: micURL, localeIdentifiers: localeIdentifiers, vocabulary: vocabulary)

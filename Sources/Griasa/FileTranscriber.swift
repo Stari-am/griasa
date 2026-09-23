@@ -2,11 +2,6 @@ import Foundation
 import AVFoundation
 import Speech
 
-struct TranscriptSegment {
-    let start: TimeInterval
-    let text: String
-}
-
 /// Transcribes a recorded audio file on-device, in ~30-second chunks so that
 /// long meetings don't hit the recognizer's single-request limits.
 ///

@@ -38,7 +38,8 @@ enum WhisperTranscriber {
 
     /// Transcribes an audio file, returning timestamped segments. Language is
     /// detected automatically by the model (`-l auto`).
-    static func transcribeSegments(audio url: URL, vocabulary: [String]) async -> [TranscriptSegment] {
+    static func transcribeSegments(audio url: URL, vocabulary: [String],
+                                   meeting: Bool = false) async -> [TranscriptSegment] {
         guard isAvailable, FileManager.default.fileExists(atPath: url.path) else { return [] }
 
         let workDir = FileManager.default.temporaryDirectory
@@ -64,7 +65,7 @@ enum WhisperTranscriber {
                     segments.append(TranscriptSegment(start: region.start, text: text))
                 }
             }
-            return TranscriptCleaner.clean(segments)
+            return TranscriptCleaner.clean(segments, meeting: meeting)
         }
 
         // Fallback: single-pass CLI with whisper's built-in VAD (timestamps
@@ -102,7 +103,7 @@ enum WhisperTranscriber {
             let fromMS = (offsets?["from"] as? NSNumber)?.doubleValue ?? 0
             segments.append(TranscriptSegment(start: fromMS / 1000.0, text: text))
         }
-        return TranscriptCleaner.clean(segments)
+        return TranscriptCleaner.clean(segments, meeting: meeting)
     }
 
     /// Decoder settings that keep Whisper out of its repetition loop, where it

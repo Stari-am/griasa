@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+**Meeting transcripts no longer thank nobody.** A cough, a keyboard or a chair
+scraping is sometimes let through by the voice detector as a short stretch of
+"speech", and Whisper decodes a sub-second burst of noise as the phrase it has
+seen most often in its training subtitles: "Thank you." The transcript then read
+as a series of people thanking someone who was not in it.
+
+Sent to the server on their own, those regions came back as exactly that phrase,
+and neither of the server's own confidence signals could tell them apart from
+real speech — the no-speech probability was zero for every region, genuine or
+not, and the log-probabilities overlapped completely. So the rule is about the
+whole segment: in a recorded meeting, a region whose entire text is "thank you",
+"thanks" or "спасибо" is dropped. "Okay, thank you, next item" is untouched, and
+dictation is untouched entirely, because there "thank you" is very often the
+whole message.
+
+That will occasionally drop a real, isolated "thank you" from a meeting. It
+carries no fact, no decision and no promise, and a transcript punctuated by
+pleasantries nobody said is exactly the thing that makes it unreadable.
+
 ## 1.0.11 — 2026-09-22
 
 **The microphone was not being recorded at all, and nothing said so.** Recordings

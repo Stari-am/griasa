@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.12 — 2026-09-23
 
 **Meeting transcripts no longer thank nobody.** A cough, a keyboard or a chair
 scraping is sometimes let through by the voice detector as a short stretch of

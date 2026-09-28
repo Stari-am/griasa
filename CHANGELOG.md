@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+**The live panel no longer thanks everybody on your behalf.** Live notes cut each
+track into short windows and sent every one of them to Whisper whole — including
+the microphone windows in which you were listening rather than talking. Those
+hold nothing but the room, and Whisper turns the room into "Thank you.", so the
+panel showed a thank-you under your name after every block of somebody else's
+speech, on a clock. 1.0.12 fixed the same thing in the finished transcript; the
+live path goes around it.
+
+A live window now goes through the same voice detector as a finished meeting.
+If nobody spoke in it, nothing is sent at all, and what is transcribed is
+cleaned by the meeting rules rather than dictation's. Checked against a real
+microphone track: the detector finds speech exactly in the minutes somebody was
+talking, and nowhere else.
+
 ## 1.0.12 — 2026-09-23
 
 **Meeting transcripts no longer thank nobody.** A cough, a keyboard or a chair

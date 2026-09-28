@@ -172,7 +172,7 @@ final class LiveNotesController: ObservableObject {
 
     private func transcribeChunk(from chunker: LiveChunker?, speaker: String, minSeconds: Double) async {
         guard let chunker, let chunk = chunker.flush(minSeconds: minSeconds) else { return }
-        let text = await WhisperTranscriber.transcribeText(audio: chunk.url, vocabulary: vocabulary)
+        let text = await WhisperTranscriber.transcribeLiveChunk(audio: chunk.url, vocabulary: vocabulary)
         try? FileManager.default.removeItem(at: chunk.url)
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return }

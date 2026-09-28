@@ -118,6 +118,56 @@ enum WhisperTranscriber {
     /// this guard off.
     private static let loopGuards = ["-mc", "64", "-et", "2.6"]
 
+    /// One live-notes chunk: a fixed slice of one track, taken whether anybody
+    /// spoke in it or not.
+    ///
+    /// That last part is the whole problem this exists for. Live notes cut each
+    /// track into 18-second windows, and while somebody else is talking the
+    /// microphone window holds nothing but the room. Sent to Whisper whole, that
+    /// comes back as "Thank you." — once per window, under the user's own name,
+    /// on a clock. So a chunk goes through the same voice detector as a finished
+    /// meeting: no speech, no request at all, and what does get transcribed is
+    /// cleaned by the meeting rules rather than dictation's.
+    ///
+    /// Separate from `transcribeSegments` because that one, finding no speech,
+    /// falls through to the one-shot command-line path — which loads the full
+    /// model from disk, every eighteen seconds, to transcribe silence.
+    static func transcribeLiveChunk(audio url: URL, vocabulary: [String]) async -> String {
+        guard isAvailable, FileManager.default.fileExists(atPath: url.path),
+              await WhisperServer.shared.ensureRunning(vocabulary: vocabulary) else { return "" }
+
+        let workDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("griasa-live-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let wav = workDir.appendingPathComponent("audio.wav")
+        guard await run("/usr/bin/afconvert",
+                        ["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", url.path, wav.path]) else {
+            return ""
+        }
+
+        var segments: [TranscriptSegment] = []
+        if let regions = await speechRegions(wav: wav) {
+            // Nobody spoke in this window. The case that produced the thank-yous.
+            guard !regions.isEmpty else { return "" }
+            for (index, region) in regions.enumerated() {
+                let slice = workDir.appendingPathComponent("region-\(index).wav")
+                guard extractRegion(from: wav, region: region, to: slice) else { continue }
+                if let text = await WhisperServer.shared.transcribe(wav: slice), !text.isEmpty {
+                    segments.append(TranscriptSegment(start: region.start, text: text))
+                }
+            }
+        } else if let text = await WhisperServer.shared.transcribe(wav: wav), !text.isEmpty {
+            // No voice detector installed: the whole window, but the meeting
+            // rules still apply to what comes back.
+            segments.append(TranscriptSegment(start: 0, text: text))
+        }
+        let text = TranscriptCleaner.clean(segments, meeting: true)
+            .map(\.text).joined(separator: " ")
+        return SpeechRepetition.collapse(text).text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Convenience: full text of a file (for dictation). Uses the warm server
     /// directly when it's already up (near-instant); otherwise the CLI path.
     static func transcribeText(audio url: URL, vocabulary: [String]) async -> String {

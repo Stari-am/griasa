@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import AppKit
 
 /// First-launch welcome guide: what to try first, and a live permission

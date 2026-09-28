@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.13 — 2026-09-28
 
 **The live panel no longer thanks everybody on your behalf.** Live notes cut each
 track into short windows and sent every one of them to Whisper whole — including

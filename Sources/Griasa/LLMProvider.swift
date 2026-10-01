@@ -89,8 +89,7 @@ struct LLMConfig: Sendable {
     }
 
     static func current() -> LLMConfig {
-        let raw = UserDefaults.standard.string(forKey: "llmProvider") ?? ""
-        return config(for: LLMProvider(rawValue: raw) ?? .anthropic)
+        return config(for: LLMProvider(rawValue: resolvedProviderRaw()) ?? .custom)
     }
 
     static func config(for provider: LLMProvider) -> LLMConfig {
@@ -131,8 +130,11 @@ struct LLMConfig: Sendable {
                              contextCharLimit: 400_000)
         case .custom:
             let limit = defaults.integer(forKey: "customContextLimit")
+            // Empty means "the local model": the default is only local if it
+            // works without the user typing an address in first.
+            let base = stored("customBaseURL")
             return LLMConfig(provider: .custom, apiKey: stored("customAPIKey"),
-                             baseURL: stored("customBaseURL"),
+                             baseURL: base.isEmpty ? ProviderDefault.localBaseURL : base,
                              fastModel: model("customFastModel", or: provider.defaultFastModel),
                              smartModel: model("customSmartModel", or: provider.defaultSmartModel),
                              contextCharLimit: limit > 0 ? limit : 24_000)
@@ -150,6 +152,30 @@ struct LLMConfig: Sendable {
                              smartModel: model("codexCLISmartModel", or: provider.defaultSmartModel),
                              contextCharLimit: 400_000)
         }
+    }
+
+    /// The provider this install is on — the saved choice, or, with none
+    /// saved, the rule in `ProviderDefault`.
+    static func resolvedProviderRaw() -> String {
+        let defaults = UserDefaults.standard
+        // The preference names are not uniform, so they are spelled out. Only a
+        // key stored in Griasa counts: an environment variable is something the
+        // shell had, not a choice anybody made here.
+        let keyNames = ["anthropic": "anthropicAPIKey", "openAI": "openAIKey", "gemini": "geminiKey"]
+        let keyed = Set(keyNames.compactMap { provider, key in
+            (defaults.string(forKey: key) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : provider
+        })
+        return ProviderDefault.resolve(stored: defaults.string(forKey: "llmProvider"), keyed: keyed)
+    }
+
+    /// Writes the resolved provider down once, so the answer is a stored
+    /// choice from then on rather than something re-derived from which keys
+    /// happen to exist — deleting a key later must not move anybody anywhere.
+    static func persistDefaultProviderIfUnset() {
+        let defaults = UserDefaults.standard
+        guard (defaults.string(forKey: "llmProvider") ?? "").isEmpty else { return }
+        defaults.set(resolvedProviderRaw(), forKey: "llmProvider")
     }
 
     /// A configured cloud provider to offer when `failed`'s request errored —
@@ -181,7 +207,8 @@ enum CloudFallback {
         alert.informativeText = """
         \(error)
 
-        Send this request via \(fallback.displayName) instead? The text will leave this Mac.
+        Send this one request via \(fallback.displayName) instead? The text will leave this Mac. \
+        Your setting stays as it is.
         """
         alert.addButton(withTitle: "Send via \(fallback.displayName)")
         alert.addButton(withTitle: "Cancel")

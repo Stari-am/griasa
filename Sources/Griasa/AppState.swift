@@ -152,6 +152,7 @@ final class AppState: ObservableObject {
         // The prep watcher stays stopped too: it would poll the calendar and
         // replace the brief the screenshot is of.
         if AppDelegate.shotPath != nil { return }
+        LLMConfig.persistDefaultProviderIfUnset()
         Permissions.requestAll()
         installHotkey()
         setupWhisper()

@@ -185,7 +185,17 @@ final class AppState: ObservableObject {
     /// automatically so the app works at full quality out of the box. Dictation
     /// and recording stay usable throughout via the Apple-recognizer fallback.
     func setupWhisper() {
-        Task { await WhisperInstaller.downloadVADModelIfNeeded() }
+        // Models already on disk are checked before anything loads them —
+        // once per file, then remembered. One that fails is moved aside, and
+        // the setup below finds it missing and downloads a verified copy.
+        Task {
+            await WhisperInstaller.setAsideUnverifiedModels()
+            Task { await WhisperInstaller.downloadVADModelIfNeeded() }
+            continueWhisperSetup()
+        }
+    }
+
+    private func continueWhisperSetup() {
         if WhisperTranscriber.isAvailable {
             whisperSetup = .ready
             prewarmWhisperServer()

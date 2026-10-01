@@ -225,12 +225,16 @@ Each provider has a **fast** model (dictation cleanup, reminder parsing, classif
 ### Speech engines
 Griasa prefers **Whisper (whisper.cpp, large-v3-turbo)** — dramatically more accurate than Apple's recognizer, fully local, with genuine automatic language detection built into the model.
 
-**Setup is automatic on first launch**: the app installs `whisper-cpp` via Homebrew (if missing) and downloads the 1.6 GB model to `~/Library/Application Support/Griasa/`, showing progress in the menu-bar menu and in Settings → Speech engine (with a Retry button if anything fails). Only Homebrew itself is assumed; without it the app tells you and keeps working on the Apple engine. Manual equivalent:
+**Setup is automatic on first launch**: the app installs `whisper-cpp` via Homebrew (if missing) and downloads the 1.6 GB model to `~/Library/Application Support/Griasa/`, showing progress in the menu-bar menu and in Settings → Speech engine (with a Retry button if anything fails). Only Homebrew itself is assumed; without it the app tells you and keeps working on the Apple engine.
+
+**Every model is checked before it is used.** Downloads come from a pinned repository commit, not a branch, and are verified against a SHA-256 and size written into the app ([ModelManifest.swift](Sources/Griasa/ModelManifest.swift)) before they are moved into place — a file that does not match is never installed. Models already on disk are checked once after an update and remembered; one that fails is renamed `*.unverified` and replaced with a verified download. Manual equivalent:
 
 ```sh
 brew install whisper-cpp
 curl -L -o ~/Library/Application\ Support/Griasa/ggml-large-v3-turbo.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo.bin
+shasum -a 256 ~/Library/Application\ Support/Griasa/ggml-large-v3-turbo.bin
+# expect 1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69
 ```
 
 Griasa keeps a local **`whisper-server`** running with the model loaded, so dictation transcribes near-instantly on hotkey release and meeting regions don't pay a per-call model load. When whisper-cli or the model is missing, everything falls back to the Apple recognizer.

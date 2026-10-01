@@ -211,7 +211,7 @@ private struct AISettings: View {
     @State private var promptsStatus = ""
 
     // Provider settings — keys mirror LLMConfig.config(for:).
-    @AppStorage("llmProvider") private var providerRaw = LLMProvider.anthropic.rawValue
+    @AppStorage("llmProvider") private var providerRaw = LLMProvider.custom.rawValue
     @AppStorage("openAIKey") private var openAIKey = ""
     @AppStorage("geminiKey") private var geminiKey = ""
     @AppStorage("customBaseURL") private var customBaseURL = ""

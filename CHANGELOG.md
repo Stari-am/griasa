@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+**A new install uses the local model.** Griasa says it keeps your meetings on
+your Mac, and that was true only for people who changed it: an install that never
+touched the provider picker was on Anthropic, so anybody who pasted a key had
+transcripts going to a cloud vendor by default. A security review put it in one
+line — announced as local, configured as cloud. The default is now a local model
+through Ollama, with no address to type in first.
+
+If no local model is running, the first AI action you take says so and how to
+fix it — install Ollama, pull the model — and names the cloud as a separate,
+explicit choice with its cost stated: text sent there leaves this Mac. If a cloud
+provider is also available, that action asks before sending this one request
+through it, and your setting stays as it is. Background work — dictation
+cleanup, promise extraction, sorting into projects — never asks: without the
+local model it simply does not run, and dictation falls back to its built-in
+cleanup.
+
+Nothing changes for anybody who already chose. A saved provider is kept, and an
+install from before this change that holds a cloud key but never saved a
+provider keeps that one too: being on the old default and pasting a key into it
+was a choice, and moving that person to a model they never installed would break
+every AI feature they use.
+
 ## 1.0.13 — 2026-09-28
 
 **The live panel no longer thanks everybody on your behalf.** Live notes cut each

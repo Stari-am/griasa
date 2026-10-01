@@ -64,7 +64,7 @@ out harder than it looked, and the questions people actually ask.**
 ## Privacy, in four lines
 
 - **Audio never leaves your Mac.** Transcription is local — Apple's recognizer or `whisper.cpp`. There is no Griasa server and no account.
-- **Text goes only to the provider you configure** — Anthropic, OpenAI, Gemini, or a local model via Ollama or LM Studio, in which case nowhere at all.
+- **Text stays on the Mac by default.** A new install uses a local model via Ollama; Anthropic, OpenAI or Gemini are used only if you choose one.
 - **The calendar is read, never written.** Reminders are created, but only when you ask for one.
 - **Every permission is optional**, and the app says what stops working if you decline it.
 
@@ -210,16 +210,16 @@ On first launch a **Welcome guide** opens in the hub: quick start plus a live ch
 
 AI cleanup uses the configured **AI provider** (see below). Without one — or if the call fails — a local rule-based cleanup runs instead, so dictation always works offline.
 
-### AI providers — Anthropic, OpenAI, Gemini, your existing subscription, or fully local
-Every AI feature routes through one configurable provider (Settings → AI & Actions):
+### AI providers — local by default; Anthropic, OpenAI, Gemini or your existing subscription if you choose them
+Every AI feature routes through one configurable provider (Settings → AI & Actions). **A new install is on the local model** — nothing is sent to a cloud vendor until somebody chooses one.
 
-- **Anthropic (Claude)** — the default. Key from Settings or `ANTHROPIC_API_KEY`.
+- **Local (the default)** — Ollama at `http://localhost:11434/v1`, no key, no setup inside Griasa: install Ollama and `ollama pull qwen3:8b`. If no local model is running, the first AI action says so and how to fix it. Any other OpenAI-compatible endpoint works by base URL — LM Studio, or a server on your network. With the built-in local Whisper, Griasa then runs **fully offline** — no text ever leaves the Mac.
+- **Anthropic (Claude)** — key from Settings or `ANTHROPIC_API_KEY`.
 - **OpenAI** — key from Settings or `OPENAI_API_KEY` (GPT-5.6 family by default).
 - **Google (Gemini)** — key from Settings or `GEMINI_API_KEY` (via Google's OpenAI-compatible endpoint; Gemini 3.x by default).
-- **Custom / local** — any **OpenAI-compatible endpoint** by base URL: Ollama (`http://localhost:11434/v1`, no key), LM Studio, OpenRouter, Groq… With Ollama + the built-in local Whisper, Griasa runs **fully offline** — no text ever leaves the Mac.
 - **Claude Code (subscription)** / **Codex CLI (ChatGPT subscription)** — **no API key at all**: if the `claude` or `codex` CLI is installed and logged in, Griasa answers through it, billed to the subscription you already pay for. Auto-detected (with an optional path override); expect ~5–10 s per request — great for meeting notes, dossiers, and documents, slower than an API key for typing-path features like `;tldr`. ([CLIRunner.swift](Sources/Griasa/CLIRunner.swift))
 
-Each provider has a **fast** model (dictation cleanup, reminder parsing, classification, reply drafts) and a **smart** model (presets, summaries, Ask Project, meeting notes); defaults are sensible (Haiku 4.5/Opus 4.8, GPT-5.6 Luna/Terra, Gemini 3.1 Flash-Lite/3.5 Flash, Qwen3 8B/30B) and editable — for local endpoints a **Load model list** button offers what's actually installed, and **Test** pings the provider and reports latency. Meeting transcripts are trimmed to a configurable context budget on local models (default 24k chars; cloud models get 400k). If the selected provider fails and a cloud key is also configured, explicit actions **ask** before re-sending the text through the cloud ("ask each time", with an *until restart* option); dictation cleanup and background classification never ask — they degrade silently. ([LLMProvider.swift](Sources/Griasa/LLMProvider.swift), [AIFormatter.swift](Sources/Griasa/AIFormatter.swift))
+Each provider has a **fast** model (dictation cleanup, reminder parsing, classification, reply drafts) and a **smart** model (presets, summaries, Ask Project, meeting notes); defaults are sensible (Haiku 4.5/Opus 4.8, GPT-5.6 Luna/Terra, Gemini 3.1 Flash-Lite/3.5 Flash, Qwen3 8B/30B) and editable — for local endpoints a **Load model list** button offers what's actually installed, and **Test** pings the provider and reports latency. Meeting transcripts are trimmed to a configurable context budget on local models (default 24k chars; cloud models get 400k). An install from before local became the default, which already had a cloud key and no saved choice, keeps that provider — pasting the key was the choice. If the selected provider fails — the local model not running is the usual case — and a cloud provider is also available, explicit actions **ask** before re-sending that one request through the cloud ("ask each time", with an *until restart* option); dictation cleanup and background classification never ask — they degrade silently. ([LLMProvider.swift](Sources/Griasa/LLMProvider.swift), [AIFormatter.swift](Sources/Griasa/AIFormatter.swift))
 
 ### Speech engines
 Griasa prefers **Whisper (whisper.cpp, large-v3-turbo)** — dramatically more accurate than Apple's recognizer, fully local, with genuine automatic language detection built into the model.

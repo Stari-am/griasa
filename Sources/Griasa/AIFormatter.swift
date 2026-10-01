@@ -237,7 +237,26 @@ enum AIFormatter {
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: req)
+        // The default provider is a model on this Mac, so the first thing most
+        // people meet is that model not being there. "Could not connect to the
+        // server" says nothing about what to do; this does.
+        let local = config.provider == .custom && ProviderDefault.isOnThisMac(config.baseURL)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch let error as URLError
+                    where local && [.cannotConnectToHost, .cannotFindHost].contains(error.code) {
+            throw NSError(domain: "Griasa", code: 6, userInfo: [
+                NSLocalizedDescriptionKey: ProviderDefault.notRunningAdvice(baseURL: config.baseURL,
+                                                                           model: model)
+            ])
+        }
+        if local, (response as? HTTPURLResponse)?.statusCode == 404 {
+            throw NSError(domain: "Griasa", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model)
+            ])
+        }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw AIProviderError(
                 provider: config.provider == .custom ? "The endpoint" : config.provider.displayName,

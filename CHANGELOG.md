@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.14 — 2026-10-01
 
 **A new install uses the local model.** Griasa says it keeps your meetings on
 your Mac, and that was true only for people who changed it: an install that never

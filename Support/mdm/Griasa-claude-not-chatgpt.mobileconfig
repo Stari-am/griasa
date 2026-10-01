@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Griasa: Claude allowed, ChatGPT and Gemini not.
+
+  Each cloud provider has its own switch. A switch that is absent leaves that
+  provider allowed, so this profile names only what it closes — plus the Claude
+  Code switch, set explicitly so the choice is visible. See README.md.
+-->
+<plist version="1.0">
+<dict>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadIdentifier</key>
+    <string>am.stari.griasa.managed.claude-not-chatgpt</string>
+    <key>PayloadUUID</key>
+    <string>46FF43D0-AC71-4094-8564-081D02B1205D</string>
+    <key>PayloadDisplayName</key>
+    <string>Griasa: Claude only among cloud providers</string>
+    <key>PayloadDescription</key>
+    <string>Allows on-device AI and Anthropic's Claude. OpenAI (API and Codex) and Google Gemini are unavailable.</string>
+    <key>PayloadScope</key>
+    <string>System</string>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>am.stari.griasa</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>am.stari.griasa.managed.claude-not-chatgpt.settings</string>
+            <key>PayloadUUID</key>
+            <string>E95C7A62-FC76-4B08-A2F2-D559755472AC</string>
+            <key>PayloadDisplayName</key>
+            <string>Griasa settings</string>
+
+            <!-- ChatGPT, both ways in: the API and the Codex CLI subscription. -->
+            <key>allowOpenAI</key>
+            <false/>
+            <key>allowCodex</key>
+            <false/>
+
+            <key>allowGemini</key>
+            <false/>
+
+            <!-- Claude through the API key is allowed (no switch = allowed).
+                 Claude Code runs on the person's own Claude subscription, under
+                 consumer terms rather than a company agreement. Set this to
+                 <false/> to allow only the company's API account. -->
+            <key>allowClaudeCode</key>
+            <true/>
+        </dict>
+    </array>
+</dict>
+</plist>

@@ -240,15 +240,29 @@ private struct AISettings: View {
     @State private var testing = false
     @State private var availableModels: [String] = []
 
-    private var provider: LLMProvider { LLMProvider(rawValue: providerRaw) ?? .anthropic }
+    /// What the app will actually use: the saved choice, unless an
+    /// organisation's profile forbids it. Never a cloud provider by accident.
+    private var provider: LLMProvider {
+        LLMProvider(rawValue: policy.effectiveProvider(providerRaw)) ?? .custom
+    }
+    private var policy: ManagedPolicy { .live }
 
     var body: some View {
         SettingsTab {
             Section("AI provider") {
-                Picker("Provider", selection: $providerRaw) {
-                    ForEach(LLMProvider.allCases) { provider in
+                Picker("Provider", selection: effectiveProviderBinding) {
+                    ForEach(LLMProvider.allCases.filter { policy.allows(provider: $0.rawValue) }) { provider in
                         Text(provider.displayName).tag(provider.rawValue)
                     }
+                }
+                .disabled(policy.isLocked("llmProvider"))
+                if !policy.anyCloudAllowed {
+                    managedNote("Your organization allows only on-device AI. Cloud providers aren't available, and nothing is ever offered to send text off this Mac.")
+                } else if LLMProvider.allCases.contains(where: { !policy.allows(provider: $0.rawValue) }) {
+                    managedNote("Some providers are turned off by your organization.")
+                }
+                if policy.anyCloudAllowed, policy.isLocked("llmProvider") {
+                    managedNote("The provider is set by your organization.")
                 }
 
                 switch provider {
@@ -267,10 +281,17 @@ private struct AISettings: View {
                 case .custom:
                     TextField("Base URL", text: $customBaseURL,
                               prompt: Text("http://localhost:11434/v1"))
+                        .disabled(policy.isLocked("customBaseURL"))
                         .help("Any OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1")
                     SecureField("API key (optional)", text: $customAPIKey)
                         .help("Leave empty for Ollama and LM Studio.")
-                    modelFields(fast: $customFast, smart: $customSmart)
+                    modelFields(fast: $customFast, smart: $customSmart,
+                                fastLocked: policy.isLocked("customFastModel"),
+                                smartLocked: policy.isLocked("customSmartModel"))
+                    if policy.isLocked("customBaseURL") || policy.isLocked("customFastModel")
+                        || policy.isLocked("customSmartModel") {
+                        managedNote("The local endpoint is set by your organization.")
+                    }
                     TextField("Context limit (characters)", value: $customContextLimit,
                               format: .number)
                         .help("Meeting transcripts are trimmed to this before summarizing — local models rarely fit more than ~32k tokens of context.")
@@ -453,9 +474,18 @@ private struct AISettings: View {
     /// means "use the default". After "Load model list", each field gets a
     /// picker of what the endpoint actually serves.
     @ViewBuilder
-    private func modelFields(fast: Binding<String>, smart: Binding<String>) -> some View {
+    private func modelFields(fast: Binding<String>, smart: Binding<String>,
+                             fastLocked: Bool = false, smartLocked: Bool = false) -> some View {
         modelField("Fast model", text: fast, fallback: provider.defaultFastModel)
+            .disabled(fastLocked)
         modelField("Smart model", text: smart, fallback: provider.defaultSmartModel)
+            .disabled(smartLocked)
+    }
+
+    /// The picker shows what is in effect, so a saved cloud choice that a
+    /// profile forbids reads as the local provider rather than as a blank.
+    private var effectiveProviderBinding: Binding<String> {
+        Binding(get: { provider.rawValue }, set: { providerRaw = $0 })
     }
 
     @ViewBuilder
@@ -725,6 +755,11 @@ private struct SystemSettings: View {
         SettingsTab {
             Section("AI assistants (MCP)") {
                 Toggle("Let assistants on this Mac read Griasa", isOn: $state.mcpEnabled)
+                    .disabled(ManagedPolicy.live.isLocked("mcpEnabled"))
+                if ManagedPolicy.live.isLocked("mcpEnabled") {
+                    managedNote(state.mcpEnabled ? "Turned on by your organization."
+                                                 : "Turned off by your organization.")
+                }
                 if state.mcpEnabled {
                     if mcp.isRunning {
                         LabeledContent("Endpoint", value: mcp.endpoint)
@@ -876,3 +911,11 @@ private struct HotkeyField: View {
     }
 }
 
+/// The line under a setting an MDM profile controls. Without it, a picker that
+/// will not move looks like a bug.
+@ViewBuilder
+func managedNote(_ text: String) -> some View {
+    Label(text, systemImage: "building.2")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+}

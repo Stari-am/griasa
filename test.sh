@@ -24,6 +24,7 @@ swiftc -O \
   Sources/Griasa/ProviderDefault.swift \
   Sources/Griasa/SecretMigration.swift \
   Sources/Griasa/ModelManifest.swift \
+  Sources/Griasa/ManagedPolicy.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -37,6 +38,7 @@ swiftc -O \
   Tests/ProviderDefaultChecks.swift \
   Tests/SecretChecks.swift \
   Tests/ModelChecks.swift \
+  Tests/ManagedChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

@@ -212,10 +212,14 @@ private struct AISettings: View {
 
     // Provider settings — keys mirror LLMConfig.config(for:).
     @AppStorage("llmProvider") private var providerRaw = LLMProvider.custom.rawValue
-    @AppStorage("openAIKey") private var openAIKey = ""
-    @AppStorage("geminiKey") private var geminiKey = ""
+    // API keys live in the keychain, not in preferences — loaded when the
+    // screen appears and written back as they are edited.
+    @State private var anthropicAPIKey = ""
+    @State private var openAIKey = ""
+    @State private var geminiKey = ""
     @AppStorage("customBaseURL") private var customBaseURL = ""
-    @AppStorage("customAPIKey") private var customAPIKey = ""
+    @State private var customAPIKey = ""
+    @State private var keysLoaded = false
     @AppStorage("anthropicFastModel") private var anthropicFast = ""
     @AppStorage("anthropicSmartModel") private var anthropicSmart = ""
     @AppStorage("openAIFastModel") private var openAIFast = ""
@@ -249,7 +253,7 @@ private struct AISettings: View {
 
                 switch provider {
                 case .anthropic:
-                    SecureField("Anthropic API key", text: $state.anthropicAPIKey)
+                    SecureField("Anthropic API key", text: $anthropicAPIKey)
                         .help("Also read from the ANTHROPIC_API_KEY environment variable.")
                     modelFields(fast: $anthropicFast, smart: $anthropicSmart)
                 case .openAI:
@@ -410,6 +414,21 @@ private struct AISettings: View {
                 }
             }
         }
+        .onAppear {
+            guard !keysLoaded else { return }
+            anthropicAPIKey = Secrets.value("anthropicAPIKey")
+            openAIKey = Secrets.value("openAIKey")
+            geminiKey = Secrets.value("geminiKey")
+            customAPIKey = Secrets.value("customAPIKey")
+            keysLoaded = true
+        }
+        // Saved as typed, like the preference fields around them. Gated on
+        // the load having happened, so the empty initial values can never be
+        // written over a key that exists.
+        .onChange(of: anthropicAPIKey) { _, new in if keysLoaded { Secrets.set("anthropicAPIKey", new) } }
+        .onChange(of: openAIKey) { _, new in if keysLoaded { Secrets.set("openAIKey", new) } }
+        .onChange(of: geminiKey) { _, new in if keysLoaded { Secrets.set("geminiKey", new) } }
+        .onChange(of: customAPIKey) { _, new in if keysLoaded { Secrets.set("customAPIKey", new) } }
     }
 
     /// Detection line for CLI providers — found (with path) or an install hint.

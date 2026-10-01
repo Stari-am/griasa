@@ -105,14 +105,14 @@ struct LLMConfig: Sendable {
 
         switch provider {
         case .anthropic:
-            var key = stored("anthropicAPIKey")
+            var key = Secrets.value("anthropicAPIKey")
             if key.isEmpty { key = env["ANTHROPIC_API_KEY"] ?? "" }
             return LLMConfig(provider: .anthropic, apiKey: key, baseURL: "",
                              fastModel: model("anthropicFastModel", or: provider.defaultFastModel),
                              smartModel: model("anthropicSmartModel", or: provider.defaultSmartModel),
                              contextCharLimit: 400_000)
         case .openAI:
-            var key = stored("openAIKey")
+            var key = Secrets.value("openAIKey")
             if key.isEmpty { key = env["OPENAI_API_KEY"] ?? "" }
             return LLMConfig(provider: .openAI, apiKey: key,
                              baseURL: "https://api.openai.com/v1",
@@ -120,7 +120,7 @@ struct LLMConfig: Sendable {
                              smartModel: model("openAISmartModel", or: provider.defaultSmartModel),
                              contextCharLimit: 400_000)
         case .gemini:
-            var key = stored("geminiKey")
+            var key = Secrets.value("geminiKey")
             if key.isEmpty { key = env["GEMINI_API_KEY"] ?? "" }
             // Google's OpenAI-compatible endpoint — same wire format as .custom.
             return LLMConfig(provider: .gemini, apiKey: key,
@@ -133,7 +133,7 @@ struct LLMConfig: Sendable {
             // Empty means "the local model": the default is only local if it
             // works without the user typing an address in first.
             let base = stored("customBaseURL")
-            return LLMConfig(provider: .custom, apiKey: stored("customAPIKey"),
+            return LLMConfig(provider: .custom, apiKey: Secrets.value("customAPIKey"),
                              baseURL: base.isEmpty ? ProviderDefault.localBaseURL : base,
                              fastModel: model("customFastModel", or: provider.defaultFastModel),
                              smartModel: model("customSmartModel", or: provider.defaultSmartModel),
@@ -158,13 +158,12 @@ struct LLMConfig: Sendable {
     /// saved, the rule in `ProviderDefault`.
     static func resolvedProviderRaw() -> String {
         let defaults = UserDefaults.standard
-        // The preference names are not uniform, so they are spelled out. Only a
-        // key stored in Griasa counts: an environment variable is something the
+        // The key names are not uniform, so they are spelled out. Only a key
+        // stored in Griasa counts: an environment variable is something the
         // shell had, not a choice anybody made here.
         let keyNames = ["anthropic": "anthropicAPIKey", "openAI": "openAIKey", "gemini": "geminiKey"]
         let keyed = Set(keyNames.compactMap { provider, key in
-            (defaults.string(forKey: key) ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : provider
+            Secrets.value(key).isEmpty ? nil : provider
         })
         return ProviderDefault.resolve(stored: defaults.string(forKey: "llmProvider"), keyed: keyed)
     }

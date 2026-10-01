@@ -5,10 +5,6 @@ import Foundation
 /// right after install with no manual setup. Until (or unless) this succeeds,
 /// transcription falls back to the Apple recognizer.
 enum WhisperInstaller {
-    static let modelDownloadURL = URL(string:
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin")!
-    static let vadModelDownloadURL = URL(string:
-        "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin")!
 
     static var brewPath: String? {
         for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
@@ -27,8 +23,48 @@ enum WhisperInstaller {
     }
 
     static func downloadModel(onProgress: @escaping @Sendable (Int) -> Void) async throws {
-        let downloader = ModelDownloader(destination: WhisperTranscriber.modelURL, onProgress: onProgress)
-        try await downloader.download(from: modelDownloadURL)
+        let downloader = ModelDownloader(destination: WhisperTranscriber.modelURL,
+                                         expected: ModelManifest.whisper, onProgress: onProgress)
+        try await downloader.download(from: ModelManifest.whisper.url)
+    }
+
+    /// Checks each pinned model already on disk against the manifest.
+    ///
+    /// Installs from before checksums existed have models nobody verified, and
+    /// those are the ones on people's machines today. Hashing the large one
+    /// takes a few seconds, so a file that passed is remembered by its size and
+    /// modification date and not hashed again until either changes. One that
+    /// fails is renamed rather than deleted — it is evidence, and 1.6 GB is not
+    /// something to destroy on a single reading — and nothing loads it.
+    static func setAsideUnverifiedModels() async {
+        let pairs: [(URL, PinnedModel)] = [(WhisperTranscriber.modelURL, ModelManifest.whisper),
+                                           (WhisperTranscriber.vadModelURL, ModelManifest.vad)]
+        for (file, expected) in pairs {
+            guard let stamp = fileStamp(file) else { continue }  // not downloaded yet
+            let key = "verifiedModel.\(expected.fileName)"
+            let remembered = "\(expected.sha256):\(stamp)"
+            if UserDefaults.standard.string(forKey: key) == remembered { continue }
+            let verdict = await Task.detached(priority: .utility) {
+                ModelManifest.verify(file, against: expected)
+            }.value
+            if verdict == .matches {
+                UserDefaults.standard.set(remembered, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+                let aside = file.appendingPathExtension("unverified")
+                try? FileManager.default.removeItem(at: aside)
+                try? FileManager.default.moveItem(at: file, to: aside)
+                NSLog("Griasa: %@ — moved aside to %@", ModelManifest.explain(verdict, model: expected),
+                      aside.lastPathComponent)
+            }
+        }
+    }
+
+    private static func fileStamp(_ file: URL) -> String? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+              let size = attributes[.size] as? NSNumber,
+              let modified = attributes[.modificationDate] as? Date else { return nil }
+        return "\(size.int64Value):\(Int(modified.timeIntervalSince1970))"
     }
 
     /// The VAD model is ~1 MB — download without progress; failure is
@@ -36,9 +72,10 @@ enum WhisperInstaller {
     /// on silence).
     static func downloadVADModelIfNeeded() async {
         guard !FileManager.default.fileExists(atPath: WhisperTranscriber.vadModelURL.path) else { return }
-        let downloader = ModelDownloader(destination: WhisperTranscriber.vadModelURL, onProgress: { _ in })
+        let downloader = ModelDownloader(destination: WhisperTranscriber.vadModelURL,
+                                         expected: ModelManifest.vad, onProgress: { _ in })
         do {
-            try await downloader.download(from: vadModelDownloadURL)
+            try await downloader.download(from: ModelManifest.vad.url)
         } catch {
             NSLog("Griasa: VAD model download failed: %@", error.localizedDescription)
         }
@@ -67,14 +104,16 @@ enum WhisperInstaller {
 /// `download(from:)` has no progress reporting, so this uses the delegate API).
 final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let destination: URL
+    private let expected: PinnedModel
     private let onProgress: @Sendable (Int) -> Void
     private var continuation: CheckedContinuation<Void, Error>?
     private var session: URLSession?
     private var lastPercent = -1
     private let lock = NSLock()
 
-    init(destination: URL, onProgress: @escaping @Sendable (Int) -> Void) {
+    init(destination: URL, expected: PinnedModel, onProgress: @escaping @Sendable (Int) -> Void) {
         self.destination = destination
+        self.expected = expected
         self.onProgress = onProgress
     }
 
@@ -124,8 +163,22 @@ final class ModelDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Se
             }
             try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
+            // Checked beside the destination, never in it: the model path is
+            // what whisper loads, so nothing unverified may ever sit there,
+            // even for the seconds the check takes. URLSession deletes
+            // `location` when this method returns, so it is moved first.
+            let staging = destination.appendingPathExtension("download")
+            try? FileManager.default.removeItem(at: staging)
+            try FileManager.default.moveItem(at: location, to: staging)
+            let verdict = ModelManifest.verify(staging, against: expected)
+            guard verdict == .matches else {
+                try? FileManager.default.removeItem(at: staging)
+                throw NSError(domain: "Griasa", code: 9, userInfo: [
+                    NSLocalizedDescriptionKey: ModelManifest.explain(verdict, model: expected)
+                ])
+            }
             try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: location, to: destination)
+            try FileManager.default.moveItem(at: staging, to: destination)
             finish(.success(()))
         } catch {
             finish(.failure(error))

@@ -24,6 +24,31 @@ provider keeps that one too: being on the old default and pasting a key into it
 was a choice, and moving that person to a model they never installed would break
 every AI feature they use.
 
+**API keys are kept in the keychain.** They used to be ordinary preferences —
+plain text in a file every program running as you could read, and copied into
+every backup. They now live in the macOS login keychain, encrypted at rest, and
+another program asking for one gets a system prompt instead of the key.
+
+Existing keys move across by themselves at the first launch, and each one leaves
+the preferences file only after it has been written to the keychain and read
+back unchanged — a key that stays in plain text for one more launch is a smaller
+harm than a key that is gone. A key found in the preferences file later, typed
+into an older version after a downgrade, replaces the keychain copy as the most
+recent one entered.
+
+**Speech models are checked before anything loads them.** They come from
+Hugging Face, and a download used to be accepted as long as the server answered:
+a file replaced upstream, cut short on the way, or altered by anything on the
+connection would have gone straight to the model parser, which has a history of
+memory-safety bugs. Each model is now pinned to a repository commit rather than
+a branch, so it cannot change underneath the app, and checked against a SHA-256
+and size written into the app before it is moved into place. A file that does
+not match is not installed, and the message says which way it was wrong.
+
+Models already on disk are checked once after the update — under a second for
+the large one — and remembered until the file changes. One that fails is renamed
+rather than deleted, and a verified copy is downloaded in its place.
+
 ## 1.0.13 — 2026-09-28
 
 **The live panel no longer thanks everybody on your behalf.** Live notes cut each

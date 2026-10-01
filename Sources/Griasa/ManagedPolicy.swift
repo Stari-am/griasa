@@ -44,7 +44,8 @@ struct ManagedPolicy {
     /// else a profile sets still takes effect — macOS applies it — it is just
     /// not drawn as locked.
     static let lockableKeys = ["llmProvider", "customBaseURL", "customFastModel",
-                               "customSmartModel", "mcpEnabled", allowCloudAIKey]
+                               "customSmartModel", "mcpEnabled", allowCloudAIKey,
+                               RecordingNotice.enabledKey, RecordingNotice.textKey]
         + providerKeys.values.sorted()
 
     /// The providers that stay on this Mac. A custom endpoint counts even when

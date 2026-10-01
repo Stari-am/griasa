@@ -15,6 +15,8 @@ macOS does the enforcement. A configuration profile whose payload type is Griasa
 | `llmProvider` | String | The AI provider. `custom` is the on-device, OpenAI-compatible one. |
 | `customBaseURL` | String | Address of the OpenAI-compatible endpoint. `http://localhost:11434/v1` is Ollama on each Mac; a model server the organization runs works the same way. |
 | `customFastModel`, `customSmartModel` | String | Model names on that endpoint. |
+| `recordingNotice` | Boolean | When a recording starts, show a sentence to paste into the call's chat telling the other participants they are being recorded. Off unless set. macOS gives the other side of a call no recording indicator, so this is the place to make asking routine. Read in the safe direction: anything written that is not a clear *no* counts as on. |
+| `recordingNoticeText` | String | The sentence. The default says the call is recorded and offers a way to object. |
 | `mcpEnabled` | Boolean | The local MCP endpoint that lets assistants on the Mac read meeting history. What an assistant reads goes wherever that assistant sends its context. |
 
 Any other Griasa preference can be managed the same way and macOS will enforce it; the ones above are the ones Settings displays as locked.
@@ -45,4 +47,4 @@ Then open Griasa → Settings → AI & Actions. The provider picker offers only 
 
 ## What a profile does not cover
 
-Data at rest — transcripts, history, people — is plain files in the user's Library, protected by FileVault and the user account, as with any app outside the sandbox. Recording consent is a matter of policy rather than configuration.
+Data at rest — transcripts, history, people — is plain files in the user's Library, protected by FileVault and the user account, as with any app outside the sandbox. Whether a recording needs consent depends on where everybody on the call is — `recordingNotice` makes asking routine, but deciding what is required is a matter for policy and legal, not configuration.

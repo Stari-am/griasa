@@ -49,7 +49,6 @@ final class AppState: ObservableObject {
     // MARK: - Settings (persisted)
     @AppStorage("hotkey") var hotkeyRaw: String = HotkeyMonitor.Key.rightOption.rawValue
     @AppStorage("aiFormattingEnabled") var aiFormattingEnabled: Bool = true
-    @AppStorage("anthropicAPIKey") var anthropicAPIKey: String = ""
     @AppStorage("autoRecordOnLaunch") var autoRecordOnLaunch: Bool = false
     @AppStorage("transcribeRecordings") var transcribeRecordings: Bool = true
     @AppStorage("openTranscriptWhenReady") var openTranscriptWhenReady: Bool = true
@@ -152,6 +151,9 @@ final class AppState: ObservableObject {
         // The prep watcher stays stopped too: it would poll the calendar and
         // replace the brief the screenshot is of.
         if AppDelegate.shotPath != nil { return }
+        // Keys first: which provider an untouched install lands on depends on
+        // which keys exist, and they have to be found where they now live.
+        Secrets.migrate()
         LLMConfig.persistDefaultProviderIfUnset()
         Permissions.requestAll()
         installHotkey()

@@ -22,6 +22,7 @@ swiftc -O \
   Sources/Griasa/AudioFormatMatch.swift \
   Sources/Griasa/TranscriptCleaner.swift \
   Sources/Griasa/ProviderDefault.swift \
+  Sources/Griasa/SecretMigration.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -33,6 +34,7 @@ swiftc -O \
   Tests/AudioFormatChecks.swift \
   Tests/CleanerChecks.swift \
   Tests/ProviderDefaultChecks.swift \
+  Tests/SecretChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

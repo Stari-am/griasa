@@ -39,6 +39,8 @@ cp Support/Info.plist "$APP/Contents/Info.plist"
 # once, and then the two never interfere again. Settings are not shared either;
 # copy them across if you want them:
 #   defaults export am.stari.griasa - | defaults import am.stari.griasa.dev -
+# API keys do not travel that way: they live in the login keychain, under each
+# build's own bundle identifier, and are entered once in each build's Settings.
 cp Support/AppIcon-dev.icns "$APP/Contents/Resources/AppIcon.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier am.stari.griasa.dev" \
                         -c "Set :CFBundleName Griasa Dev" \

@@ -24,6 +24,18 @@ provider keeps that one too: being on the old default and pasting a key into it
 was a choice, and moving that person to a model they never installed would break
 every AI feature they use.
 
+**API keys are kept in the keychain.** They used to be ordinary preferences —
+plain text in a file every program running as you could read, and copied into
+every backup. They now live in the macOS login keychain, encrypted at rest, and
+another program asking for one gets a system prompt instead of the key.
+
+Existing keys move across by themselves at the first launch, and each one leaves
+the preferences file only after it has been written to the keychain and read
+back unchanged — a key that stays in plain text for one more launch is a smaller
+harm than a key that is gone. A key found in the preferences file later, typed
+into an older version after a downgrade, replaces the keychain copy as the most
+recent one entered.
+
 ## 1.0.13 — 2026-09-28
 
 **The live panel no longer thanks everybody on your behalf.** Live notes cut each

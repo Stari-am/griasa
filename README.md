@@ -66,6 +66,7 @@ out harder than it looked, and the questions people actually ask.**
 - **Audio never leaves your Mac.** Transcription is local — Apple's recognizer or `whisper.cpp`. There is no Griasa server and no account.
 - **Text stays on the Mac by default.** A new install uses a local model via Ollama; Anthropic, OpenAI or Gemini are used only if you choose one.
 - **The calendar is read, never written.** Reminders are created, but only when you ask for one.
+- **API keys are kept in the macOS keychain**, encrypted, not in a plain preferences file.
 - **Every permission is optional**, and the app says what stops working if you decline it.
 
 ## Download
@@ -214,7 +215,7 @@ AI cleanup uses the configured **AI provider** (see below). Without one — or i
 Every AI feature routes through one configurable provider (Settings → AI & Actions). **A new install is on the local model** — nothing is sent to a cloud vendor until somebody chooses one.
 
 - **Local (the default)** — Ollama at `http://localhost:11434/v1`, no key, no setup inside Griasa: install Ollama and `ollama pull qwen3:8b`. If no local model is running, the first AI action says so and how to fix it. Any other OpenAI-compatible endpoint works by base URL — LM Studio, or a server on your network. With the built-in local Whisper, Griasa then runs **fully offline** — no text ever leaves the Mac.
-- **Anthropic (Claude)** — key from Settings or `ANTHROPIC_API_KEY`.
+- **Anthropic (Claude)** — key from Settings or `ANTHROPIC_API_KEY`. Keys entered in Settings are kept in the macOS login keychain, never in the preferences file.
 - **OpenAI** — key from Settings or `OPENAI_API_KEY` (GPT-5.6 family by default).
 - **Google (Gemini)** — key from Settings or `GEMINI_API_KEY` (via Google's OpenAI-compatible endpoint; Gemini 3.x by default).
 - **Claude Code (subscription)** / **Codex CLI (ChatGPT subscription)** — **no API key at all**: if the `claude` or `codex` CLI is installed and logged in, Griasa answers through it, billed to the subscription you already pay for. Auto-detected (with an optional path override); expect ~5–10 s per request — great for meeting notes, dossiers, and documents, slower than an API key for typing-path features like `;tldr`. ([CLIRunner.swift](Sources/Griasa/CLIRunner.swift))

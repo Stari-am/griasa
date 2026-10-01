@@ -256,9 +256,12 @@ private struct AISettings: View {
                     }
                 }
                 .disabled(policy.isLocked("llmProvider"))
-                if !policy.cloudAllowed {
+                if !policy.anyCloudAllowed {
                     managedNote("Your organization allows only on-device AI. Cloud providers aren't available, and nothing is ever offered to send text off this Mac.")
-                } else if policy.isLocked("llmProvider") {
+                } else if LLMProvider.allCases.contains(where: { !policy.allows(provider: $0.rawValue) }) {
+                    managedNote("Some providers are turned off by your organization.")
+                }
+                if policy.anyCloudAllowed, policy.isLocked("llmProvider") {
                     managedNote("The provider is set by your organization.")
                 }
 

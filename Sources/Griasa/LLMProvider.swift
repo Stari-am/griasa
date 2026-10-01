@@ -185,11 +185,11 @@ struct LLMConfig: Sendable {
     /// the text goes to the vendor, just billed to a subscription.
     static func cloudFallback(for failed: LLMConfig) -> LLMConfig? {
         // Forbidden by policy means not even offered: the consent dialog is a
-        // question, and an organisation that has answered it does not want its
-        // people asked.
-        guard ManagedPolicy.live.cloudAllowed else { return nil }
+        // question, and an organisation that has answered it — for every cloud
+        // provider, or only for some — does not want its people asked.
+        let policy = ManagedPolicy.live
         for provider in [LLMProvider.anthropic, .openAI, .gemini, .claudeCLI, .codexCLI]
-        where provider != failed.provider {
+        where provider != failed.provider && policy.allows(provider: provider.rawValue) {
             let candidate = config(for: provider)
             if candidate.isConfigured { return candidate }
         }

@@ -23,14 +23,29 @@ struct ManagedPolicy {
     /// The value currently in effect for a key, managed or not.
     let value: (String) -> Any?
 
-    /// The one policy key that is not an existing setting.
+    /// The master switch: `false` closes every cloud provider at once.
     static let allowCloudAIKey = "allowCloudAI"
+
+    /// One switch per way text can leave the Mac, so an organisation can allow
+    /// one vendor and not another. The API and the subscription CLI of the same
+    /// vendor are separate on purpose: a company API account under a data
+    /// agreement and somebody's personal Claude Pro or ChatGPT Plus subscription
+    /// are different contracts with different retention terms, and a security
+    /// team will often want the first and not the second.
+    static let providerKeys: [String: String] = [
+        "anthropic": "allowAnthropic",
+        "claudeCLI": "allowClaudeCode",
+        "openAI": "allowOpenAI",
+        "codexCLI": "allowCodex",
+        "gemini": "allowGemini",
+    ]
 
     /// The keys Settings shows as locked when a profile sets them. Anything
     /// else a profile sets still takes effect — macOS applies it — it is just
     /// not drawn as locked.
     static let lockableKeys = ["llmProvider", "customBaseURL", "customFastModel",
                                "customSmartModel", "mcpEnabled", allowCloudAIKey]
+        + providerKeys.values.sorted()
 
     /// The providers that stay on this Mac. A custom endpoint counts even when
     /// it is a server on the company network: pointing it there is exactly what
@@ -39,15 +54,18 @@ struct ManagedPolicy {
 
     /// Absent means allowed: that is every install without a profile, and it
     /// must behave exactly as it always has.
+    var cloudAllowed: Bool { flag(Self.allowCloudAIKey) ?? true }
+
+    /// A policy switch as a profile wrote it: nil when absent.
     ///
-    /// Present is a different matter. Somebody wrote this key into a profile,
-    /// so they meant to say something about the cloud, and the common profile
+    /// Present is a different matter from absent. Somebody wrote this key into
+    /// a profile, so they meant to say something, and the common profile
     /// mistake — `<string>false</string>` where `<false/>` was meant — must not
-    /// leave an organisation believing the cloud is closed while it is open. So
-    /// the usual spellings of yes and no are understood, and anything else is
-    /// read as no. A security control that fails open on a typo is not one.
-    var cloudAllowed: Bool {
-        guard let raw = value(Self.allowCloudAIKey) else { return true }
+    /// leave an organisation believing a provider is closed while it is open.
+    /// So the usual spellings of yes and no are understood, and anything else
+    /// is read as no. A security control that fails open on a typo is not one.
+    func flag(_ key: String) -> Bool? {
+        guard let raw = value(key) else { return nil }
         if let flag = raw as? Bool { return flag }
         if let number = raw as? NSNumber { return number.boolValue }
         if let text = (raw as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
@@ -56,12 +74,24 @@ struct ManagedPolicy {
         return false
     }
 
+    /// Whether any cloud provider at all is still allowed — the difference
+    /// between "only on-device AI" and "some providers are off".
+    var anyCloudAllowed: Bool {
+        Self.providerKeys.keys.contains { allows(provider: $0) }
+    }
+
     func isLocked(_ key: String) -> Bool { isForced(key) }
 
     var isManaged: Bool { Self.lockableKeys.contains(where: isForced) }
 
+    /// The on-device provider is always allowed. A cloud one needs the master
+    /// switch open and its own switch not closed; a provider with no switch of
+    /// its own — one added later and not yet given a key — follows the master.
     func allows(provider raw: String) -> Bool {
-        cloudAllowed || Self.onDeviceProviders.contains(raw)
+        if Self.onDeviceProviders.contains(raw) { return true }
+        guard cloudAllowed else { return false }
+        guard let key = Self.providerKeys[raw] else { return true }
+        return flag(key) ?? true
     }
 
     /// The provider to actually use. A cloud provider saved before the policy

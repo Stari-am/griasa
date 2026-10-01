@@ -58,9 +58,15 @@ nobody is offered a cloud fallback. Each setting a profile controls is shown as
 locked in Settings, with a line saying the organization set it. A ready profile
 and a short guide for IT are in `Support/mdm`.
 
-For everybody without a profile, nothing changes. And a value in
-`allowCloudAI` that cannot be read as yes counts as no, so the common profile
-typo closes the cloud rather than leaving it open.
+A profile can also allow one vendor and not another: each cloud provider has
+its own switch, and a vendor's API and its subscription CLI are separate ones —
+a company API account and somebody's personal Claude or ChatGPT subscription are
+different contracts. A provider that is closed and was already saved falls back
+to the on-device one, never to a different vendor.
+
+For everybody without a profile, nothing changes. And a switch that cannot be
+read as yes counts as no, so the common profile typo closes a provider rather
+than leaving it open.
 
 ## 1.0.13 — 2026-09-28
 

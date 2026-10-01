@@ -75,5 +75,56 @@ check(pinned.isLocked("llmProvider") && pinned.isLocked("customBaseURL") && !pin
       meaning: "locking more takes away choices the company left open; locking less shows a picker that does nothing",
       saw: "locked: \(ManagedPolicy.lockableKeys.filter(pinned.isLocked))")
 
+// Per provider: allow one vendor, not another.
+let claudeOnly = policy(forced: ["allowOpenAI", "allowCodex", "allowGemini"],
+                        values: ["allowOpenAI": false, "allowCodex": false, "allowGemini": false])
+let allowedNow = providers.filter(claudeOnly.allows(provider:))
+check(allowedNow == ["anthropic", "custom", "claudeCLI"],
+      rule: "closing OpenAI, Codex and Gemini leaves Claude and the on-device provider open",
+      meaning: "this is the request — allow one vendor and not another — and each closed switch must close exactly its own provider",
+      saw: "\(allowedNow)")
+
+check(claudeOnly.effectiveProvider("openAI") == "custom" && claudeOnly.effectiveProvider("codexCLI") == "custom"
+        && claudeOnly.effectiveProvider("anthropic") == "anthropic",
+      rule: "a saved provider that is now closed falls back to on-device, never to another vendor",
+      meaning: "silently moving somebody from ChatGPT to Claude would be the app choosing a vendor on their behalf",
+      saw: "openAI → \(claudeOnly.effectiveProvider("openAI")), codexCLI → \(claudeOnly.effectiveProvider("codexCLI"))")
+
+let apiNotSubscription = policy(values: ["allowClaudeCode": false])
+check(apiNotSubscription.allows(provider: "anthropic") && !apiNotSubscription.allows(provider: "claudeCLI"),
+      rule: "a vendor's API and its subscription CLI are switched separately",
+      meaning: "a company API account under a data agreement and somebody's personal subscription are different contracts; a security team often wants the first and not the second",
+      saw: "anthropic \(apiNotSubscription.allows(provider: "anthropic")), claudeCLI \(apiNotSubscription.allows(provider: "claudeCLI"))")
+
+let masterWins = policy(values: [ManagedPolicy.allowCloudAIKey: false, "allowAnthropic": true])
+check(!masterWins.allows(provider: "anthropic") && !masterWins.anyCloudAllowed,
+      rule: "allowCloudAI = false overrides a provider switch that says yes",
+      meaning: "the master switch exists so one key can close everything; a leftover per-provider yes must not reopen a hole",
+      saw: "anthropic allowed: \(masterWins.allows(provider: "anthropic"))")
+
+let oneTypo = policy(values: ["allowGemini": "nope"])
+check(!oneTypo.allows(provider: "gemini") && oneTypo.allows(provider: "openAI"),
+      rule: "an unreadable provider switch closes that provider only",
+      meaning: "fail closed, but only as far as the mistake reaches — one typo must not take every vendor away",
+      saw: "gemini \(oneTypo.allows(provider: "gemini")), openAI \(oneTypo.allows(provider: "openAI"))")
+
+let allOff = policy(values: ["allowAnthropic": false, "allowClaudeCode": false, "allowOpenAI": false,
+                             "allowCodex": false, "allowGemini": false])
+check(!allOff.anyCloudAllowed && allOff.cloudAllowed,
+      rule: "every provider switched off one by one reads as on-device only, even with the master open",
+      meaning: "Settings uses this to say \"only on-device AI\" rather than \"some providers are off\", which would be misleading",
+      saw: "anyCloudAllowed \(allOff.anyCloudAllowed)")
+
+let cloud = providers.filter { $0 != "custom" }
+check(Set(ManagedPolicy.providerKeys.keys) == Set(cloud),
+      rule: "every cloud provider has its own switch",
+      meaning: "a provider with no key of its own could only be closed by the master switch — the per-vendor policy would quietly not cover it",
+      saw: "keys for \(ManagedPolicy.providerKeys.keys.sorted()), cloud providers \(cloud.sorted())")
+
+check(policy().anyCloudAllowed && providers.allSatisfy { policy().allows(provider: $0) },
+      rule: "with no profile, no per-provider switch closes anything",
+      meaning: "the unmanaged install — nearly everybody — must not lose a provider to a key nobody set",
+      saw: "unmanaged policy refused a provider")
+
 return failures
 }

@@ -154,13 +154,30 @@ private struct RecordingSettings: View {
     @ObservedObject private var roster = ParticipantRoster.shared
     @AppStorage("prepBriefEnabled") private var prepBriefEnabled = true
     @AppStorage("prepLeadMinutes") private var prepLeadMinutes = 5
+    @AppStorage(RecordingNotice.enabledKey) private var recordingNotice = false
+    @AppStorage(RecordingNotice.textKey) private var recordingNoticeText = ""
+    private var policy: ManagedPolicy { .live }
     var body: some View {
         SettingsTab {
             Section("Conversation recording") {
                 Toggle("Start recording when Griasa launches", isOn: $state.autoRecordOnLaunch)
                 Toggle("Transcribe meetings when recording stops", isOn: $state.transcribeRecordings)
-                    .help("Speech-to-text runs on-device; with an Anthropic API key set, Claude then produces cleaned notes with a summary and action items.")
+                    .help("Speech-to-text runs on-device; the AI provider set in AI & Actions then produces cleaned notes with a summary and action items.")
                 Toggle("Open the transcript when it's ready", isOn: $state.openTranscriptWhenReady)
+            }
+            Section("Telling people") {
+                Toggle("Remind me to tell everyone the call is recorded", isOn: $recordingNotice)
+                    .disabled(policy.isLocked(RecordingNotice.enabledKey))
+                    .help("When a recording starts, shows a sentence to paste into the call's chat. The other side gets no recording indicator from macOS — only you do.")
+                if recordingNotice || policy.isLocked(RecordingNotice.enabledKey) {
+                    TextField("What to say", text: $recordingNoticeText,
+                              prompt: Text(RecordingNotice.defaultText), axis: .vertical)
+                        .lineLimit(2...4)
+                        .disabled(policy.isLocked(RecordingNotice.textKey))
+                }
+                if policy.isLocked(RecordingNotice.enabledKey) || policy.isLocked(RecordingNotice.textKey) {
+                    managedNote("Set by your organization.")
+                }
             }
             Section("Silence") {
                 Toggle("Ask before recording silence forever", isOn: $state.silenceWatchEnabled)

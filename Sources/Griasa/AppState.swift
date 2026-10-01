@@ -434,6 +434,14 @@ final class AppState: ObservableObject {
             }
             try await recorder.start()
             isRecording = true
+            // After the start, not before: the reminder is about a recording
+            // that exists, and it must never be the reason one fails to begin.
+            let defaults = UserDefaults.standard
+            if RecordingNotice.isOn(defaults.object(forKey: RecordingNotice.enabledKey)) {
+                PopupController.shared.showMessage(
+                    title: "Tell everyone this call is recorded",
+                    message: RecordingNotice.text(defaults.object(forKey: RecordingNotice.textKey)))
+            }
             recordingStartedAt = Date()
             lastError = recorder.micFailure
             if liveNotesEnabled {

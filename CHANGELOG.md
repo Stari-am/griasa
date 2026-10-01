@@ -68,6 +68,20 @@ For everybody without a profile, nothing changes. And a switch that cannot be
 read as yes counts as no, so the common profile typo closes a provider rather
 than leaving it open.
 
+**A reminder to tell people they are being recorded.** Griasa records the other
+side of a call through the Mac's own audio, so only the person running it sees
+a recording indicator. Whether that needs consent depends on where everybody
+is, and the app cannot decide it — but it can make asking the easy thing to do.
+With *Settings → Meetings → Remind me to tell everyone the call is recorded* on,
+starting a recording shows a ready sentence with a Copy button, for the call's
+chat. The default says the call is recorded and offers a way to object; it can
+be changed.
+
+It is off unless somebody turns it on. An organisation can turn it on for
+everybody, and set the wording, with an MDM profile — and a profile value that
+cannot be read as a clear no counts as on, so a typo produces one reminder too
+many rather than a call nobody was told about.
+
 ## 1.0.13 — 2026-09-28
 
 **The live panel no longer thanks everybody on your behalf.** Live notes cut each

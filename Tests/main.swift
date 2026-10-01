@@ -2,7 +2,7 @@ import Foundation
 
 // Entry point, kept separate from the checks so those files read as a
 // description of the rules rather than as a program.
-let failed = runStabilizerChecks() + runSilenceChecks() + runIdentityChecks() + runMCPChecks() + runScopeChecks() + runCommitmentChecks() + runAttendanceChecks() + runAudioFormatChecks() + runCleanerChecks() + runProviderDefaultChecks() + runSecretChecks() + runModelChecks() + runManagedChecks()
+let failed = runStabilizerChecks() + runSilenceChecks() + runIdentityChecks() + runMCPChecks() + runScopeChecks() + runCommitmentChecks() + runAttendanceChecks() + runAudioFormatChecks() + runCleanerChecks() + runProviderDefaultChecks() + runSecretChecks() + runModelChecks() + runManagedChecks() + runNoticeChecks()
 if failed == 0 {
     print("checks: all passed")
 } else {

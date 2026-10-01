@@ -89,7 +89,10 @@ struct LLMConfig: Sendable {
     }
 
     static func current() -> LLMConfig {
-        return config(for: LLMProvider(rawValue: resolvedProviderRaw()) ?? .custom)
+        // An organisation that forbids cloud AI gets the local provider whatever
+        // was saved; with no profile this changes nothing.
+        let raw = ManagedPolicy.live.effectiveProvider(resolvedProviderRaw())
+        return config(for: LLMProvider(rawValue: raw) ?? .custom)
     }
 
     static func config(for provider: LLMProvider) -> LLMConfig {
@@ -181,6 +184,10 @@ struct LLMConfig: Sendable {
     /// nil when there's nothing to fall back to. CLI providers count as cloud:
     /// the text goes to the vendor, just billed to a subscription.
     static func cloudFallback(for failed: LLMConfig) -> LLMConfig? {
+        // Forbidden by policy means not even offered: the consent dialog is a
+        // question, and an organisation that has answered it does not want its
+        // people asked.
+        guard ManagedPolicy.live.cloudAllowed else { return nil }
         for provider in [LLMProvider.anthropic, .openAI, .gemini, .claudeCLI, .codexCLI]
         where provider != failed.provider {
             let candidate = config(for: provider)

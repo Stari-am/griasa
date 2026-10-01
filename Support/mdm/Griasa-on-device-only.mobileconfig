@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Griasa: on-device AI only.
+
+  Installs managed preferences for the bundle identifier am.stari.griasa. macOS
+  returns these ahead of anything the user saved, and Griasa shows each one as
+  locked in Settings with a note that the organization set it.
+
+  Edit the values marked EDIT, then upload through your MDM (Jamf, Kandji,
+  Intune, Mosyle: "Custom settings" / "Application & Custom Settings" with the
+  preference domain am.stari.griasa), or install directly on a test Mac by
+  double-clicking. See README.md beside this file.
+-->
+<plist version="1.0">
+<dict>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadIdentifier</key>
+    <string>am.stari.griasa.managed.on-device-only</string>
+    <key>PayloadUUID</key>
+    <string>D5FBFFAA-4F28-40FC-80B4-CB932C5C62F1</string>
+    <key>PayloadDisplayName</key>
+    <string>Griasa: on-device AI only</string>
+    <key>PayloadDescription</key>
+    <string>Keeps Griasa's AI features on this Mac or on the organization's own model server. Cloud AI providers are unavailable.</string>
+    <key>PayloadScope</key>
+    <string>System</string>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>am.stari.griasa</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>am.stari.griasa.managed.on-device-only.settings</string>
+            <key>PayloadUUID</key>
+            <string>B54CBA0A-F5D5-4361-BC62-138B98E0A788</string>
+            <key>PayloadDisplayName</key>
+            <string>Griasa settings</string>
+
+            <!-- Closes every path that sends text off the Mac: Anthropic, OpenAI,
+                 Gemini, and the Claude Code / Codex subscriptions. Nobody is
+                 offered a cloud fallback either. Write it as a real boolean;
+                 anything Griasa cannot read as "yes" is treated as "no". -->
+            <key>allowCloudAI</key>
+            <false/>
+
+            <!-- The on-device provider: any OpenAI-compatible endpoint. -->
+            <key>llmProvider</key>
+            <string>custom</string>
+
+            <!-- EDIT: Ollama on each Mac is the default. To use a model server
+                 the organization runs instead, put its address here. -->
+            <key>customBaseURL</key>
+            <string>http://localhost:11434/v1</string>
+
+            <!-- Optional: pin the models. Remove these two to let people choose. -->
+            <key>customFastModel</key>
+            <string>qwen3:8b</string>
+            <key>customSmartModel</key>
+            <string>qwen3:30b</string>
+
+            <!-- The MCP endpoint lets assistants on the Mac (Claude Code, Codex,
+                 Cursor) read meeting history, and whatever an assistant reads
+                 goes wherever that assistant sends its context. Off, for an
+                 organization that does not allow cloud AI. -->
+            <key>mcpEnabled</key>
+            <false/>
+        </dict>
+    </array>
+</dict>
+</plist>

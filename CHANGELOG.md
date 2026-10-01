@@ -49,6 +49,19 @@ Models already on disk are checked once after the update — under a second for
 the large one — and remembered until the file changes. One that fails is renamed
 rather than deleted, and a verified copy is downloaded in its place.
 
+**Companies can manage Griasa with MDM.** A configuration profile for
+`am.stari.griasa` can pin the AI provider, point it at a model server the
+company runs, turn the MCP endpoint off, and — with `allowCloudAI` set to false —
+close every path that sends text off the Mac: cloud providers disappear from
+Settings, a cloud provider saved earlier is replaced by the on-device one, and
+nobody is offered a cloud fallback. Each setting a profile controls is shown as
+locked in Settings, with a line saying the organization set it. A ready profile
+and a short guide for IT are in `Support/mdm`.
+
+For everybody without a profile, nothing changes. And a value in
+`allowCloudAI` that cannot be read as yes counts as no, so the common profile
+typo closes the cloud rather than leaving it open.
+
 ## 1.0.13 — 2026-09-28
 
 **The live panel no longer thanks everybody on your behalf.** Live notes cut each

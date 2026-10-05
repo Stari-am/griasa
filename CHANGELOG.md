@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.15 — 2026-10-05
 
 **Meeting notes from other tools can be imported.** ChatGPT now records
 meetings, and so do Zoom, Meet and Teams; none of them offers a way for another

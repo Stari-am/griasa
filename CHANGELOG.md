@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+**Meeting notes from other tools can be imported.** ChatGPT now records
+meetings, and so do Zoom, Meet and Teams; none of them offers a way for another
+app to read the result. So Griasa takes the text: *Import Meeting Notes…* in the
+menu, paste or drop the notes, say when the meeting was, and answer the same
+"who was there" question a recording asks — with the calendar consulted for
+that hour. The notes become a meeting like any other: promises extracted, a
+page for each person, the brief before the next call, the project it belongs
+to. The stored notes say where they came from.
+
+Imported notes can be weeks old, which a recording never is, so two things
+follow the meeting's date rather than today's. "By Friday" is worked out from
+the day of the meeting, and each promise is dated by it, so an old one is not
+mistaken for new and reaches the monthly review on time. And an import older
+than the latest meeting is not asked which promises it closed — it would offer
+to close promises made after the conversation took place. The history stays in
+date order, so an old import never becomes "last time" in a brief.
+
 **Old recording audio can be deleted on a schedule.** Recordings keep two audio
 tracks for every meeting, and they add up: audio is nearly all of the space a
 recordings folder takes, and the transcript and notes made from it are a tiny

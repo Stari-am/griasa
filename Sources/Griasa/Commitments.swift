@@ -209,8 +209,13 @@ enum CommitmentExtractor {
     /// the typing/UI path can report it (the account alert fires via
     /// AIFormatter); the background auto-extract calls this with `try?`.
     @discardableResult
+    /// - Parameter meetingDate: when the conversation happened. "By Friday" is
+    ///   resolved from it, and each promise is dated by it — for a meeting
+    ///   recorded just now that is today, but notes imported from another tool
+    ///   can be weeks old, and a promise from last month must not look new.
     static func extract(markdown: String, participants: [String], myName: String,
-                        sourceTitle: String, sourceEntryID: UUID?) async throws -> Int {
+                        sourceTitle: String, sourceEntryID: UUID?,
+                        meetingDate: Date = Date()) async throws -> Int {
         guard AIFormatter.isConfigured else {
             throw NSError(domain: "Griasa", code: 10, userInfo: [
                 NSLocalizedDescriptionKey: "No AI provider configured (Settings → AI & Actions)."
@@ -218,7 +223,7 @@ enum CommitmentExtractor {
         }
 
         let mine = myName.isEmpty ? "You" : myName
-        let today = Date().formatted(.iso8601.year().month().day())
+        let today = meetingDate.formatted(.iso8601.year().month().day())
         let people = participants.isEmpty ? mine : participants.joined(separator: ", ")
 
         let system = Prompts.text(.commitments)
@@ -248,7 +253,8 @@ enum CommitmentExtractor {
                 dueHint: item.dueHint,
                 dueDate: item.due.flatMap { dateParser.date(from: $0) },
                 sourceTitle: sourceTitle,
-                sourceEntryID: sourceEntryID)
+                sourceEntryID: sourceEntryID,
+                date: meetingDate)
         }
         guard !parsed.isEmpty else { return 0 }
 

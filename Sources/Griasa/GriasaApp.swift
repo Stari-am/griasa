@@ -93,7 +93,7 @@ struct GriasaApp: App {
             MenuView()
                 .environmentObject(state)
         } label: {
-            MenuBarLabel(symbol: state.menuBarSymbol)
+            MenuBarLabel(mark: state.menuBarMark)
         }
         .menuBarExtraStyle(.window)
 
@@ -110,11 +110,11 @@ struct GriasaApp: App {
 /// nothing this early, and MenuBarExtra's *content* isn't built until someone
 /// clicks the icon, whereas its label always is.
 private struct MenuBarLabel: View {
-    let symbol: String
+    let mark: MenuBarMark.Variant
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Image(systemName: symbol)
+        Image(nsImage: MenuBarMark.image(mark, devBuild: AppState.isDevBuild))
             .task {
                 guard AppDelegate.openSettingsOnLaunch, !AppDelegate.settingsOpened else { return }
                 AppDelegate.settingsOpened = true
@@ -184,6 +184,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.isVisible && window !== hub
                 && window.frame.width > 300 && window.frame.height > 200
         }
+    }
+
+    /// Opening Griasa while it is already running — from Launchpad, Spotlight
+    /// or Finder — is what somebody does when they cannot find it. Show them.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        Task { @MainActor in FirstRunCoachmark.shared.show() }
+        return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -17,6 +17,7 @@ macOS does the enforcement. A configuration profile whose payload type is Griasa
 | `customFastModel`, `customSmartModel` | String | Model names on that endpoint. |
 | `recordingNotice` | Boolean | When a recording starts, show a sentence to paste into the call's chat telling the other participants they are being recorded. Off unless set. macOS gives the other side of a call no recording indicator, so this is the place to make asking routine. Read in the safe direction: anything written that is not a clear *no* counts as on. |
 | `recordingNoticeText` | String | The sentence. The default says the call is recorded and offers a way to object. |
+| `audioRetentionDays` | Integer | Delete the audio of transcribed recordings after this many days (0 keeps it). Transcripts and notes are kept; a recording without a finished transcript is never touched. |
 | `mcpEnabled` | Boolean | The local MCP endpoint that lets assistants on the Mac read meeting history. What an assistant reads goes wherever that assistant sends its context. |
 
 Any other Griasa preference can be managed the same way and macOS will enforce it; the ones above are the ones Settings displays as locked.

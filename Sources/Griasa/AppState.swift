@@ -155,6 +155,12 @@ final class AppState: ObservableObject {
         // which keys exist, and they have to be found where they now live.
         Secrets.migrate()
         LLMConfig.persistDefaultProviderIfUnset()
+        // Recording housekeeping: at launch, then a few times a day for an app
+        // that is rarely quit. Both settings are off unless turned on.
+        Task { await RecordingStorage.maintain() }
+        Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
+            Task { @MainActor in await RecordingStorage.purgeAudio() }
+        }
         Permissions.requestAll()
         installHotkey()
         setupWhisper()

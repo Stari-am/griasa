@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+**Old recording audio can be deleted on a schedule.** Recordings keep two audio
+tracks for every meeting, and they add up: audio is nearly all of the space a
+recordings folder takes, and the transcript and notes made from it are a tiny
+fraction. *Settings → Meetings → Recordings on disk* can now delete the audio of
+transcribed recordings after a day, a week, a month or three months. The
+transcript and the notes stay, and re-summarizing still works; only running
+speech recognition again needs the audio.
+
+A recording without a finished transcript is never touched, however old — for a
+recording whose transcription failed or never ran, the audio is the only copy
+of the meeting there is — and neither is the one in progress. Choosing a period
+says how much will go before anything does, and it is off unless turned on.
+Deletion is permanent: moving a hundred gigabytes to the Trash would free none
+of it. An organisation can set the period with MDM (`audioRetentionDays`).
+
+**Recordings can live with their project.** With *Keep recordings in their
+project's folder* on, each recording folder moves beside its project's meeting
+notes — `Documents/Griasa/Projects/<project>/Recordings/` — and follows the
+meeting when it is moved to another project. Unsorted ones go to Inbox, and
+turning it off moves them back. The history finds a recording again by its
+folder's name whenever a folder moves underneath it: a project renamed or
+deleted, or a tidy-up in Finder.
+
+Merging a deleted project's folder into Inbox used to move only the top level
+and then delete the source regardless. Harmless while project folders held
+Markdown files; with recordings inside them, a `Recordings` folder already in
+Inbox would have made the move fail silently and the deletion take the
+recordings with it. Folders now merge recursively, a name that still clashes is
+kept under a new name, and the source is removed only once it is empty.
+
 ## 1.0.14 — 2026-10-01
 
 **A new install uses the local model.** Griasa says it keeps your meetings on

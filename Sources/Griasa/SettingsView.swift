@@ -154,9 +154,60 @@ private struct RecordingSettings: View {
     @ObservedObject private var roster = ParticipantRoster.shared
     @AppStorage("prepBriefEnabled") private var prepBriefEnabled = true
     @AppStorage("prepLeadMinutes") private var prepLeadMinutes = 5
+    @AppStorage(RecordingStorage.retentionKey) private var audioRetentionDays = 0
+    @AppStorage(RecordingStorage.byProjectKey) private var recordingsByProject = false
+    @State private var audioUsage: (total: Int64, freeable: Int64, recordings: Int)?
+    @State private var pendingRetention: Int?
+    @State private var confirmPurgeNow = false
+    @State private var storageStatus = ""
     @AppStorage(RecordingNotice.enabledKey) private var recordingNotice = false
     @AppStorage(RecordingNotice.textKey) private var recordingNoticeText = ""
     private var policy: ManagedPolicy { .live }
+    /// Choosing a shorter period is a deletion, so it says how much before it
+    /// happens; choosing a longer one, or Never, just takes effect.
+    private var retentionBinding: Binding<Int> {
+        Binding(get: { audioRetentionDays }, set: { newValue in
+            guard newValue > 0 else { audioRetentionDays = newValue; Task { await refreshUsage() }; return }
+            Task {
+                let usage = await RecordingStorage.usage(days: newValue)
+                if usage.freeable > 0 {
+                    audioUsage = usage
+                    pendingRetention = newValue
+                } else {
+                    audioRetentionDays = newValue
+                    await refreshUsage()
+                }
+            }
+        })
+    }
+
+    private var retentionAlertTitle: String {
+        let usage = audioUsage
+        let bytes = ByteCountFormatter.string(fromByteCount: usage?.freeable ?? 0, countStyle: .file)
+        let count = usage?.recordings ?? 0
+        return "Delete \(bytes) of audio from \(count) recording\(count == 1 ? "" : "s")?"
+    }
+
+    private func usageLine(_ usage: (total: Int64, freeable: Int64, recordings: Int)) -> String {
+        let total = ByteCountFormatter.string(fromByteCount: usage.total, countStyle: .file)
+        guard audioRetentionDays > 0 else { return "Recording audio on this Mac: \(total)." }
+        let freeable = ByteCountFormatter.string(fromByteCount: usage.freeable, countStyle: .file)
+        return usage.freeable > 0
+            ? "Recording audio on this Mac: \(total), of which \(freeable) is past the limit."
+            : "Recording audio on this Mac: \(total). Nothing is past the limit yet."
+    }
+
+    private func refreshUsage() async {
+        audioUsage = await RecordingStorage.usage(days: audioRetentionDays)
+    }
+
+    private func purge(days: Int) async {
+        storageStatus = "Deleting audio…"
+        let result = await RecordingStorage.purgeAudio(days: days)
+        storageStatus = "Deleted \(ByteCountFormatter.string(fromByteCount: result.bytes, countStyle: .file)) of audio from \(result.files) file\(result.files == 1 ? "" : "s")."
+        await refreshUsage()
+    }
+
     var body: some View {
         SettingsTab {
             Section("Conversation recording") {
@@ -164,6 +215,62 @@ private struct RecordingSettings: View {
                 Toggle("Transcribe meetings when recording stops", isOn: $state.transcribeRecordings)
                     .help("Speech-to-text runs on-device; the AI provider set in AI & Actions then produces cleaned notes with a summary and action items.")
                 Toggle("Open the transcript when it's ready", isOn: $state.openTranscriptWhenReady)
+            }
+            Section("Recordings on disk") {
+                Picker("Delete audio of transcribed recordings", selection: retentionBinding) {
+                    Text("Never").tag(0)
+                    Text("After a day").tag(1)
+                    Text("After a week").tag(7)
+                    Text("After a month").tag(30)
+                    Text("After 3 months").tag(90)
+                }
+                .disabled(policy.isLocked(RecordingStorage.retentionKey))
+                .help("Only the audio goes. The transcript and the meeting notes stay, and re-summarizing still works; only running speech recognition again needs the audio. A recording that has no transcript yet is never touched.")
+                if let usage = audioUsage {
+                    Text(usageLine(usage))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if audioRetentionDays > 0, usage.freeable > 0 {
+                        Button("Delete it now…") { confirmPurgeNow = true }
+                    }
+                }
+                if policy.isLocked(RecordingStorage.retentionKey) {
+                    managedNote("Set by your organization.")
+                }
+                Toggle("Keep recordings in their project's folder", isOn: $recordingsByProject)
+                    .help("Each recording folder moves beside its project's meeting notes, in Documents → Griasa → Projects → <project> → Recordings, and follows the meeting if you move it to another project. Unsorted ones go to Inbox. Turning this off moves them back.")
+                if !storageStatus.isEmpty {
+                    Text(storageStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .task { await refreshUsage() }
+            .onChange(of: recordingsByProject) { _, _ in
+                storageStatus = "Moving recording folders…"
+                RecordingStorage.applyLayout()
+                storageStatus = recordingsByProject
+                    ? "Recordings now live in their project folders."
+                    : "Recordings moved back to Documents → Griasa Recordings."
+            }
+            .alert(retentionAlertTitle, isPresented: Binding(
+                get: { pendingRetention != nil }, set: { if !$0 { pendingRetention = nil } })) {
+                Button("Delete", role: .destructive) {
+                    if let days = pendingRetention {
+                        audioRetentionDays = days
+                        Task { await purge(days: days) }
+                    }
+                    pendingRetention = nil
+                }
+                Button("Cancel", role: .cancel) { pendingRetention = nil }
+            } message: {
+                Text("Transcripts and notes are kept. This can't be undone.")
+            }
+            .alert(retentionAlertTitle, isPresented: $confirmPurgeNow) {
+                Button("Delete", role: .destructive) { Task { await purge(days: audioRetentionDays) } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Transcripts and notes are kept. This can't be undone.")
             }
             Section("Telling people") {
                 Toggle("Remind me to tell everyone the call is recorded", isOn: $recordingNotice)

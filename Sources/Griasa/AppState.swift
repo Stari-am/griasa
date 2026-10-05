@@ -131,14 +131,12 @@ final class AppState: ObservableObject {
     /// other way — otherwise you cannot tell which one is in the menu bar.
     static let isDevBuild = Bundle.main.object(forInfoDictionaryKey: "GriasaDevBuild") as? Bool ?? false
 
-    var menuBarSymbol: String {
-        if isRecording { return "record.circle.fill" }
+    var menuBarMark: MenuBarMark.Variant {
+        if isRecording { return .recording }
         switch dictationStatus {
-        // A hollow square around the glyph in local builds: visible at a glance
-        // in the menu bar without occupying more room than the normal icon.
-        case .idle: return AppState.isDevBuild ? "mic.square" : "mic"
-        case .listening: return AppState.isDevBuild ? "mic.square.fill" : "mic.fill"
-        case .processing: return "ellipsis.circle"
+        case .idle: return .idle
+        case .listening: return .listening
+        case .processing: return .processing
         }
     }
 
@@ -177,12 +175,13 @@ final class AppState: ObservableObject {
         if autoRecordOnLaunch {
             Task { await startRecording() }
         }
-        // First launch: open the welcome guide so permissions get explained
-        // before anything mysteriously "doesn't work".
+        // First launch: show where the app went — it has no window and no Dock
+        // icon — with the full permissions guide one click away, rather than
+        // opening that whole guide on somebody who has not found the app yet.
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: "welcomeShown") {
             defaults.set(true, forKey: "welcomeShown")
-            HubController.shared.open(.welcome)
+            FirstRunCoachmark.shared.show()
         }
         UpdateChecker.checkAutomatically()
     }

@@ -293,5 +293,7 @@ struct MenuView: View {
         }
         .padding(12)
         .frame(width: 300)
+        // Found it: the hint has done its job.
+        .onAppear { FirstRunCoachmark.shared.dismiss() }
     }
 }

@@ -65,7 +65,11 @@ final class ProjectStore: ObservableObject {
         knownNames[project.id] = nil
         HistoryStore.shared.moveEntries(from: project.id, to: Project.inboxID)
         let name = project.name
-        Task.detached { ProjectFiles.mergeIntoInbox(folderNamed: name) }
+        Task.detached {
+            ProjectFiles.mergeIntoInbox(folderNamed: name)
+            // Recordings inside the project moved with its folder.
+            await RecordingStorage.repairPaths()
+        }
     }
 
     private func save() {
@@ -83,6 +87,7 @@ final class ProjectStore: ObservableObject {
         for project in projects {
             if let old = knownNames[project.id], old != project.name {
                 ProjectFiles.renameFolder(old, to: project.name)
+                RecordingStorage.repairPaths()
             }
             knownNames[project.id] = project.name
         }

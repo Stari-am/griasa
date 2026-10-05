@@ -126,6 +126,16 @@ final class HistoryStore: ObservableObject {
             }
             ProjectFiles.write(entry: entry, projectName: newName)
         }
+        // The recording folder follows its notes, when that is switched on.
+        if RecordingStorage.byProject { RecordingStorage.place(entry) }
+    }
+
+    /// Points an entry at its recording's new location after the folder moved.
+    func setFilePath(_ path: String, for id: UUID) {
+        guard let index = entries.firstIndex(where: { $0.id == id }),
+              entries[index].filePath != path else { return }
+        entries[index].filePath = path
+        save()
     }
 
     /// Re-tags all entries of a deleted project as Inbox (files are merged on

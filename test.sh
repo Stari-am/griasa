@@ -26,6 +26,7 @@ swiftc -O \
   Sources/Griasa/ModelManifest.swift \
   Sources/Griasa/ManagedPolicy.swift \
   Sources/Griasa/RecordingNotice.swift \
+  Sources/Griasa/RecordingHousekeeping.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -41,6 +42,7 @@ swiftc -O \
   Tests/ModelChecks.swift \
   Tests/ManagedChecks.swift \
   Tests/NoticeChecks.swift \
+  Tests/RecordingRulesChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

@@ -73,13 +73,40 @@ enum ProjectFiles {
         merge(from: folder(named: name), into: folder(named: Project.inboxName))
     }
 
-    private static func merge(from: URL, into dest: URL) {
+    /// Moves everything in `from` into `dest`, merging folders that exist on
+    /// both sides, and removes `from` only once it is empty.
+    ///
+    /// It used to move top-level items with `try?` and then delete the source
+    /// regardless. Harmless while a project folder held only Markdown files;
+    /// once recordings live inside projects, a `Recordings` folder already in
+    /// the destination made the move fail silently and the delete that followed
+    /// took the recordings with it. Now a clash recurses, a file that still
+    /// clashes is kept under a new name, and anything that cannot be moved
+    /// stays where it is — the source folder survives until it is genuinely
+    /// empty.
+    static func merge(from: URL, into dest: URL) {
         let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(at: from, includingPropertiesForKeys: nil) else { return }
+        guard let items = try? fm.contentsOfDirectory(at: from, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
         try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        for file in files {
-            try? fm.moveItem(at: file, to: dest.appendingPathComponent(file.lastPathComponent))
+        for item in items {
+            let target = dest.appendingPathComponent(item.lastPathComponent)
+            var isDirectory: ObjCBool = false
+            let clash = fm.fileExists(atPath: target.path, isDirectory: &isDirectory)
+            let itemIsDirectory = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if clash && isDirectory.boolValue && itemIsDirectory {
+                merge(from: item, into: target)
+            } else if clash {
+                let stem = target.deletingPathExtension().lastPathComponent
+                let ext = target.pathExtension
+                let renamed = dest.appendingPathComponent(
+                    "\(stem) (from \(from.lastPathComponent))" + (ext.isEmpty ? "" : ".\(ext)"))
+                try? fm.moveItem(at: item, to: renamed)
+            } else {
+                try? fm.moveItem(at: item, to: target)
+            }
         }
-        try? fm.removeItem(at: from)
+        if (try? fm.contentsOfDirectory(atPath: from.path))?.isEmpty == true {
+            try? fm.removeItem(at: from)
+        }
     }
 }

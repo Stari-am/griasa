@@ -81,12 +81,16 @@ final class HistoryStore: ObservableObject {
     /// saved) so callers can reference the entry later.
     @discardableResult
     func add(kind: HistoryEntry.Kind, title: String, text: String, filePath: String? = nil,
-             projectID: UUID? = nil, participants: [String]? = nil) -> UUID? {
+             projectID: UUID? = nil, participants: [String]? = nil, date: Date = Date()) -> UUID? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let entry = HistoryEntry(kind: kind, title: title, text: trimmed, filePath: filePath,
+        var entry = HistoryEntry(kind: kind, title: title, text: trimmed, filePath: filePath,
                                  participants: participants)
-        entries.insert(entry, at: 0)
+        entry.date = date
+        // Newest first, which every reader assumes. Something recorded now goes
+        // on top as before; notes imported from an older meeting go where that
+        // meeting belongs.
+        entries.insert(entry, at: ImportedNotes.insertionIndex(of: date, in: entries.map(\.date)))
         if entries.count > maxEntries { entries.removeLast(entries.count - maxEntries) }
         save()
         if let projectID {

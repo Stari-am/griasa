@@ -69,6 +69,7 @@ out harder than it looked, and the questions people actually ask.**
 - **API keys are kept in the macOS keychain**, encrypted, not in a plain preferences file.
 - **Every permission is optional**, and the app says what stops working if you decline it.
 - **An optional reminder to tell people they're recorded.** The other side of a call gets no recording indicator from macOS. Turn on *Settings → Meetings → Remind me to tell everyone*, and starting a recording offers a sentence to paste into the call's chat.
+- **Notes from other tools come in too.** *Import Meeting Notes…* turns a ChatGPT Record, Zoom or Meet summary into a Griasa meeting — promises, people pages, the brief — dated by when the meeting happened.
 - **Old audio can delete itself.** Transcripts and notes are kept; the audio of transcribed recordings can be removed after a chosen period (*Settings → Meetings → Recordings on disk*). It is nearly all of the space recordings take.
 - **Companies can lock it down with MDM** — on-device AI only, a company model server, MCP off. See [Support/mdm](Support/mdm/README.md).
 

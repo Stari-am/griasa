@@ -236,6 +236,10 @@ struct MenuView: View {
                     MenuBarPanel.dismiss()
                     HubController.shared.open(.newDocument)
                 }
+                Button("📥  Import Meeting Notes…") {
+                    MenuBarPanel.dismiss()
+                    HubController.shared.open(.importNotes)
+                }
             }
 
             if let error = state.lastError {

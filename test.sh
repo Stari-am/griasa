@@ -30,6 +30,7 @@ swiftc -O \
   Sources/Griasa/ImportedNotes.swift \
   Sources/Griasa/FirstRunPlacement.swift \
   Sources/Griasa/LocalModelCatalog.swift \
+  Sources/Griasa/LocalRouting.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -49,6 +50,7 @@ swiftc -O \
   Tests/ImportChecks.swift \
   Tests/FirstRunChecks.swift \
   Tests/LocalModelChecks.swift \
+  Tests/RoutingChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

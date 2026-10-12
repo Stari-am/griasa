@@ -55,14 +55,6 @@ enum LLMProvider: String, CaseIterable, Identifiable {
     }
 }
 
-/// Which class of model a request needs. Cheap in-the-flow tasks (dictation
-/// cleanup, classification, reminder parsing, reply drafts) use `fast`;
-/// heavy ones (presets, summaries, Ask Project, meeting notes) use `smart`.
-enum ModelTier {
-    case fast
-    case smart
-}
-
 /// Immutable snapshot of the provider settings, safe to read from any thread
 /// or detached task (UserDefaults is thread-safe; @AppStorage in Settings
 /// writes to the same keys).

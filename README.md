@@ -64,7 +64,7 @@ out harder than it looked, and the questions people actually ask.**
 ## Privacy, in four lines
 
 - **Audio never leaves your Mac.** Transcription is local — Apple's recognizer or `whisper.cpp`. There is no Griasa server and no account.
-- **Text stays on the Mac by default.** A new install uses a local model via Ollama; Anthropic, OpenAI or Gemini are used only if you choose one.
+- **Text stays on the Mac by default.** A new install uses a local model that Griasa sets up after one question; Anthropic, OpenAI or Gemini are used only if you choose one.
 - **The calendar is read, never written.** Reminders are created, but only when you ask for one.
 - **API keys are kept in the macOS keychain**, encrypted, not in a plain preferences file.
 - **Every permission is optional**, and the app says what stops working if you decline it.
@@ -218,7 +218,7 @@ AI cleanup uses the configured **AI provider** (see below). Without one — or i
 ### AI providers — local by default; Anthropic, OpenAI, Gemini or your existing subscription if you choose them
 Every AI feature routes through one configurable provider (Settings → AI & Actions). **A new install is on the local model** — nothing is sent to a cloud vendor until somebody chooses one.
 
-- **Local (the default)** — Ollama at `http://localhost:11434/v1`, no key, no setup inside Griasa: install Ollama and `ollama pull qwen3:8b`. If no local model is running, the first AI action says so and how to fix it. Any other OpenAI-compatible endpoint works by base URL — LM Studio, or a server on your network. With the built-in local Whisper, Griasa then runs **fully offline** — no text ever leaves the Mac.
+- **Local (the default)** — no key and nothing to install by hand. Griasa looks at the Mac's memory and free disk, uses a model already in Ollama or LM Studio if there is one, and otherwise asks once to download one (a few GB, sized to the Mac's memory) into its own engine on `127.0.0.1:8177`. Short English cleanup jobs go to Apple's on-device model where the Mac has it. A server typed into Settings (`customBaseURL`) is never replaced. Meetings that end before the model is ready are summarized afterwards. If no local model is running, the first AI action says so and how to fix it. With the built-in local Whisper, Griasa then runs **fully offline** — no text ever leaves the Mac. (Organizations: [MDM guide](Support/mdm/README.md).)
 - **Anthropic (Claude)** — key from Settings or `ANTHROPIC_API_KEY`. Keys entered in Settings are kept in the macOS login keychain, never in the preferences file.
 - **OpenAI** — key from Settings or `OPENAI_API_KEY` (GPT-5.6 family by default).
 - **Google (Gemini)** — key from Settings or `GEMINI_API_KEY` (via Google's OpenAI-compatible endpoint; Gemini 3.x by default).

@@ -32,6 +32,7 @@ swiftc -O \
   Sources/Griasa/LocalModelCatalog.swift \
   Sources/Griasa/LocalRouting.swift \
   Sources/Griasa/LocalRuntimeParsing.swift \
+  Sources/Griasa/LocalEngineChoice.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -53,6 +54,7 @@ swiftc -O \
   Tests/LocalModelChecks.swift \
   Tests/RoutingChecks.swift \
   Tests/RuntimeParsingChecks.swift \
+  Tests/EngineChoiceChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

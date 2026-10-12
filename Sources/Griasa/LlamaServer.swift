@@ -50,7 +50,9 @@ enum LlamaInstaller {
 /// holding gigabytes. Loopback only.
 final class LlamaServer: @unchecked Sendable {
     static let shared = LlamaServer()
-    static let port = 8179
+    /// 8177 because Griasa already holds its neighbours: Whisper is on 8178 and
+    /// the MCP server binds upward from 8179.
+    static let port = 8177
     static var baseURL: String { "http://127.0.0.1:\(port)/v1" }
 
     private var process: Process?

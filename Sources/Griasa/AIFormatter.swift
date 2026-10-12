@@ -242,8 +242,9 @@ enum AIFormatter {
         } else {
             body["max_tokens"] = maxTokens
         }
-        // Turns thinking off on llama-server; other servers ignore unknown fields.
-        if config.provider == .custom {
+        // Turns thinking off on a llama-server on this Mac. Not sent to remote
+        // endpoints: a strict gateway may reject fields it does not know.
+        if config.provider == .custom && ProviderDefault.isOnThisMac(config.baseURL) {
             body["chat_template_kwargs"] = ["enable_thinking": false]
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -290,19 +291,28 @@ enum AIFormatter {
 
     private static let ollamaLock = NSLock()
     nonisolated(unsafe) private static var ollamaRoots: [String: Bool] = [:]
+    nonisolated(unsafe) private static var notOllamaAt: [String: Date] = [:]
 
-    /// Asked once per base URL: is this Ollama? A server down the hall on
-    /// another port is just an OpenAI-compatible endpoint.
+    /// Asked per base URL: is this Ollama? A server down the hall on another
+    /// port is just an OpenAI-compatible endpoint. A yes is remembered for good;
+    /// a no is remembered for a minute, so a gateway or LM Studio is not sent
+    /// an extra probe (up to 2 s) on every request, while Ollama started later
+    /// is still noticed.
     private static func isOllama(_ baseURL: String) async -> Bool {
         let root = OllamaRequest.root(fromOpenAIBase: baseURL)
-        if let known = ollamaLock.withLock({ ollamaRoots[root] }) { return known }
+        let cached: Bool? = ollamaLock.withLock {
+            if ollamaRoots[root] == true { return true }
+            if let at = notOllamaAt[root], Date().timeIntervalSince(at) < 60 { return false }
+            return nil
+        }
+        if let cached { return cached }
         var request = URLRequest(url: URL(string: root + "/api/version") ?? URL(string: "http://invalid")!)
         request.timeoutInterval = 2
         let answer = (try? await URLSession.shared.data(for: request))
             .map { LocalRuntimeParsing.isOllamaVersion($0.0) } ?? false
-        // Only a positive answer is remembered: Ollama may simply not be
-        // started yet, and the next request should look again.
-        if answer { ollamaLock.withLock { ollamaRoots[root] = true } }
+        ollamaLock.withLock {
+            if answer { ollamaRoots[root] = true } else { notOllamaAt[root] = Date() }
+        }
         return answer
     }
 

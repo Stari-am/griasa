@@ -34,6 +34,7 @@ swiftc -O \
   Sources/Griasa/LocalRuntimeParsing.swift \
   Sources/Griasa/LocalEngineChoice.swift \
   Sources/Griasa/OllamaRequest.swift \
+  Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -57,6 +58,7 @@ swiftc -O \
   Tests/RuntimeParsingChecks.swift \
   Tests/EngineChoiceChecks.swift \
   Tests/OllamaRequestChecks.swift \
+  Tests/PendingChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

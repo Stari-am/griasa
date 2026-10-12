@@ -15,6 +15,9 @@ macOS does the enforcement. A configuration profile whose payload type is Griasa
 | `llmProvider` | String | The AI provider. `custom` is the on-device, OpenAI-compatible one. |
 | `customBaseURL` | String | Address of the OpenAI-compatible endpoint. `http://localhost:11434/v1` is Ollama on each Mac; a model server the organization runs works the same way. |
 | `customFastModel`, `customSmartModel` | String | Model names on that endpoint. |
+| `localModelID` | String | Pin the on-device model to one catalog entry (for example `qwen3.5-9b-q4`) instead of the size Griasa picks for the Mac. Ignored when `customBaseURL` is set. |
+| `localModelAutoDownload` | Boolean | `true` downloads the on-device model without asking the person, and the consent card is not shown. Absent means Griasa asks once. |
+| `localEnginePreferred` | String | Which runtime to prefer when more than one could answer: `ollama`, `lmStudio` or `griasa` (Griasa's own engine). Empty or absent lets Griasa decide. |
 | `recordingNotice` | Boolean | When a recording starts, show a sentence to paste into the call's chat telling the other participants they are being recorded. Off unless set. macOS gives the other side of a call no recording indicator, so this is the place to make asking routine. Read in the safe direction: anything written that is not a clear *no* counts as on. |
 | `recordingNoticeText` | String | The sentence. The default says the call is recorded and offers a way to object. |
 | `audioRetentionDays` | Integer | Delete the audio of transcribed recordings after this many days (0 keeps it). Transcripts and notes are kept; a recording without a finished transcript is never touched. |

@@ -81,6 +81,24 @@ enum AIFormatter {
                          maxTokens: Int, timeout: TimeInterval = 120,
                          allowCloudFallback: Bool = true) async throws -> String {
         let config = LLMConfig.current()
+        // On-device family only: Apple's model never stands in for a cloud
+        // provider the person chose.
+        if config.provider == .custom,
+           LocalRouting.route(tier: tier,
+                              englishConfidence: LocalModelSetup.englishConfidence(user),
+                              inputTokens: LocalRouting.estimatedTokens(system + user),
+                              appleAvailable: AppleOnDeviceModel.isAvailable) == .apple,
+           let text = try? await AppleOnDeviceModel.complete(system: system, user: user), !text.isEmpty {
+            return text
+        }
+        // Apple refused (locale, length, rate) or was not chosen: the local LLM.
+        if config.provider == .custom, config.baseURL == LlamaServer.baseURL,
+           let entry = LocalModelCatalog.entry(id: config.smartModel) {
+            guard await LlamaServer.shared.ensureRunning(entry) else {
+                throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey:
+                    "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."])
+            }
+        }
         do {
             return try await complete(config, system: system, user: user,
                                       model: config.model(for: tier),

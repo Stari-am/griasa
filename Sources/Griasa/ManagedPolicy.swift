@@ -46,7 +46,8 @@ struct ManagedPolicy {
     static let lockableKeys = ["llmProvider", "customBaseURL", "customFastModel",
                                "customSmartModel", "mcpEnabled", allowCloudAIKey,
                                RecordingNotice.enabledKey, RecordingNotice.textKey,
-                               "audioRetentionDays"]
+                               "audioRetentionDays",
+                               "localModelID", "localModelAutoDownload", "localEnginePreferred"]
         + providerKeys.values.sorted()
 
     /// The providers that stay on this Mac. A custom endpoint counts even when

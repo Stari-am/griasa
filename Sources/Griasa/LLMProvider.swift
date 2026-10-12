@@ -128,6 +128,22 @@ struct LLMConfig: Sendable {
             // Empty means "the local model": the default is only local if it
             // works without the user typing an address in first.
             let base = stored("customBaseURL")
+            if base.isEmpty, let engine = LocalEngine(rawValue: stored(LocalModelSetup.engineKey)),
+               case let model = stored(LocalModelSetup.modelKey), !model.isEmpty {
+                // Set up by Griasa: one model for both tiers — the tier was
+                // chosen to fit this Mac, there is no second model to fall to.
+                let url: String
+                switch engine {
+                case .griasa: url = LlamaServer.baseURL
+                case .ollama, .userServer: url = ProviderDefault.localBaseURL
+                case .lmStudio: url = "http://localhost:1234/v1"
+                }
+                let context = LocalModelCatalog.entry(id: stored(LocalModelSetup.chosenIDKey))?.contextTokens
+                    ?? LocalModelCatalog.entry(id: model)?.contextTokens ?? 32_768
+                return LLMConfig(provider: .custom, apiKey: "", baseURL: url,
+                                 fastModel: model, smartModel: model,
+                                 contextCharLimit: context * 3)
+            }
             return LLMConfig(provider: .custom, apiKey: Secrets.value("customAPIKey"),
                              baseURL: base.isEmpty ? ProviderDefault.localBaseURL : base,
                              fastModel: model("customFastModel", or: provider.defaultFastModel),

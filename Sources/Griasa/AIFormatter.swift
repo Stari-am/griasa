@@ -139,7 +139,14 @@ enum AIFormatter {
             return try await anthropicComplete(system: system, user: user, model: model,
                                                maxTokens: maxTokens, apiKey: config.apiKey,
                                                timeout: timeout)
-        case .openAI, .gemini, .custom:
+        case .openAI, .gemini:
+            return try await openAIComplete(config, system: system, user: user, model: model,
+                                            maxTokens: maxTokens, timeout: timeout)
+        case .custom:
+            if await isOllama(config.baseURL) {
+                return try await ollamaComplete(config, system: system, user: user, model: model,
+                                                maxTokens: maxTokens, timeout: timeout)
+            }
             return try await openAIComplete(config, system: system, user: user, model: model,
                                             maxTokens: maxTokens, timeout: timeout)
         case .claudeCLI, .codexCLI:
@@ -235,6 +242,10 @@ enum AIFormatter {
         } else {
             body["max_tokens"] = maxTokens
         }
+        // Turns thinking off on llama-server; other servers ignore unknown fields.
+        if config.provider == .custom {
+            body["chat_template_kwargs"] = ["enable_thinking": false]
+        }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         // The default provider is a model on this Mac, so the first thing most
@@ -273,6 +284,52 @@ enum AIFormatter {
             throw NSError(domain: "Griasa", code: 4, userInfo: [NSLocalizedDescriptionKey: "Unexpected API response"])
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Ollama (native API, for its context length)
+
+    private static let ollamaLock = NSLock()
+    nonisolated(unsafe) private static var ollamaRoots: [String: Bool] = [:]
+
+    /// Asked once per base URL: is this Ollama? A server down the hall on
+    /// another port is just an OpenAI-compatible endpoint.
+    private static func isOllama(_ baseURL: String) async -> Bool {
+        let root = OllamaRequest.root(fromOpenAIBase: baseURL)
+        if let known = ollamaLock.withLock({ ollamaRoots[root] }) { return known }
+        var request = URLRequest(url: URL(string: root + "/api/version") ?? URL(string: "http://invalid")!)
+        request.timeoutInterval = 2
+        let answer = (try? await URLSession.shared.data(for: request))
+            .map { LocalRuntimeParsing.isOllamaVersion($0.0) } ?? false
+        // Only a positive answer is remembered: Ollama may simply not be
+        // started yet, and the next request should look again.
+        if answer { ollamaLock.withLock { ollamaRoots[root] = true } }
+        return answer
+    }
+
+    private static func ollamaComplete(_ config: LLMConfig, system: String, user: String,
+                                       model: String, maxTokens: Int,
+                                       timeout: TimeInterval) async throws -> String {
+        let root = OllamaRequest.root(fromOpenAIBase: config.baseURL)
+        guard let url = URL(string: root + "/api/chat") else {
+            throw NSError(domain: "Griasa", code: 5, userInfo: [
+                NSLocalizedDescriptionKey: "Invalid base URL: \(config.baseURL)"])
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = timeout
+        req.setValue("application/json", forHTTPHeaderField: "content-type")
+        req.httpBody = try JSONSerialization.data(
+            withJSONObject: OllamaRequest.chatBody(model: model, system: system, user: user, maxTokens: maxTokens))
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        if status == 404 {
+            throw NSError(domain: "Griasa", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model)])
+        }
+        guard status == 200, let text = OllamaRequest.reply(data) else {
+            throw AIProviderError(provider: "Ollama", status: status, detail: Self.errorDetail(from: data))
+        }
+        return text
     }
 
     /// Model list from an OpenAI-compatible endpoint (`GET {base}/models`) —

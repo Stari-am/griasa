@@ -16,6 +16,7 @@ enum HubTab: String, Identifiable {
     case newDocument
     case importNotes
     case typingDiagnostics
+    case localModel
 
     var id: String { rawValue }
 
@@ -34,6 +35,7 @@ enum HubTab: String, Identifiable {
         case .newDocument: return "📄 New Document"
         case .importNotes: return "📥 Import Notes"
         case .typingDiagnostics: return "⌨️ Typing Test"
+        case .localModel: return "🧠 Local AI"
         }
     }
 }
@@ -113,6 +115,7 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
         case .newDocument: close(.newDocument)
         case .importNotes: close(.importNotes)
         case .typingDiagnostics: close(.typingDiagnostics)
+        case .localModel: close(.localModel)
         }
     }
 
@@ -264,6 +267,8 @@ struct HubView: View {
             ImportNotesView()
         case .typingDiagnostics:
             TypingDiagnosticsView()
+        case .localModel:
+            LocalModelCardView()
         }
     }
 }

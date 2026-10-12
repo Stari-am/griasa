@@ -34,6 +34,7 @@ struct MenuView: View {
     @ObservedObject private var snippets = SnippetStore.shared
     @ObservedObject private var stats = UsageStats.shared
     @ObservedObject private var commitmentStore = CommitmentStore.shared
+    @ObservedObject private var localModel = LocalModelSetup.shared
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -63,6 +64,13 @@ struct MenuView: View {
                     Text(setupText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if case .downloading(let p) = localModel.state {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Downloading local AI model… \(p)%").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -222,6 +230,12 @@ struct MenuView: View {
                             Text("\(commitmentStore.openCount)")
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                }
+                if !localModel.isReady {
+                    Button("🧠  Local AI…") {
+                        MenuBarPanel.dismiss()
+                        HubController.shared.open(.localModel)
                     }
                 }
                 Button("📇  People") {

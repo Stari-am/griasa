@@ -360,6 +360,9 @@ private struct AISettings: View {
     @AppStorage("claudeCLIPath") private var claudeCLIPath = ""
     @AppStorage("codexCLIPath") private var codexCLIPath = ""
 
+    @ObservedObject private var localSetup = LocalModelSetup.shared
+    @AppStorage(LocalModelSetup.chosenIDKey) private var chosenID = ""
+    @AppStorage(LocalModelSetup.preferredEngineKey) private var preferredEngine = ""
     @State private var testResult = ""
     @State private var testing = false
     @State private var availableModels: [String] = []
@@ -373,6 +376,7 @@ private struct AISettings: View {
 
     var body: some View {
         SettingsTab {
+            if provider == .custom { localModelSection }
             Section("AI provider") {
                 Picker("Provider", selection: effectiveProviderBinding) {
                     ForEach(LLMProvider.allCases.filter { policy.allows(provider: $0.rawValue) }) { provider in
@@ -403,12 +407,6 @@ private struct AISettings: View {
                         .help("Also read from the GEMINI_API_KEY environment variable. Get one at aistudio.google.com.")
                     modelFields(fast: $geminiFast, smart: $geminiSmart)
                 case .custom:
-                    TextField("Base URL", text: $customBaseURL,
-                              prompt: Text("http://localhost:11434/v1"))
-                        .disabled(policy.isLocked("customBaseURL"))
-                        .help("Any OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1")
-                    SecureField("API key (optional)", text: $customAPIKey)
-                        .help("Leave empty for Ollama and LM Studio.")
                     modelFields(fast: $customFast, smart: $customSmart,
                                 fastLocked: policy.isLocked("customFastModel"),
                                 smartLocked: policy.isLocked("customSmartModel"))
@@ -560,6 +558,7 @@ private struct AISettings: View {
             }
         }
         .onAppear {
+            LocalModelCard.showIfNeeded()
             guard !keysLoaded else { return }
             anthropicAPIKey = Secrets.value("anthropicAPIKey")
             openAIKey = Secrets.value("openAIKey")
@@ -570,6 +569,8 @@ private struct AISettings: View {
         // Saved as typed, like the preference fields around them. Gated on
         // the load having happened, so the empty initial values can never be
         // written over a key that exists.
+        .onChange(of: chosenID) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
+        .onChange(of: preferredEngine) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
         .onChange(of: anthropicAPIKey) { _, new in if keysLoaded { Secrets.set("anthropicAPIKey", new) } }
         .onChange(of: openAIKey) { _, new in if keysLoaded { Secrets.set("openAIKey", new) } }
         .onChange(of: geminiKey) { _, new in if keysLoaded { Secrets.set("geminiKey", new) } }
@@ -591,6 +592,74 @@ private struct AISettings: View {
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
+        }
+    }
+
+    /// Settings → AI & Actions → Local model: what is set up, and the
+    /// overrides for people who know what a model is. Model and engine names
+    /// are allowed here; the consent card avoids them.
+    @ViewBuilder
+    private var localModelSection: some View {
+        let memoryGB = Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824)
+        Section("Local model") {
+            switch localSetup.state {
+            case .ready(.userServer, _, _):
+                Text("Using your own server").foregroundStyle(.secondary)
+            case .ready(let engine, _, let name):
+                Text("Ready · \(name) · \(engineLabel(engine))").foregroundStyle(.secondary)
+            case .downloading(let p):
+                Text("Downloading… \(p)%").foregroundStyle(.secondary)
+            case .installing:
+                Text("Installing…").foregroundStyle(.secondary)
+            case .needsConsent, .noSpace:
+                HStack {
+                    Text("Not set up").foregroundStyle(.secondary)
+                    Button("Set up…") { HubController.shared.open(.localModel) }
+                }
+            case .failed(let message):
+                Text(message).font(.caption).foregroundStyle(.secondary)
+            case .checking:
+                Text("Checking…").foregroundStyle(.secondary)
+            }
+            DisclosureGroup("Advanced") {
+                Picker("Model", selection: $chosenID) {
+                    Text("Automatic").tag("")
+                    ForEach(LocalModelCatalog.runnable(memoryGB: memoryGB), id: \.id) { entry in
+                        Text("\(entry.displayName) — \(String(format: "%.1f GB", Double(entry.pinned.size) / 1e9))")
+                            .tag(entry.id)
+                    }
+                }
+                .disabled(policy.isLocked(LocalModelSetup.chosenIDKey))
+                Picker("Engine", selection: $preferredEngine) {
+                    Text("Auto").tag("")
+                    Text("Ollama").tag(LocalEngine.ollama.rawValue)
+                    Text("LM Studio").tag(LocalEngine.lmStudio.rawValue)
+                    Text("Griasa").tag(LocalEngine.griasa.rawValue)
+                }
+                .disabled(policy.isLocked(LocalModelSetup.preferredEngineKey))
+                Button("Remove model", role: .destructive) { localSetup.removeModel() }
+                    .disabled(policy.isLocked(LocalModelSetup.chosenIDKey))
+                if policy.isLocked(LocalModelSetup.chosenIDKey) || policy.isLocked(LocalModelSetup.preferredEngineKey) {
+                    managedNote("Set by your organization.")
+                }
+                Text("Your own server (overrides everything above)")
+                    .font(.caption).foregroundStyle(.secondary)
+                TextField("Base URL", text: $customBaseURL,
+                          prompt: Text("http://localhost:11434/v1"))
+                    .disabled(policy.isLocked("customBaseURL"))
+                    .help("Any OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1")
+                SecureField("API key (optional)", text: $customAPIKey)
+                    .help("Leave empty for Ollama and LM Studio.")
+            }
+        }
+    }
+
+    private func engineLabel(_ engine: LocalEngine) -> String {
+        switch engine {
+        case .ollama: return "Ollama"
+        case .lmStudio: return "LM Studio"
+        case .griasa: return "Griasa"
+        case .userServer: return "your server"
         }
     }
 

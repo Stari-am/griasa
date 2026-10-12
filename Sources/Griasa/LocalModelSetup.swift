@@ -134,6 +134,11 @@ final class LocalModelSetup: ObservableObject {
         catchUp()
     }
 
+    var isReady: Bool {
+        if case .ready = state { return true }
+        return false
+    }
+
     var shouldOfferCard: Bool {
         switch state {
         case .needsConsent, .noSpace: break

@@ -43,6 +43,12 @@ struct AIProviderError: LocalizedError {
 }
 
 enum AIFormatter {
+    /// Whether the person typed the server address themselves (Settings) rather
+    /// than Griasa's own setup supplying it: decides which advice is true.
+    static var baseURLTypedByPerson: Bool {
+        !(UserDefaults.standard.string(forKey: "customBaseURL") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     /// Whether AI features can run at all with the current provider settings.
     /// Replaces the old "is the Anthropic key set?" gates.
     static var isConfigured: Bool { LLMConfig.current().isConfigured }
@@ -282,13 +288,13 @@ enum AIFormatter {
         } catch let error as URLError
                     where local && [.cannotConnectToHost, .cannotFindHost].contains(error.code) {
             throw NSError(domain: "Griasa", code: 6, userInfo: [
-                NSLocalizedDescriptionKey: ProviderDefault.notRunningAdvice(baseURL: config.baseURL,
-                                                                           model: model)
+                NSLocalizedDescriptionKey: ProviderDefault.notRunningAdvice(baseURL: config.baseURL, model: model,
+                                                                           typedByPerson: Self.baseURLTypedByPerson)
             ])
         }
         if local, (response as? HTTPURLResponse)?.statusCode == 404 {
             throw NSError(domain: "Griasa", code: 7, userInfo: [
-                NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model)
+                NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model, typedByPerson: Self.baseURLTypedByPerson)
             ])
         }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
@@ -356,7 +362,7 @@ enum AIFormatter {
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         if status == 404 {
             throw NSError(domain: "Griasa", code: 7, userInfo: [
-                NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model)])
+                NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model, typedByPerson: Self.baseURLTypedByPerson)])
         }
         guard status == 200, let text = OllamaRequest.reply(data) else {
             throw AIProviderError(provider: "Ollama", status: status, detail: Self.errorDetail(from: data))

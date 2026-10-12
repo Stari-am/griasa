@@ -47,11 +47,18 @@ enum ProviderDefault {
         return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
+    static let notSetUpAdvice = "Local AI isn't set up yet. Open Griasa's menu → Local AI to download it (one time)."
+
     /// What to tell somebody whose local model is not there. Written for the
     /// moment it appears — right after they asked for something — so it says
     /// how to get the local path working first, and offers the cloud as a
     /// separate, explicit choice with its cost stated, rather than as a fix.
-    static func notRunningAdvice(baseURL: String, model: String) -> String {
+    ///
+    /// `typedByPerson` is true when the base URL came from Settings rather than
+    /// from Griasa's own setup: only then is "install Ollama" the right advice,
+    /// because otherwise Griasa downloads and runs the model itself.
+    static func notRunningAdvice(baseURL: String, model: String, typedByPerson: Bool) -> String {
+        if !typedByPerson { return notSetUpAdvice }
         let host = URL(string: baseURL).flatMap { url in
             url.port.map { "\(url.host ?? "localhost"):\($0)" } ?? url.host
         } ?? baseURL
@@ -65,8 +72,9 @@ enum ProviderDefault {
 
     /// Ollama is up but the model is not downloaded — the next most likely
     /// first-run state, and one with a one-line fix.
-    static func missingModelAdvice(model: String) -> String {
-        "The local model “\(model)” is not downloaded yet. Run `ollama pull \(model)`, " +
+    static func missingModelAdvice(model: String, typedByPerson: Bool) -> String {
+        if !typedByPerson { return notSetUpAdvice }
+        return "The local model “\(model)” is not downloaded yet. Run `ollama pull \(model)`, " +
         "or pick a model you already have in Settings → AI & Actions."
     }
 }

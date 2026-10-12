@@ -538,6 +538,7 @@ final class AppState: ObservableObject {
                         // summarize it when the local model is ready.
                         if !AIFormatter.isConfigured || text.contains("Meeting transcript (raw)") {
                             if let entryID { LocalModelSetup.shared.enqueuePending(entryID) }
+                            LocalModelCard.showIfNeeded()
                         }
                         // Quietly pull out who promised what — the list in the
                         // Commitments tab just grows, nothing pops up.

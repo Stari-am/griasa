@@ -81,7 +81,7 @@ enum WhisperInstaller {
         }
     }
 
-    private static func runProcess(_ launchPath: String, _ arguments: [String]) async -> Bool {
+    static func runProcess(_ launchPath: String, _ arguments: [String]) async -> Bool {
         await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: launchPath)

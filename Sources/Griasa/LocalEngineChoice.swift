@@ -43,3 +43,17 @@ enum LocalEngineChoice {
         return .download
     }
 }
+
+/// What `LocalModelSetup.refresh()` does before it probes anything: a server
+/// the person typed is theirs and wins over every other consideration (disk,
+/// memory, catalog), and a refresh while a download is running must not reset
+/// it. Foundation only, so `test.sh` can reach it.
+enum LocalRefreshGate {
+    enum Action: Equatable { case skip, userServer, proceed }
+
+    static func action(typedBaseURL: String, busy: Bool) -> Action {
+        if busy { return .skip }
+        if !typedBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .userServer }
+        return .proceed
+    }
+}

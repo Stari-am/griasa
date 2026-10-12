@@ -58,17 +58,42 @@ final class LocalModelSetup: ObservableObject {
         return data
     }
 
+    private var refreshTask: Task<Void, Never>?
+
+    private var typedBaseURL: String { defaults.string(forKey: "customBaseURL") ?? "" }
+
+    /// Concurrent callers share one probe instead of racing each other.
     func refresh() async {
-        // A user-typed server is theirs; nothing to set up.
-        let userBase = (defaults.string(forKey: "customBaseURL") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let running = refreshTask { await running.value; return }
+        let task = Task { @MainActor in await self.performRefresh() }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func performRefresh() async {
+        let busy: Bool
+        switch state {
+        case .installing, .downloading: busy = true
+        default: busy = false
+        }
+        // A user-typed server is theirs; nothing to set up, whatever the disk says.
+        switch LocalRefreshGate.action(typedBaseURL: typedBaseURL, busy: busy) {
+        case .skip: return
+        case .userServer:
+            state = .ready(engine: .userServer, model: "", displayName: "Your server")
+            return
+        case .proceed: break
+        }
         guard let entry = chooseEntry() else {
+            clearStoredEngine()
             let smallest = LocalModelCatalog.entries[0]
             state = .noSpace(neededGB: Int((Double(smallest.pinned.size) / 1e9).rounded(.up)) + LocalModelCatalog.diskHeadroomGB)
             return
         }
         self.entry = entry
         let probe = LocalProbe(
-            userBaseURL: userBase,
+            userBaseURL: "",
             ollamaModels: await get("http://127.0.0.1:11434/api/tags").flatMap(LocalRuntimeParsing.ollamaModelNames),
             lmStudioModels: await get("http://127.0.0.1:1234/api/v1/models").flatMap(LocalRuntimeParsing.lmStudioModelKeys),
             griasaModelOnDisk: LlamaInstaller.isDownloaded(entry))
@@ -77,15 +102,24 @@ final class LocalModelSetup: ObservableObject {
         case .use(let engine, let model):
             apply(engine: engine, model: model, entry: entry)
         case .pullIntoOllama(let tag):
+            clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: tag)
             if defaults.bool(forKey: Self.autoDownloadKey) { consent() }
         case .download:
+            clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: nil)
             if defaults.bool(forKey: Self.autoDownloadKey) { consent() }
         }
     }
 
-    private func apply(engine: LocalEngine, model: String, entry: LocalModelEntry) {
+    /// A stored engine that no longer has a model behind it must not keep
+    /// pointing `LLMConfig` at a dead server.
+    private func clearStoredEngine() {
+        defaults.removeObject(forKey: Self.engineKey)
+        defaults.removeObject(forKey: Self.modelKey)
+    }
+
+    private func apply(engine: LocalEngine, model: String, entry: LocalModelEntry, downloaded: Bool = false) {
         let previous = defaults.string(forKey: Self.engineKey)
         if engine != .userServer {
             defaults.set(engine.rawValue, forKey: Self.engineKey)
@@ -93,7 +127,7 @@ final class LocalModelSetup: ObservableObject {
         }
         let name = engine == .griasa ? entry.displayName : model
         state = .ready(engine: engine, model: model, displayName: name)
-        if previous == nil, engine == .ollama || engine == .lmStudio {
+        if previous == nil, !downloaded, engine == .ollama || engine == .lmStudio {
             LocalNotice.post(title: "Local AI is ready",
                           body: "Griasa uses the AI model already on this Mac (\(engine == .ollama ? "Ollama" : "LM Studio")).")
         }
@@ -106,6 +140,7 @@ final class LocalModelSetup: ObservableObject {
         default: return false
         }
         if defaults.bool(forKey: Self.autoDownloadKey) { return false }
+        if !typedBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
         if let declined = defaults.object(forKey: Self.declinedKey) as? Date,
            Date().timeIntervalSince(declined) < 7 * 86_400 { return false }
         return true
@@ -116,13 +151,14 @@ final class LocalModelSetup: ObservableObject {
     func consent() {
         guard case .needsConsent(let entry, let tag) = state else { return }
         defaults.removeObject(forKey: Self.declinedKey)
+        // Set before the task starts, so a second tap or a refresh sees a busy state.
+        state = tag == nil ? .installing : .downloading(percent: 0)
         Task {
             if let tag { await pullIntoOllama(tag, entry: entry) } else { await downloadOwn(entry) }
         }
     }
 
     private func downloadOwn(_ entry: LocalModelEntry) async {
-        state = .installing
         guard await LlamaInstaller.installEngine() else {
             state = .failed(WhisperInstaller.brewPath == nil
                 ? "Homebrew is needed to install the AI engine — install it from brew.sh, then try again."
@@ -149,7 +185,6 @@ final class LocalModelSetup: ObservableObject {
     }
 
     private func pullIntoOllama(_ tag: String, entry: LocalModelEntry) async {
-        state = .downloading(percent: 0)
         var request = URLRequest(url: URL(string: "http://127.0.0.1:11434/api/pull")!)
         request.httpMethod = "POST"
         request.timeoutInterval = 3600
@@ -159,7 +194,11 @@ final class LocalModelSetup: ObservableObject {
             for try await line in bytes.lines {
                 guard let progress = LocalRuntimeParsing.ollamaPullProgress(Data(line.utf8)) else { continue }
                 if let error = progress.error { state = .failed("Ollama: \(error)"); return }
-                if progress.done { apply(engine: .ollama, model: tag, entry: entry); return }
+                if progress.done {
+                    apply(engine: .ollama, model: tag, entry: entry, downloaded: true)
+                    LocalNotice.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
+                    return
+                }
                 if progress.total > 0 {
                     state = .downloading(percent: Int(progress.completed * 100 / progress.total))
                 }
@@ -183,6 +222,7 @@ final class LocalModelSetup: ObservableObject {
     func enqueuePending(_ id: UUID) {
         pending.add(id)
         defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
+        if case .ready = state { catchUp() }
     }
 
     /// Summarizes waiting meetings one at a time, oldest first.
@@ -197,12 +237,18 @@ final class LocalModelSetup: ObservableObject {
                 let summarized = Set(history.filter { !$0.text.contains("Meeting transcript (raw)") }.map(\.id))
                 guard let id = pending.next(existing: existing, alreadySummarized: summarized),
                       let entry = history.first(where: { $0.id == id }) else { break }
-                _ = await HistoryStore.shared.reprocessMeeting(entry)
+                let status = await HistoryStore.shared.reprocessMeeting(entry)
+                // A real failure keeps the id for the next time the model is
+                // ready; a transcript that is gone will never succeed, so it goes.
+                guard status.hasPrefix("✓") || status.contains("isn't on disk anymore") else { break }
                 pending.remove(id)
                 defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
             }
-            // Clean out ids that are gone or done.
-            for id in pending.ids { pending.remove(id) }
+            // Clean out ids that are gone or done (not the ones that failed).
+            let history = HistoryStore.shared.entries
+            let existing = Set(history.map(\.id))
+            let summarized = Set(history.filter { !$0.text.contains("Meeting transcript (raw)") }.map(\.id))
+            for id in pending.ids where !existing.contains(id) || summarized.contains(id) { pending.remove(id) }
             defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
         }
     }

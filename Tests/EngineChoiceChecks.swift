@@ -62,5 +62,16 @@ check(d(p) == .use(.griasa, model: entry.id),
       rule: "Griasa's engine is used when its model is on disk", meaning: "the normal case after setup", saw: "\(d(p))")
 check(d(empty) == .download,
       rule: "nothing anywhere → download (after consent)", meaning: "the first-run case", saw: "\(d(empty))")
+check(LocalRefreshGate.action(typedBaseURL: " http://gw.corp/v1\n", busy: false) == .userServer
+        && LocalRefreshGate.action(typedBaseURL: "  \n", busy: false) == .proceed,
+      rule: "a typed server address wins before any disk or memory decision; whitespace alone is not an address",
+      meaning: "a company-gateway user must never see a download card or a no-space message",
+      saw: "typed → \(LocalRefreshGate.action(typedBaseURL: " http://gw.corp/v1", busy: false)), blank → \(LocalRefreshGate.action(typedBaseURL: "  ", busy: false))")
+check(LocalRefreshGate.action(typedBaseURL: "", busy: true) == .skip
+        && LocalRefreshGate.action(typedBaseURL: "http://x/v1", busy: true) == .skip,
+      rule: "a refresh while installing or downloading does nothing",
+      meaning: "a second refresh must not reset a running download to the consent card",
+      saw: "busy → \(LocalRefreshGate.action(typedBaseURL: "", busy: true))")
+
 return failures
 }

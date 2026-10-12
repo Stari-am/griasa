@@ -35,6 +35,7 @@ struct MenuView: View {
     @ObservedObject private var stats = UsageStats.shared
     @ObservedObject private var commitmentStore = CommitmentStore.shared
     @ObservedObject private var localModel = LocalModelSetup.shared
+    @AppStorage("customBaseURL") private var customBaseURL = ""
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -232,7 +233,7 @@ struct MenuView: View {
                         }
                     }
                 }
-                if !localModel.isReady {
+                if !localModel.isReady, customBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button("🧠  Local AI…") {
                         MenuBarPanel.dismiss()
                         HubController.shared.open(.localModel)

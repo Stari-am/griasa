@@ -49,6 +49,8 @@ enum ProviderDefault {
 
     static let notSetUpAdvice = "Local AI isn't set up yet. Open Griasa's menu → Local AI to download it (one time)."
 
+    static let notAnsweringAdvice = "The local AI model isn't answering. Griasa will start it again on the next request; if this keeps happening, open Settings → AI & Actions → Local model."
+
     /// What to tell somebody whose local model is not there. Written for the
     /// moment it appears — right after they asked for something — so it says
     /// how to get the local path working first, and offers the cloud as a
@@ -57,8 +59,12 @@ enum ProviderDefault {
     /// `typedByPerson` is true when the base URL came from Settings rather than
     /// from Griasa's own setup: only then is "install Ollama" the right advice,
     /// because otherwise Griasa downloads and runs the model itself.
-    static func notRunningAdvice(baseURL: String, model: String, typedByPerson: Bool) -> String {
-        if !typedByPerson { return notSetUpAdvice }
+    ///
+    /// `modelSetUp` is true when Griasa's setup already stored an engine, so the
+    /// model exists and the server is merely unreachable right now.
+    static func notRunningAdvice(baseURL: String, model: String, typedByPerson: Bool,
+                                 modelSetUp: Bool = false) -> String {
+        if !typedByPerson { return modelSetUp ? notAnsweringAdvice : notSetUpAdvice }
         let host = URL(string: baseURL).flatMap { url in
             url.port.map { "\(url.host ?? "localhost"):\($0)" } ?? url.host
         } ?? baseURL
@@ -72,8 +78,8 @@ enum ProviderDefault {
 
     /// Ollama is up but the model is not downloaded — the next most likely
     /// first-run state, and one with a one-line fix.
-    static func missingModelAdvice(model: String, typedByPerson: Bool) -> String {
-        if !typedByPerson { return notSetUpAdvice }
+    static func missingModelAdvice(model: String, typedByPerson: Bool, modelSetUp: Bool = false) -> String {
+        if !typedByPerson { return modelSetUp ? notAnsweringAdvice : notSetUpAdvice }
         return "The local model “\(model)” is not downloaded yet. Run `ollama pull \(model)`, " +
         "or pick a model you already have in Settings → AI & Actions."
     }

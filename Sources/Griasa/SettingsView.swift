@@ -569,6 +569,7 @@ private struct AISettings: View {
         // Saved as typed, like the preference fields around them. Gated on
         // the load having happened, so the empty initial values can never be
         // written over a key that exists.
+        .onChange(of: customBaseURL) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
         .onChange(of: chosenID) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
         .onChange(of: preferredEngine) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
         .onChange(of: anthropicAPIKey) { _, new in if keysLoaded { Secrets.set("anthropicAPIKey", new) } }
@@ -624,7 +625,9 @@ private struct AISettings: View {
             DisclosureGroup("Advanced") {
                 Picker("Model", selection: $chosenID) {
                     Text("Automatic").tag("")
-                    ForEach(LocalModelCatalog.runnable(memoryGB: memoryGB), id: \.id) { entry in
+                    // A pinned (or organization-set) tier this Mac would not pick
+                    // still needs a row, or the picker has nothing to show.
+                    ForEach(pickerEntries(memoryGB: memoryGB), id: \.id) { entry in
                         Text("\(entry.displayName) — \(String(format: "%.1f GB", Double(entry.pinned.size) / 1e9))")
                             .tag(entry.id)
                     }
@@ -652,6 +655,14 @@ private struct AISettings: View {
                     .help("Leave empty for Ollama and LM Studio.")
             }
         }
+    }
+
+    private func pickerEntries(memoryGB: Int) -> [LocalModelEntry] {
+        var entries = LocalModelCatalog.runnable(memoryGB: memoryGB)
+        if let pinned = LocalModelCatalog.entry(id: chosenID), !entries.contains(where: { $0.id == pinned.id }) {
+            entries.append(pinned)
+        }
+        return entries
     }
 
     private func engineLabel(_ engine: LocalEngine) -> String {

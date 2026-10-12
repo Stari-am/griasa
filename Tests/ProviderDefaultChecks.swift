@@ -70,6 +70,12 @@ check(setupAdvice.contains("Local AI isn't set up yet") && !setupAdvice.contains
       meaning: "telling somebody to install a second program to fix something Griasa downloads itself sends them down the wrong road",
       saw: setupAdvice)
 
+let notAnswering = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "m", typedByPerson: false, modelSetUp: true)
+check(notAnswering.contains("isn't answering") && !notAnswering.contains("isn't set up yet"),
+      rule: "when the model is already set up and the server is just unreachable, the message does not claim it is not set up",
+      meaning: "sending somebody to download something they already have is wrong and confusing",
+      saw: notAnswering)
+
 let missingTyped = ProviderDefault.missingModelAdvice(model: "qwen3:8b", typedByPerson: true)
 let missingSetup = ProviderDefault.missingModelAdvice(model: "qwen3:8b", typedByPerson: false)
 check(missingTyped.contains("ollama pull qwen3:8b") && missingSetup.contains("Local AI isn't set up yet"),

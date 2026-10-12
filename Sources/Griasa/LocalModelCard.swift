@@ -13,8 +13,15 @@ enum LocalModelCard {
 struct LocalModelCardView: View {
     @ObservedObject private var setup = LocalModelSetup.shared
 
+    @AppStorage("customBaseURL") private var customBaseURL = ""
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if !customBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Defensive: a typed server is theirs, so there is nothing to offer.
+                Text("Griasa uses your own server — nothing to set up.")
+                Button("Close") { HubController.shared.close(.localModel) }
+            } else {
             switch setup.state {
             case .needsConsent(let entry, _):
                 Text("Summaries and promises on this Mac").font(.title2.bold())
@@ -34,7 +41,7 @@ struct LocalModelCardView: View {
                 }
             case .noSpace(let needed):
                 Text("Not enough space for local AI").font(.title2.bold())
-                Text("The AI model needs about \(needed) GB free. Free up space, and Griasa will offer it again.")
+                Text("The AI model needs about \(needed) GB free. Free up space, and Griasa will offer it again in a few days.")
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Close") { setup.decline(); HubController.shared.close(.localModel) }
             case .installing, .downloading:
@@ -54,6 +61,7 @@ struct LocalModelCardView: View {
                 Button("Try again") { Task { await setup.refresh(); setup.consent() } }
             case .checking:
                 ProgressView()
+            }
             }
         }
         .padding(24)

@@ -17,4 +17,16 @@ enum LocalFailure {
         let error = error as NSError
         return error.domain == "Griasa" && error.code == 6 ? .unreachable : .other
     }
+
+    /// The timeout a request gets on a local engine Griasa manages. A model on
+    /// this Mac writes a long summary far slower than a cloud model, which is
+    /// what callers' timeouts were set for, so background jobs (a minute or
+    /// more: summaries, promises) get three times as long. Short timeouts are
+    /// interactive — dictation cleanup waits 10 s while the person waits for
+    /// text — and stay as they are; the local fallback is better than 30 s.
+    static let backgroundTimeout: TimeInterval = 60
+
+    static func timeout(_ requested: TimeInterval, managedLocal: Bool) -> TimeInterval {
+        managedLocal && requested >= backgroundTimeout ? requested * 3 : requested
+    }
 }

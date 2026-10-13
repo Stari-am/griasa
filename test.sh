@@ -37,6 +37,7 @@ swiftc -O \
   Sources/Griasa/OllamaRequest.swift \
   Sources/Griasa/LlamaStream.swift \
   Sources/Griasa/LocalFailure.swift \
+  Sources/Griasa/LlamaServerRules.swift \
   Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
@@ -64,6 +65,7 @@ swiftc -O \
   Tests/PendingChecks.swift \
   Tests/SetupMemoryChecks.swift \
   Tests/LlamaStreamChecks.swift \
+  Tests/LlamaServerChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

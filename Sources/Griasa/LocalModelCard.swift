@@ -5,11 +5,14 @@ enum LocalModelCard {
     /// Probes first: the state from launch may be stale — Ollama started
     /// since, or a model arrived — and a card offering a download the Mac no
     /// longer needs is worse than no card. Concurrent refreshes are shared.
-    static func showIfNeeded() {
+    ///
+    /// `afterEnqueue` is the call right after a meeting was queued: its probe
+    /// never starts catch-up (see `LocalModelSetup.RefreshOrigin.enqueue`).
+    static func showIfNeeded(afterEnqueue: Bool = false) {
         // Cloud users never see it (also checked in `shouldOfferCard`, after the probe).
         guard LLMConfig.current().provider == .custom else { return }
         Task { @MainActor in
-            await LocalModelSetup.shared.refresh()
+            await LocalModelSetup.shared.refresh(afterEnqueue ? .enqueue : .normal)
             guard LocalModelSetup.shared.shouldOfferCard else { return }
             HubController.shared.open(.localModel, activate: false)
         }
@@ -53,7 +56,16 @@ struct LocalModelCardView: View {
                 Text("Not enough space for local AI").font(.title2.bold())
                 Text("The AI model needs about \(needed) GB free. Free up space, and Griasa will offer it again in a few days.")
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Close") { setup.decline(); HubController.shared.close(.localModel) }
+                HStack {
+                    // Same rule as the download question: only where the organization allows the cloud.
+                    if ManagedPolicy.live.anyCloudAllowed {
+                        Button("Use a cloud provider instead…") {
+                            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                        }.buttonStyle(.link)
+                    }
+                    Spacer()
+                    Button("Close") { setup.decline(); HubController.shared.close(.localModel) }
+                }
             case .installing, .downloading:
                 Text("Downloading the AI model…").font(.title2.bold())
                 if case .downloading(let p) = setup.state { ProgressView(value: Double(p), total: 100) }

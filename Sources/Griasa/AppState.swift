@@ -541,7 +541,7 @@ final class AppState: ObservableObject {
                         if LLMConfig.current().provider == .custom,
                            !AIFormatter.isConfigured || text.contains("Meeting transcript (raw)") {
                             if let entryID { LocalModelSetup.shared.enqueuePending(entryID) }
-                            LocalModelCard.showIfNeeded()
+                            LocalModelCard.showIfNeeded(afterEnqueue: true)
                         }
                         // Quietly pull out who promised what — the list in the
                         // Commitments tab just grows, nothing pops up.

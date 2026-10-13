@@ -363,6 +363,9 @@ private struct AISettings: View {
     @ObservedObject private var localSetup = LocalModelSetup.shared
     @AppStorage(LocalModelSetup.chosenIDKey) private var chosenID = ""
     @AppStorage(LocalModelSetup.preferredEngineKey) private var preferredEngine = ""
+    /// Typing in the server and model fields refreshes the status once the
+    /// typing stops, not at every keystroke.
+    @State private var localRefreshDebounce: Task<Void, Never>?
     @State private var testResult = ""
     @State private var testing = false
     @State private var availableModels: [String] = []
@@ -410,9 +413,9 @@ private struct AISettings: View {
                     modelFields(fast: $customFast, smart: $customSmart,
                                 fastLocked: policy.isLocked("customFastModel"),
                                 smartLocked: policy.isLocked("customSmartModel"))
-                    if policy.isLocked("customBaseURL") || policy.isLocked("customFastModel")
-                        || policy.isLocked("customSmartModel") {
-                        managedNote("The local endpoint is set by your organization.")
+                    // The base URL's own note sits beside it, inside Local model → Advanced.
+                    if policy.isLocked("customFastModel") || policy.isLocked("customSmartModel") {
+                        managedNote("The local models are set by your organization.")
                     }
                     TextField("Context limit (characters)", value: $customContextLimit,
                               format: .number)
@@ -569,13 +572,28 @@ private struct AISettings: View {
         // Saved as typed, like the preference fields around them. Gated on
         // the load having happened, so the empty initial values can never be
         // written over a key that exists.
-        .onChange(of: customBaseURL) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
-        .onChange(of: chosenID) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
+        .onChange(of: customBaseURL) { _, _ in scheduleLocalRefresh() }
+        .onChange(of: customFast) { _, _ in scheduleLocalRefresh() }
+        .onChange(of: customSmart) { _, _ in scheduleLocalRefresh() }
+        .onChange(of: chosenID) { _, _ in
+            // A model picked here outranks a step-down Griasa made on its own.
+            LocalModelSetup.shared.modelPickedByPerson()
+            Task { await LocalModelSetup.shared.refresh() }
+        }
         .onChange(of: preferredEngine) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
         .onChange(of: anthropicAPIKey) { _, new in if keysLoaded { Secrets.set("anthropicAPIKey", new) } }
         .onChange(of: openAIKey) { _, new in if keysLoaded { Secrets.set("openAIKey", new) } }
         .onChange(of: geminiKey) { _, new in if keysLoaded { Secrets.set("geminiKey", new) } }
         .onChange(of: customAPIKey) { _, new in if keysLoaded { Secrets.set("customAPIKey", new) } }
+    }
+
+    private func scheduleLocalRefresh() {
+        localRefreshDebounce?.cancel()
+        localRefreshDebounce = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+            await LocalModelSetup.shared.refresh()
+        }
     }
 
     /// Detection line for CLI providers — found (with path) or an install hint.
@@ -607,7 +625,13 @@ private struct AISettings: View {
             case .ready(.userServer, _, _):
                 Text("Using your own server").foregroundStyle(.secondary)
             case .ready(let engine, _, let name):
-                Text("Ready · \(name) · \(engineLabel(engine))").foregroundStyle(.secondary)
+                if let silent = localSetup.notAnswering {
+                    Text(ProviderDefault.notAnsweringAdvice(storedEngine: silent.rawValue))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Ready · \(name) · \(engineLabel(engine))").foregroundStyle(.secondary)
+                }
             case .downloading(let p):
                 Text("Downloading… \(p)%").foregroundStyle(.secondary)
             case .installing:
@@ -651,6 +675,9 @@ private struct AISettings: View {
                           prompt: Text("http://localhost:11434/v1"))
                     .disabled(policy.isLocked("customBaseURL"))
                     .help("Any OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1 · LM Studio: http://localhost:1234/v1")
+                if policy.isLocked("customBaseURL") {
+                    managedNote("The local endpoint is set by your organization.")
+                }
                 SecureField("API key (optional)", text: $customAPIKey)
                     .help("Leave empty for Ollama and LM Studio.")
             }

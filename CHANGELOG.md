@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+**Local AI keeps what works, and says why when it can't start.** When Ollama or
+LM Studio is the engine and it stays silent after Griasa has waited for it,
+the setup is now kept and Settings says it is not answering, with what to do;
+before, Griasa forgot it, and on a Mac where the organization pre-approved the
+download it fetched a second copy of the model. Dictation on a local model
+again gives up after 10 seconds and uses the plain cleanup, instead of waiting
+half a minute; summaries and promises still get the longer wait. When a
+meeting's summary is rebuilt but its promises cannot be collected, History
+now shows the new summary that is already in the meeting's file, and the
+promises are collected the next time the model is ready. Griasa's own engine
+waits for the previous model to quit before starting another, stops an engine
+left behind by a crash instead of quietly using it with the wrong model, and
+when it cannot start, the message ends with the engine's own reason. The "not
+enough space" card offers a cloud provider where the organization allows one,
+and the note that the organization set the local server's address now sits
+next to that address.
+
 ## 1.0.16 — 2026-10-13
 
 **The local model sets itself up.** Since 1.0.14 a new install is on a local

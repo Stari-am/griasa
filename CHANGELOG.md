@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.16 — 2026-10-13
 
 **The local model sets itself up.** Since 1.0.14 a new install is on a local
 model, but "local" meant installing Ollama and pulling a model by hand, and

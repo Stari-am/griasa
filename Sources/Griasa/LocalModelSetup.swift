@@ -35,6 +35,9 @@ final class LocalModelSetup: ObservableObject {
     /// The stored Ollama or LM Studio, kept after every wait went unanswered:
     /// the status says it is not answering instead of offering a download.
     @Published private(set) var notAnswering: LocalEngine?
+    /// Griasa's own download lost the network and is waiting for it to come
+    /// back; it continues from where it stopped.
+    @Published private(set) var waitingForNetwork = false
     private(set) var entry: LocalModelEntry?
     private var pending = PendingSummaries.load(from: UserDefaults.standard.data(forKey: PendingSummaries.defaultsKey))
     private var catchingUp = false
@@ -234,6 +237,9 @@ final class LocalModelSetup: ObservableObject {
             defaults.set(engine.rawValue, forKey: Self.engineKey)
             defaults.set(model, forKey: Self.modelKey)
         }
+        // Whatever is ready now, a half-downloaded model of another choice is
+        // abandoned (the one downloading, if any, is never touched).
+        LlamaInstaller.removeAbandonedParts(keeping: nil)
         let name = engine == .griasa ? entry.displayName : model
         state = .ready(engine: engine, model: model, displayName: name)
         if previous == nil, !downloaded, engine == .ollama || engine == .lmStudio, onLocalProvider {
@@ -295,17 +301,21 @@ final class LocalModelSetup: ObservableObject {
         state = .downloading(percent: 0)
         for attempt in 1...2 {
             do {
-                try await LlamaInstaller.download(entry) { percent in
+                try await LlamaInstaller.download(entry, onProgress: { percent in
                     Task { @MainActor in
                         if case .downloading = LocalModelSetup.shared.state {
                             LocalModelSetup.shared.state = .downloading(percent: percent)
                         }
                     }
-                }
+                }, onWaiting: { waiting in
+                    Task { @MainActor in LocalModelSetup.shared.waitingForNetwork = waiting }
+                })
+                waitingForNetwork = false
                 apply(engine: .griasa, model: entry.id, entry: entry)
                 LocalNotice.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
                 return
             } catch {
+                waitingForNetwork = false
                 if attempt == 2 { state = .failed(error.localizedDescription) }
             }
         }

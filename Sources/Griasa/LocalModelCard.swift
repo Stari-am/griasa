@@ -67,6 +67,10 @@ struct LocalModelCardView: View {
                 Text("Downloading the AI model…").font(.title2.bold())
                 if case .downloading(let p) = setup.state { ProgressView(value: Double(p), total: 100) }
                 else { ProgressView() }
+                if setup.waitingForNetwork {
+                    Text("Waiting for the network — the download continues from where it stopped.")
+                        .foregroundStyle(.secondary)
+                }
                 Text("You can close this — it keeps going, and meetings recorded meanwhile get their summaries when it is done.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

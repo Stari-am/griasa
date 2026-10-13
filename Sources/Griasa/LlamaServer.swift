@@ -32,16 +32,42 @@ enum LlamaInstaller {
         return size == entry.pinned.size
     }
 
+    /// The model whose `.part` is being written right now; its part is never
+    /// swept as abandoned.
+    private static let activeLock = NSLock()
+    nonisolated(unsafe) private static var activeDownloadID: String?
+
+    /// Continues a download an earlier attempt, or an earlier run, left in
+    /// `<model>.part`; see `ResumableDownloader`.
     static func download(_ entry: LocalModelEntry,
-                         onProgress: @escaping @Sendable (Int) -> Void) async throws {
+                         onProgress: @escaping @Sendable (Int) -> Void,
+                         onWaiting: @escaping @Sendable (Bool) -> Void = { _ in }) async throws {
         try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
-        let downloader = ModelDownloader(destination: modelURL(entry), expected: entry.pinned,
-                                         onProgress: onProgress)
+        activeLock.withLock { activeDownloadID = entry.id }
+        defer { activeLock.withLock { if activeDownloadID == entry.id { activeDownloadID = nil } } }
+        removeAbandonedParts(keeping: entry)
+        let downloader = ResumableDownloader(destination: modelURL(entry), expected: entry.pinned,
+                                             onProgress: onProgress, onWaiting: onWaiting)
         try await downloader.download(from: entry.pinned.url)
+    }
+
+    static func partURL(_ entry: LocalModelEntry) -> URL {
+        modelURL(entry).appendingPathExtension("part")
     }
 
     static func remove(_ entry: LocalModelEntry) {
         try? FileManager.default.removeItem(at: modelURL(entry))
+        removeAbandonedParts(keeping: nil)
+    }
+
+    /// Deletes the half-downloaded models nobody is fetching any more — a
+    /// model switched away from, or removed — except `keeping`'s and the one
+    /// downloading now. They can be tens of gigabytes.
+    static func removeAbandonedParts(keeping: LocalModelEntry?) {
+        let active = activeLock.withLock { activeDownloadID }
+        for entry in LocalModelCatalog.entries where entry.id != keeping?.id && entry.id != active {
+            try? FileManager.default.removeItem(at: partURL(entry))
+        }
     }
 }
 

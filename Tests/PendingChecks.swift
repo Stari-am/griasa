@@ -72,5 +72,13 @@ check(manual.ids == [b] && manual.extractionOwed.isEmpty,
       meaning: "the catch-up would otherwise collect them again (reworded, so not deduplicated), or never rebuild the summary",
       saw: "\(manual.ids)")
 
+let now = Date(timeIntervalSince1970: 1_000_000)
+check(PendingSummaries.isFresh(queuedAt: now.addingTimeInterval(-60), now: now)
+        && !PendingSummaries.isFresh(queuedAt: now.addingTimeInterval(-600), now: now)
+        && !PendingSummaries.isFresh(queuedAt: nil, now: now),
+      rule: "a meeting queued under 10 minutes ago is passed over; one older, or from an earlier session, is not",
+      meaning: "retrying at once competes with that meeting's own closure detection on the one-slot engine",
+      saw: "1 min → \(PendingSummaries.isFresh(queuedAt: now.addingTimeInterval(-60), now: now)), 10 min → \(PendingSummaries.isFresh(queuedAt: now.addingTimeInterval(-600), now: now))")
+
 return failures
 }

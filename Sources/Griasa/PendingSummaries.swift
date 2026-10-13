@@ -70,6 +70,19 @@ struct PendingSummaries: Codable, Equatable {
         extractionOwed.removeAll { !ids.contains($0) }
     }
 
+    /// How long a meeting queued in this session is left alone. It was queued
+    /// because its summary just failed, often on a slow, short-of-memory
+    /// engine that is still busy with the same meeting's closure detection;
+    /// retrying at once would compete with it for the one slot.
+    static let freshGrace: TimeInterval = 600
+
+    /// Whether a meeting queued at `queuedAt` is passed over this round.
+    /// Meetings with no time (queued in an earlier session) are never skipped.
+    static func isFresh(queuedAt: Date?, now: Date, grace: TimeInterval = freshGrace) -> Bool {
+        guard let queuedAt else { return false }
+        return now.timeIntervalSince(queuedAt) < grace
+    }
+
     static func load(from data: Data?) -> PendingSummaries {
         data.flatMap { try? JSONDecoder().decode(PendingSummaries.self, from: $0) } ?? PendingSummaries(ids: [])
     }

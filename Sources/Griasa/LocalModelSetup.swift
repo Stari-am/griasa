@@ -38,6 +38,9 @@ final class LocalModelSetup: ObservableObject {
     private(set) var entry: LocalModelEntry?
     private var pending = PendingSummaries.load(from: UserDefaults.standard.data(forKey: PendingSummaries.defaultsKey))
     private var catchingUp = false
+    /// When each meeting was queued in this session; see `PendingSummaries.isFresh`.
+    private var queuedAt: [UUID: Date] = [:]
+    private var delayedCatchUp: Task<Void, Never>?
     /// Refreshes in a row that kept a silent Ollama or LM Studio; see `LocalRuntimeWait`.
     private var runtimeWaits = 0
     private var retryTask: Task<Void, Never>?
@@ -91,8 +94,9 @@ final class LocalModelSetup: ObservableObject {
     /// Who asked for a refresh. `request` is the reconnect after a request
     /// failed to connect: it never spends the waits kept for a runtime still
     /// starting. `typing` is Settings while the server address or model names
-    /// are being typed: it updates the status only, and never starts catch-up
-    /// against a half-typed name.
+    /// are being typed: on a typed server it updates the status only, and
+    /// never starts catch-up against a half-typed name; once the fields are
+    /// emptied and Griasa's own setup is back, it is a normal refresh.
     ///
     /// The probe after a meeting was queued is a plain refresh and does start
     /// catch-up when the model is ready. That cannot bring back the cloud
@@ -196,7 +200,9 @@ final class LocalModelSetup: ObservableObject {
         let mayAutoDownload = defaults.bool(forKey: Self.autoDownloadKey) && onLocalProvider && answered
         switch decision {
         case .use(let engine, let model):
-            apply(engine: engine, model: model, entry: entry, startCatchUp: origin != .typing)
+            // Even from typing: an emptied address or name lands here, on
+            // Griasa's own setup, and that is a return to the normal case.
+            apply(engine: engine, model: model, entry: entry)
         case .pullIntoOllama(let tag):
             clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: tag)
@@ -215,8 +221,7 @@ final class LocalModelSetup: ObservableObject {
         defaults.removeObject(forKey: Self.modelKey)
     }
 
-    private func apply(engine: LocalEngine, model: String, entry: LocalModelEntry, downloaded: Bool = false,
-                       startCatchUp: Bool = true) {
+    private func apply(engine: LocalEngine, model: String, entry: LocalModelEntry, downloaded: Bool = false) {
         let previous = defaults.string(forKey: Self.engineKey)
         // A larger tier than the one stepped down to is working: the reason
         // for the step-down is gone.
@@ -235,7 +240,7 @@ final class LocalModelSetup: ObservableObject {
             LocalNotice.post(title: "Local AI is ready",
                           body: "Griasa uses the AI model already on this Mac (\(engine == .ollama ? "Ollama" : "LM Studio")).")
         }
-        if startCatchUp { catchUp() }
+        catchUp()
     }
 
     /// Promises for `id` were collected outside the catch-up; see
@@ -381,9 +386,20 @@ final class LocalModelSetup: ObservableObject {
     /// Only remembers the meeting. Summarizing it here would run it at once
     /// against a model that may be busy or about to change; catch-up runs when
     /// the model becomes ready and at launch.
+    ///
+    /// A fresh meeting is passed over by catch-up for ten minutes (see
+    /// `PendingSummaries.isFresh`), so one delayed catch-up is scheduled for
+    /// after that; it runs if the model is ready then.
     func enqueuePending(_ id: UUID) {
         pending.add(id)
+        queuedAt[id] = Date()
         defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
+        delayedCatchUp?.cancel()
+        delayedCatchUp = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64((PendingSummaries.freshGrace + 5) * 1_000_000_000))
+            guard !Task.isCancelled, self.isReady else { return }
+            self.catchUp()
+        }
     }
 
     /// Summarizes waiting meetings one at a time, oldest first.
@@ -393,7 +409,8 @@ final class LocalModelSetup: ObservableObject {
         Task { @MainActor in
             defer { catchingUp = false }
             // Passed over this round: being worked on by hand right now.
-            var skipped: Set<UUID> = []
+            let now = Date()
+            var skipped = Set(queuedAt.filter { PendingSummaries.isFresh(queuedAt: $0.value, now: now) }.keys)
             // Checked before every meeting: the person may have moved to a
             // cloud provider since the last one, and catch-up never uses one.
             while mayCatchUp {

@@ -18,6 +18,14 @@ func check(_ passed: Bool, rule: String, meaning: String, saw: String) {
     """)
 }
 
+
+// The answer for a 1000-byte model, with the body's length and type when given.
+func resp(status: Int, requestedFrom: Int64, contentRangeStart: Int64?,
+          length: Int64? = nil, type: String? = "application/octet-stream") -> DownloadResume.Response {
+    DownloadResume.response(status: status, requestedFrom: requestedFrom, contentRangeStart: contentRangeStart,
+                            contentLength: length, mimeType: type, expectedSize: 1000)
+}
+
 // What is on disk before the request
 check(DownloadResume.existing(partSize: nil, expectedSize: 100) == .requestFrom(0)
         && DownloadResume.existing(partSize: 0, expectedSize: 100) == .requestFrom(0),
@@ -37,30 +45,58 @@ check(DownloadResume.existing(partSize: 101, expectedSize: 100) == .discard,
       meaning: "it cannot be a prefix of the pinned file",
       saw: "\(DownloadResume.existing(partSize: 101, expectedSize: 100))")
 
+check(DownloadResume.existing(partSize: 100 << 20, expectedSize: 1 << 40, rewind: DownloadResume.syncEvery) == .requestFrom(36 << 20)
+        && DownloadResume.existing(partSize: 10 << 20, expectedSize: 1 << 40, rewind: DownloadResume.syncEvery) == .requestFrom(0)
+        && DownloadResume.existing(partSize: 1 << 40, expectedSize: 1 << 40, rewind: DownloadResume.syncEvery) == .verifyNow,
+      rule: "after a launch, the part is cut back by one flush interval (not below 0) before resuming",
+      meaning: "a power cut can leave zeros in the unflushed tail; resuming after them fails the checksum after the whole download",
+      saw: "\(DownloadResume.existing(partSize: 100 << 20, expectedSize: 1 << 40, rewind: DownloadResume.syncEvery))")
+
 // The server's answer
-check(DownloadResume.response(status: 206, requestedFrom: 40, contentRangeStart: 40) == .append,
+check(resp(status: 206, requestedFrom: 40, contentRangeStart: 40) == .append,
       rule: "206 starting where the part ends → append",
       meaning: "the resumed bytes go after the ones already on disk",
-      saw: "\(DownloadResume.response(status: 206, requestedFrom: 40, contentRangeStart: 40))")
-check(DownloadResume.response(status: 206, requestedFrom: 40, contentRangeStart: 0) == .discardAndRetry
-        && DownloadResume.response(status: 206, requestedFrom: 40, contentRangeStart: nil) == .discardAndRetry,
+      saw: "\(resp(status: 206, requestedFrom: 40, contentRangeStart: 40))")
+check(resp(status: 206, requestedFrom: 40, contentRangeStart: 0) == .discardAndRetry
+        && resp(status: 206, requestedFrom: 40, contentRangeStart: nil) == .discardAndRetry,
       rule: "206 starting anywhere else, or unreadable → start over",
       meaning: "appending a range that does not line up stitches together a file nobody published",
-      saw: "\(DownloadResume.response(status: 206, requestedFrom: 40, contentRangeStart: 0))")
-check(DownloadResume.response(status: 200, requestedFrom: 40, contentRangeStart: nil) == .restartFromZero
-        && DownloadResume.response(status: 200, requestedFrom: 0, contentRangeStart: nil) == .append,
-      rule: "200 to a Range request → empty the part and write the whole body; 200 from 0 → write",
+      saw: "\(resp(status: 206, requestedFrom: 40, contentRangeStart: 0))")
+check(resp(status: 200, requestedFrom: 40, contentRangeStart: nil, length: 1000) == .restartFromZero
+        && resp(status: 200, requestedFrom: 0, contentRangeStart: nil, length: 1000) == .append
+        && resp(status: 200, requestedFrom: 0, contentRangeStart: nil, length: nil) == .append,
+      rule: "200 of the model's exact length to a Range request → empty the part and write it; 200 from 0 → write",
       meaning: "a server that ignores Range sends the file from byte 0; appending it would double the start",
-      saw: "\(DownloadResume.response(status: 200, requestedFrom: 40, contentRangeStart: nil))")
-check(DownloadResume.response(status: 416, requestedFrom: 40, contentRangeStart: nil) == .discardAndRetry,
+      saw: "\(resp(status: 200, requestedFrom: 40, contentRangeStart: nil, length: 1000))")
+check(resp(status: 200, requestedFrom: 40, contentRangeStart: nil, length: 5120) == .retryLater
+        && resp(status: 200, requestedFrom: 40, contentRangeStart: nil, length: nil) == .retryLater
+        && resp(status: 200, requestedFrom: 40, contentRangeStart: nil, length: 1000, type: "text/html; charset=utf-8") == .retryLater,
+      rule: "200 to a Range request of another or unknown length, or a web page → keep the part, try again later",
+      meaning: "a hotel login page answering 200 must not erase 30 GB already on disk",
+      saw: "other length → \(resp(status: 200, requestedFrom: 40, contentRangeStart: nil, length: 5120))")
+check(resp(status: 200, requestedFrom: 0, contentRangeStart: nil, length: 5120) == .retryLater
+        && resp(status: 200, requestedFrom: 0, contentRangeStart: nil, length: nil, type: "text/html") == .retryLater
+        && resp(status: 206, requestedFrom: 40, contentRangeStart: 40, type: "text/html") == .retryLater,
+      rule: "a first answer of the wrong length, or any web page → not written, try again later",
+      meaning: "a portal page written as the model's first bytes would be resumed onto and fail its checksum after the whole download",
+      saw: "from 0, wrong length → \(resp(status: 200, requestedFrom: 0, contentRangeStart: nil, length: 5120))")
+check(resp(status: 503, requestedFrom: 40, contentRangeStart: nil) == .retryLater
+        && resp(status: 500, requestedFrom: 0, contentRangeStart: nil) == .retryLater
+        && resp(status: 502, requestedFrom: 0, contentRangeStart: nil) == .retryLater
+        && resp(status: 504, requestedFrom: 0, contentRangeStart: nil) == .retryLater
+        && DownloadResume.isNetworkError(DownloadResume.retryableError),
+      rule: "a server error (500, 502, 503, 504) is waited out like a network drop",
+      meaning: "a CDN's bad minute must not end a download a dropped connection would survive",
+      saw: "503 → \(resp(status: 503, requestedFrom: 40, contentRangeStart: nil))")
+check(resp(status: 416, requestedFrom: 40, contentRangeStart: nil) == .discardAndRetry,
       rule: "416 → delete the part and start over",
       meaning: "the part does not fit the file the server has",
-      saw: "\(DownloadResume.response(status: 416, requestedFrom: 40, contentRangeStart: nil))")
-check(DownloadResume.response(status: 404, requestedFrom: 40, contentRangeStart: nil) == .fail(status: 404)
-        && DownloadResume.response(status: 500, requestedFrom: 0, contentRangeStart: nil) == .fail(status: 500),
+      saw: "\(resp(status: 416, requestedFrom: 40, contentRangeStart: nil))")
+check(resp(status: 404, requestedFrom: 40, contentRangeStart: nil) == .fail(status: 404)
+        && resp(status: 403, requestedFrom: 0, contentRangeStart: nil) == .fail(status: 403),
       rule: "any other status fails as before",
       meaning: "an error page must never be written into the model",
-      saw: "\(DownloadResume.response(status: 404, requestedFrom: 40, contentRangeStart: nil))")
+      saw: "\(resp(status: 404, requestedFrom: 40, contentRangeStart: nil))")
 check(DownloadResume.contentRangeStart("bytes 1000-2023/2740937888") == 1000
         && DownloadResume.contentRangeStart("Bytes 0-9/10") == 0
         && DownloadResume.contentRangeStart("bytes */100") == nil
@@ -112,6 +148,14 @@ check(!DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: nil, entry
       rule: "no yes (or a Not now since), a yes for another model, or no part → ask as before",
       meaning: "a multi-gigabyte download never starts on a yes that was taken back or given for something else",
       saw: "no consent → \(DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: nil, entryID: "m", autoDownload: false))")
+
+check(!DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entryID: "m", autoDownload: false,
+                                           resumedThisLaunch: true, lastFailureWasNetwork: false)
+        && DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entryID: "m", autoDownload: true,
+                                               resumedThisLaunch: true, lastFailureWasNetwork: true),
+      rule: "continued without asking once this launch → not again, unless the last try ended on the network",
+      meaning: "a pulled file or a full disk would otherwise restart and fail at every refresh",
+      saw: "again after a non-network failure → \(DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entryID: "m", autoDownload: false, resumedThisLaunch: true, lastFailureWasNetwork: false))")
 
 // Progress counts what was already there
 check(DownloadResume.percent(have: 50, of: 200) == 25

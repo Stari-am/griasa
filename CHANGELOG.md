@@ -23,8 +23,11 @@ enough space" card offers a cloud provider where the organization allows one,
 and the note that the organization set the local server's address now sits
 next to that address. A model download that is interrupted — the network drops,
 the Mac sleeps or Griasa quits — now continues from where it stopped instead of
-starting over, and waits up to half an hour for the network to come back; after
-a relaunch it picks up again on its own, without asking a second time.
+starting over, and waits up to half an hour for the network to come back. After
+a relaunch on the local provider it picks up again on its own, without asking a
+second time, as long as the rest of the model still fits on the disk; "Not
+now", removing the model or moving to a cloud provider stops it and deletes
+the partial file.
 
 ## 1.0.16 — 2026-10-13
 

@@ -19,11 +19,19 @@ enum DownloadResume {
         case discard
     }
 
-    static func existing(partSize: Int64?, expectedSize: Int64) -> Existing {
+    /// Bytes written since the last flush to disk at most; see `existing`.
+    static let syncEvery: Int64 = 64 << 20
+
+    /// `rewind` is for the first look after a launch: a power cut can leave
+    /// the file's length ahead of what reached the disk, with zeros in the
+    /// tail. Everything older than the last flush is safe, so the part is
+    /// cut back by one flush interval before asking for the rest. Within a
+    /// run (rewind 0) the bytes written are what the file holds.
+    static func existing(partSize: Int64?, expectedSize: Int64, rewind: Int64 = 0) -> Existing {
         guard let partSize, partSize > 0 else { return .requestFrom(0) }
         if partSize > expectedSize { return .discard }
         if partSize == expectedSize { return .verifyNow }
-        return .requestFrom(partSize)
+        return .requestFrom(max(0, partSize - rewind))
     }
 
     /// What to do with the server's answer to a request from `offset`.
@@ -35,14 +43,33 @@ enum DownloadResume {
         /// The part does not fit what the server has: delete it and ask again
         /// from the start.
         case discardAndRetry
+        /// Not the model, or not now (a captive portal's page, a proxy's
+        /// answer, a server error): keep the part and try again like after a
+        /// network drop.
+        case retryLater
         case fail(status: Int)
     }
 
-    static func response(status: Int, requestedFrom offset: Int64, contentRangeStart: Int64?) -> Response {
+    /// - Parameters:
+    ///   - contentLength: the body's length if the server said (nil if not).
+    ///   - mimeType: the body's type if the server said.
+    static func response(status: Int, requestedFrom offset: Int64, contentRangeStart: Int64?,
+                         contentLength: Int64?, mimeType: String?, expectedSize: Int64) -> Response {
+        // A web page is never a model: a hotel login page or a proxy's
+        // notice, answered in place of the file.
+        if (200...299).contains(status), mimeType?.lowercased().hasPrefix("text/html") == true {
+            return .retryLater
+        }
         switch status {
         case 200:
-            // A server that ignored the Range sends the whole file.
-            return offset == 0 ? .append : .restartFromZero
+            // A 200 is the whole file from byte 0 — or something else that
+            // answered. Only the model's exact length is taken for the file;
+            // anything else leaves what is on disk alone.
+            if offset == 0 {
+                if let contentLength, contentLength != expectedSize { return .retryLater }
+                return .append
+            }
+            return contentLength == expectedSize ? .restartFromZero : .retryLater
         case 206:
             // Partial content must start exactly where the part ends, or the
             // two would be stitched into a file nobody published.
@@ -51,10 +78,18 @@ enum DownloadResume {
         case 416:
             // Range not satisfiable: the part is not a prefix of this file.
             return .discardAndRetry
+        case 500, 502, 503, 504:
+            // The CDN having a bad minute is waited out like the network.
+            return .retryLater
         default:
             return .fail(status: status)
         }
     }
+
+    /// The error a `retryLater` answer ends an attempt with; network-type.
+    static let retryableError = NSError(domain: "GriasaDownload", code: 1, userInfo: [
+        NSLocalizedDescriptionKey: "The download server did not send the model. Try again later."
+    ])
 
     /// The start offset in a `Content-Range: bytes 100-199/1000` header.
     static func contentRangeStart(_ header: String?) -> Int64? {
@@ -70,6 +105,7 @@ enum DownloadResume {
     /// at once, as it did before.
     static func isNetworkError(_ error: Error) -> Bool {
         let nsError = error as NSError
+        if nsError.domain == retryableError.domain, nsError.code == retryableError.code { return true }
         guard nsError.domain == NSURLErrorDomain else { return false }
         return [NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet,
                 NSURLErrorTimedOut, NSURLErrorCannotConnectToHost,
@@ -97,9 +133,17 @@ enum DownloadResume {
     /// organization turned on automatic downloads) and part of it is on disk:
     /// asking again after a quit would be asking twice. A "Not now" since
     /// then clears the yes, and a part of another model is no reason.
+    ///
+    /// At most once per launch for a model, unless the last try ended on the
+    /// network: a download that failed for another reason (a file pulled, a
+    /// full disk) would otherwise start again at every refresh and fail again,
+    /// flipping the message the person was reading.
     static func resumesWithoutAsking(partSize: Int64?, consentedID: String?,
-                                     entryID: String, autoDownload: Bool) -> Bool {
+                                     entryID: String, autoDownload: Bool,
+                                     resumedThisLaunch: Bool = false,
+                                     lastFailureWasNetwork: Bool = false) -> Bool {
         guard let partSize, partSize > 0 else { return false }
+        if resumedThisLaunch, !lastFailureWasNetwork { return false }
         return autoDownload || consentedID == entryID
     }
 

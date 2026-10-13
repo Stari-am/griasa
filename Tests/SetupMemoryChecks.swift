@@ -21,12 +21,30 @@ let nine = LocalModelCatalog.entry(id: "qwen3.5-9b-q4")!
 let gemma = LocalModelCatalog.entry(id: "gemma4-12b-q8")!
 func choose(pinned: String? = nil, steppedDown: String? = nil,
             engine: LocalEngine? = nil, model: String? = nil,
-            downloaded: [LocalModelEntry] = [], memory: Int = 16, disk: Int = 500) -> String? {
+            downloaded: [LocalModelEntry] = [], memory: Int = 16, disk: Int = 500,
+            part: (id: String, bytes: Int64)? = nil) -> String? {
     LocalSetupMemory.choose(pinnedID: pinned, steppedDownID: steppedDown,
                             storedEngine: engine, storedModel: model,
                             isDownloaded: { entry in downloaded.contains { $0.id == entry.id } },
-                            memoryGB: memory, freeDiskGB: disk)?.id
+                            memoryGB: memory, freeDiskGB: disk, consentedPart: part)?.id
 }
+
+// 64 GB Mac picked the 12B with room to spare; 10 GB of it arrived before a
+// quit and 6 GB are free now — a fresh pick would fall to the 4B.
+let cut = choose(memory: 64, disk: 6, part: (gemma.id, 10_000_000_000))
+check(cut == gemma.id,
+      rule: "a consented download with a part on disk is chosen over a fresh pick when the rest of it fits",
+      meaning: "the part took the disk the fresh pick reads; re-picking would offer another model and the part would be swept",
+      saw: "\(cut ?? "nil")")
+let cutShort = choose(memory: 64, disk: 3, part: (gemma.id, 10_000_000_000))
+check(cutShort == nil && choose(memory: 64, disk: 500, part: nil) != nil,
+      rule: "…but not when even the rest does not fit (then the usual pick, here nothing)",
+      meaning: "a download that cannot finish would only fail at the end",
+      saw: "\(cutShort ?? "nil")")
+check(choose(pinned: nine.id, memory: 64, disk: 6, part: (gemma.id, 10_000_000_000)) == nine.id,
+      rule: "a pin outranks a cut download",
+      meaning: "the organization's or expert's choice stands",
+      saw: "\(choose(pinned: nine.id, memory: 64, disk: 6, part: (gemma.id, 10_000_000_000)) ?? "nil")")
 
 // 16 GB Mac, 7 GB free after the 9B download: a fresh pick would be the 4B.
 let relaunch = choose(engine: .griasa, model: nine.id, downloaded: [nine], disk: 7)

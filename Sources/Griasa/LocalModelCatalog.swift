@@ -100,10 +100,16 @@ enum LocalModelCatalog {
     /// Highest tier the memory allows, then down until the file plus headroom
     /// fits the disk. Nil when even the smallest does not fit the disk.
     static func pick(memoryGB: Int, freeDiskGB: Int) -> LocalModelEntry? {
-        for entry in runnable(memoryGB: memoryGB).reversed() {
-            let needGB = Int((Double(entry.pinned.size) / 1_000_000_000).rounded(.up)) + diskHeadroomGB
-            if needGB <= freeDiskGB { return entry }
+        for entry in runnable(memoryGB: memoryGB).reversed() where fits(entry, freeDiskGB: freeDiskGB) {
+            return entry
         }
         return nil
+    }
+
+    /// Whether the rest of `entry` plus headroom fits, `have` bytes of it
+    /// being on disk already (a part from a download that was cut).
+    static func fits(_ entry: LocalModelEntry, freeDiskGB: Int, have: Int64 = 0) -> Bool {
+        let rest = max(0, entry.pinned.size - have)
+        return Int((Double(rest) / 1_000_000_000).rounded(.up)) + diskHeadroomGB <= freeDiskGB
     }
 }

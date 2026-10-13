@@ -39,16 +39,27 @@ enum LlamaInstaller {
 
     /// Continues a download an earlier attempt, or an earlier run, left in
     /// `<model>.part`; see `ResumableDownloader`.
+    /// The caller marks the download active (`markActive`) from before the
+    /// engine install until it ends, so no sweep takes the part meanwhile.
     static func download(_ entry: LocalModelEntry,
                          onProgress: @escaping @Sendable (Int) -> Void,
-                         onWaiting: @escaping @Sendable (Bool) -> Void = { _ in }) async throws {
+                         onWaiting: @escaping @Sendable (Bool) -> Void = { _ in },
+                         onRestart: @escaping @Sendable () -> Void = {}) async throws {
         try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
-        activeLock.withLock { activeDownloadID = entry.id }
-        defer { activeLock.withLock { if activeDownloadID == entry.id { activeDownloadID = nil } } }
         removeAbandonedParts(keeping: entry)
         let downloader = ResumableDownloader(destination: modelURL(entry), expected: entry.pinned,
-                                             onProgress: onProgress, onWaiting: onWaiting)
+                                             onProgress: onProgress, onWaiting: onWaiting,
+                                             onRestart: onRestart)
         try await downloader.download(from: entry.pinned.url)
+    }
+
+    /// `id` is about to download (or nil: nothing is); its part is kept by every sweep.
+    static func markActive(_ id: String?) {
+        activeLock.withLock { activeDownloadID = id }
+    }
+
+    static func partSize(_ entry: LocalModelEntry) -> Int64? {
+        (try? FileManager.default.attributesOfItem(atPath: partURL(entry).path)[.size] as? NSNumber)?.int64Value
     }
 
     static func partURL(_ entry: LocalModelEntry) -> URL {

@@ -10,7 +10,8 @@ import Foundation
 /// an organization or an expert pinned; the smaller entry Griasa stepped down
 /// to after the model ran out of memory; the stored Griasa model if its file
 /// is still there; the stored Ollama or LM Studio model mapped back to its
-/// entry; a fresh pick for this Mac; and when even the smallest tier no longer
+/// entry; a download the person said yes to whose part is on disk, if the
+/// rest of it fits; a fresh pick for this Mac; and when even the smallest tier no longer
 /// fits the disk, the largest one already downloaded, whose space is taken by
 /// it anyway.
 ///
@@ -19,7 +20,8 @@ enum LocalSetupMemory {
     static func choose(pinnedID: String?, steppedDownID: String?,
                        storedEngine: LocalEngine?, storedModel: String?,
                        isDownloaded: (LocalModelEntry) -> Bool,
-                       memoryGB: Int, freeDiskGB: Int) -> LocalModelEntry? {
+                       memoryGB: Int, freeDiskGB: Int,
+                       consentedPart: (id: String, bytes: Int64)? = nil) -> LocalModelEntry? {
         for id in [pinnedID, steppedDownID] {
             if let id, let entry = LocalModelCatalog.entry(id: id) { return entry }
         }
@@ -40,6 +42,15 @@ enum LocalSetupMemory {
             case .userServer, nil:
                 break
             }
+        }
+        // A download the person said yes to and that was cut: its part has
+        // taken the disk a fresh pick would read, so a fresh pick would fall
+        // to a smaller tier and the part would be lost. Only the rest of it
+        // has to fit.
+        if let consentedPart, consentedPart.bytes > 0,
+           let entry = LocalModelCatalog.entry(id: consentedPart.id),
+           LocalModelCatalog.fits(entry, freeDiskGB: freeDiskGB, have: consentedPart.bytes) {
+            return entry
         }
         if let fits = LocalModelCatalog.pick(memoryGB: memoryGB, freeDiskGB: freeDiskGB) { return fits }
         return LocalModelCatalog.runnable(memoryGB: memoryGB).reversed().first(where: isDownloaded)

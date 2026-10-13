@@ -46,6 +46,15 @@ final class LocalModelSetup: ObservableObject {
     private(set) var entry: LocalModelEntry?
     private var pending = PendingSummaries.load(from: UserDefaults.standard.data(forKey: PendingSummaries.defaultsKey))
     private var catchingUp = false
+    /// `catchUp()` was called while a round ran: run one more after it.
+    private var catchUpAgain = false
+    /// Griasa's own download (or a pull into Ollama) in progress, so a
+    /// removal, another pick or a move to the cloud can stop it.
+    private var downloadTask: Task<Void, Never>?
+    /// Models whose download was continued without asking in this launch;
+    /// see `DownloadResume.resumesWithoutAsking`.
+    private var resumedThisLaunch: Set<String> = []
+    private var lastFailureWasNetwork = false
     /// When each meeting was queued in this session; see `PendingSummaries.isFresh`.
     private var queuedAt: [UUID: Date] = [:]
     private var delayedCatchUp: Task<Void, Never>?
@@ -75,7 +84,16 @@ final class LocalModelSetup: ObservableObject {
                                 storedEngine: storedEngine,
                                 storedModel: defaults.string(forKey: Self.modelKey),
                                 isDownloaded: LlamaInstaller.isDownloaded,
-                                memoryGB: memoryGB, freeDiskGB: freeDiskGB)
+                                memoryGB: memoryGB, freeDiskGB: freeDiskGB,
+                                consentedPart: consentedPart)
+    }
+
+    /// The model the person said yes to, with how much of it is on disk.
+    private var consentedPart: (id: String, bytes: Int64)? {
+        guard let id = defaults.string(forKey: Self.consentedIDKey),
+              let entry = LocalModelCatalog.entry(id: id),
+              let bytes = LlamaInstaller.partSize(entry), bytes > 0 else { return nil }
+        return (id, bytes)
     }
 
     /// Local setup is for people on the local provider. Somebody who chose a
@@ -160,6 +178,9 @@ final class LocalModelSetup: ObservableObject {
         guard let entry = chooseEntry() else {
             notAnswering = nil
             clearStoredEngine()
+            // A part that cannot be finished here is only disk the person is
+            // being asked to free.
+            LlamaInstaller.removeAbandonedParts(keeping: nil)
             let smallest = LocalModelCatalog.entries[0]
             state = .noSpace(neededGB: Int((Double(smallest.pinned.size) / 1e9).rounded(.up)) + LocalModelCatalog.diskHeadroomGB)
             return
@@ -218,16 +239,19 @@ final class LocalModelSetup: ObservableObject {
         case .download:
             clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: nil)
-            let partSize = (try? FileManager.default.attributesOfItem(atPath: LlamaInstaller.partURL(entry).path)[.size] as? NSNumber)?.int64Value
+            let partSize = LlamaInstaller.partSize(entry)
             if onLocalProvider, answered,
                DownloadResume.resumesWithoutAsking(partSize: partSize,
                                                    consentedID: defaults.string(forKey: Self.consentedIDKey),
                                                    entryID: entry.id,
-                                                   autoDownload: defaults.bool(forKey: Self.autoDownloadKey)) {
+                                                   autoDownload: defaults.bool(forKey: Self.autoDownloadKey),
+                                                   resumedThisLaunch: resumedThisLaunch.contains(entry.id),
+                                                   lastFailureWasNetwork: lastFailureWasNetwork) {
+                resumedThisLaunch.insert(entry.id)
                 let percent = DownloadResume.percent(have: partSize ?? 0, of: entry.pinned.size)
                 resuming = true
                 state = .downloading(percent: percent)
-                Task { await downloadOwn(entry, from: percent) }
+                downloadTask = Task { await downloadOwn(entry, from: percent) }
             } else if mayAutoDownload { consent() }
         }
     }
@@ -272,9 +296,39 @@ final class LocalModelSetup: ObservableObject {
     }
 
     /// The person picked a model in Settings: any step-down Griasa made on
-    /// its own gives way to that choice.
-    func modelPickedByPerson() {
+    /// its own gives way to that choice, and a download of the model picked
+    /// before stops (its part stays, for if they pick it again).
+    func modelPickedByPerson() async {
         defaults.removeObject(forKey: Self.steppedDownIDKey)
+        await cancelDownload()
+        await refresh()
+    }
+
+    /// Another engine was preferred in Settings: a download for the old
+    /// choice stops, and the setup is decided again.
+    func enginePreferenceChanged() async {
+        await cancelDownload()
+        await refresh()
+    }
+
+    /// The provider changed in Settings. Away from local, a download stops
+    /// and half-downloaded models go: a cloud user is never sent gigabytes.
+    func providerChanged() async {
+        guard !onLocalProvider else { return }
+        let stopped = await cancelDownload()
+        LlamaInstaller.removeAbandonedParts(keeping: nil)
+        if stopped { await refresh() }
+    }
+
+    /// Stops the download in progress and waits for it to end. Returns
+    /// whether there was one.
+    @discardableResult
+    private func cancelDownload() async -> Bool {
+        guard let task = downloadTask else { return false }
+        downloadTask = nil
+        task.cancel()
+        await task.value
+        return true
     }
 
     var isReady: Bool {
@@ -297,6 +351,8 @@ final class LocalModelSetup: ObservableObject {
     func decline() {
         defaults.set(Date(), forKey: Self.declinedKey)
         defaults.removeObject(forKey: Self.consentedIDKey)
+        // Without the yes, a part will never be finished.
+        LlamaInstaller.removeAbandonedParts(keeping: nil)
     }
 
     func consent() {
@@ -305,19 +361,35 @@ final class LocalModelSetup: ObservableObject {
         if tag == nil { defaults.set(entry.id, forKey: Self.consentedIDKey) }
         // Set before the task starts, so a second tap or a refresh sees a busy state.
         state = tag == nil ? .installing : .downloading(percent: 0)
-        Task {
+        downloadTask = Task {
             if let tag { await pullIntoOllama(tag, entry: entry) } else { await downloadOwn(entry) }
         }
     }
 
+    /// A download stopped by `cancelDownload`: back to a state a refresh
+    /// decides from (a busy one would be skipped).
+    private func settleCancelled() {
+        waitingForNetwork = false
+        resuming = false
+        state = .checking
+    }
+
     private func downloadOwn(_ entry: LocalModelEntry, from startPercent: Int = 0) async {
-        defer { resuming = false }
+        // Active from before the engine install, which can take minutes: a
+        // sweep meanwhile would take the part this download is about to use.
+        LlamaInstaller.markActive(entry.id)
+        defer {
+            LlamaInstaller.markActive(nil)
+            resuming = false
+        }
         guard await LlamaInstaller.installEngine() else {
+            if Task.isCancelled { settleCancelled(); return }
             state = .failed(WhisperInstaller.brewPath == nil
                 ? "Homebrew is needed to install the AI engine — install it from brew.sh, then try again."
                 : "Installing the AI engine failed — run `brew install llama.cpp` in Terminal, then try again.")
             return
         }
+        if Task.isCancelled { settleCancelled(); return }
         state = .downloading(percent: startPercent)
         for attempt in 1...2 {
             do {
@@ -329,14 +401,29 @@ final class LocalModelSetup: ObservableObject {
                     }
                 }, onWaiting: { waiting in
                     Task { @MainActor in LocalModelSetup.shared.waitingForNetwork = waiting }
+                }, onRestart: {
+                    Task { @MainActor in LocalModelSetup.shared.resuming = false }
                 })
                 waitingForNetwork = false
+                lastFailureWasNetwork = false
+                if Task.isCancelled { settleCancelled(); return }
                 apply(engine: .griasa, model: entry.id, entry: entry)
                 LocalNotice.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
                 return
             } catch {
                 waitingForNetwork = false
-                if attempt == 2 { state = .failed(error.localizedDescription) }
+                if Task.isCancelled { settleCancelled(); return }
+                let network = DownloadResume.isNetworkError(error)
+                lastFailureWasNetwork = network
+                // The downloader already waited out the network for half an
+                // hour; a second try would wait as long again. A file that
+                // failed its check starts over from nothing, so the second
+                // try is no longer a resume.
+                if attempt == 2 || network {
+                    state = .failed(error.localizedDescription)
+                    return
+                }
+                resuming = false
             }
         }
     }
@@ -370,18 +457,31 @@ final class LocalModelSetup: ObservableObject {
             // would show the download running forever.
             if case .downloading = state { state = .failed("The download from Ollama stopped. Try again.") }
         } catch {
+            if Task.isCancelled { settleCancelled(); return }
             state = .failed(error.localizedDescription)
         }
     }
 
     func removeModel() {
         defaults.removeObject(forKey: Self.consentedIDKey)
+        // A download in progress stops, and its part goes with the rest.
+        Task {
+            await cancelDownload()
+            removeFiles()
+        }
+    }
+
+    private func removeFiles() {
         // The file of the model in use, which after a step-down or an
         // earlier pick need not be the one this Mac would pick today.
         let inUse = storedEngine == .griasa
             ? LocalModelCatalog.entry(id: defaults.string(forKey: Self.modelKey) ?? "") ?? entry
             : entry
-        guard let inUse else { return }
+        guard let inUse else {
+            LlamaInstaller.removeAbandonedParts(keeping: nil)
+            Task { await refresh() }
+            return
+        }
         LlamaServer.shared.stop()
         LlamaInstaller.remove(inUse)
         defaults.removeObject(forKey: Self.engineKey)
@@ -434,57 +534,72 @@ final class LocalModelSetup: ObservableObject {
     }
 
     /// Summarizes waiting meetings one at a time, oldest first.
+    ///
+    /// A call while a round runs is not dropped (the delayed retry for a
+    /// fresh meeting may land then): it runs one more round after this one.
     private func catchUp() {
-        guard !catchingUp, mayCatchUp else { return }
+        if catchingUp { catchUpAgain = true; return }
+        guard mayCatchUp else { return }
         catchingUp = true
         Task { @MainActor in
             defer { catchingUp = false }
-            // Passed over this round: being worked on by hand right now.
+            repeat {
+                catchUpAgain = false
+                await catchUpRound()
+            } while catchUpAgain && mayCatchUp
+        }
+    }
+
+    private func catchUpRound() async {
+        // Passed over this round: being worked on by hand right now.
+        var skipped: Set<UUID> = []
+        // Checked before every meeting: the person may have moved to a
+        // cloud provider since the last one, and catch-up never uses one.
+        while mayCatchUp {
+            // Fresh per meeting, not per round: a meeting queued while the
+            // round runs gets its ten minutes too.
             let now = Date()
-            var skipped = Set(queuedAt.filter { PendingSummaries.isFresh(queuedAt: $0.value, now: now) }.keys)
-            // Checked before every meeting: the person may have moved to a
-            // cloud provider since the last one, and catch-up never uses one.
-            while mayCatchUp {
-                let history = HistoryStore.shared.entries
-                let existing = Set(history.map(\.id))
-                let summarized = Set(history.filter { !$0.text.contains(Self.rawMarker) }.map(\.id))
-                guard let id = pending.next(existing: existing, alreadySummarized: summarized, skipping: skipped),
-                      let entry = history.first(where: { $0.id == id }) else { break }
-                if HistoryStore.shared.working.contains(id) { skipped.insert(id); continue }
-                // Never the cloud: nobody is there to answer the question, and
-                // a meeting summarized in the background must stay on this Mac.
-                let done: Bool
-                let status: String
-                if pending.needsOnlyExtraction(id, alreadySummarized: summarized) {
-                    status = await HistoryStore.shared.collectCommitments(entry, requireLocal: true)
-                    done = status.hasPrefix("✓") || status.hasPrefix("No new commitments")
-                } else {
-                    status = await HistoryStore.shared.reprocessMeeting(entry, allowCloudFallback: false,
-                                                                        requireExtraction: true, requireLocal: true)
-                    // A transcript that is gone will never succeed, so it goes.
-                    done = status.hasPrefix("✓") || status.contains("isn't on disk anymore")
-                }
-                if status == HistoryStore.alreadyWorking { skipped.insert(id); continue }
-                if !done {
-                    // A real failure keeps the id for the next time the model
-                    // is ready. If the summary was saved before the promises
-                    // failed, only the promises are owed now.
-                    if HistoryStore.shared.entries.first(where: { $0.id == id })
-                        .map({ !$0.text.contains(Self.rawMarker) }) == true {
-                        pending.summarySaved(id)
-                        defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
-                    }
-                    break
-                }
-                pending.remove(id)
-                defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
-            }
-            // Clean out ids that are gone or done (not the ones that failed).
+            let fresh = Set(queuedAt.filter { PendingSummaries.isFresh(queuedAt: $0.value, now: now) }.keys)
             let history = HistoryStore.shared.entries
-            pending.prune(existing: Set(history.map(\.id)),
-                          alreadySummarized: Set(history.filter { !$0.text.contains(Self.rawMarker) }.map(\.id)))
+            let existing = Set(history.map(\.id))
+            let summarized = Set(history.filter { !$0.text.contains(Self.rawMarker) }.map(\.id))
+            guard let id = pending.next(existing: existing, alreadySummarized: summarized,
+                                        skipping: skipped.union(fresh)),
+                  let entry = history.first(where: { $0.id == id }) else { break }
+            if HistoryStore.shared.working.contains(id) { skipped.insert(id); continue }
+            // Never the cloud: nobody is there to answer the question, and
+            // a meeting summarized in the background must stay on this Mac.
+            let done: Bool
+            let status: String
+            if pending.needsOnlyExtraction(id, alreadySummarized: summarized) {
+                status = await HistoryStore.shared.collectCommitments(entry, requireLocal: true)
+                done = status.hasPrefix("✓") || status.hasPrefix("No new commitments")
+            } else {
+                status = await HistoryStore.shared.reprocessMeeting(entry, allowCloudFallback: false,
+                                                                    requireExtraction: true, requireLocal: true)
+                // A transcript that is gone will never succeed, so it goes.
+                done = status.hasPrefix("✓") || status.contains("isn't on disk anymore")
+            }
+            if status == HistoryStore.alreadyWorking { skipped.insert(id); continue }
+            if !done {
+                // A real failure keeps the id for the next time the model
+                // is ready. If the summary was saved before the promises
+                // failed, only the promises are owed now.
+                if HistoryStore.shared.entries.first(where: { $0.id == id })
+                    .map({ !$0.text.contains(Self.rawMarker) }) == true {
+                    pending.summarySaved(id)
+                    defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
+                }
+                break
+            }
+            pending.remove(id)
             defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
         }
+        // Clean out ids that are gone or done (not the ones that failed).
+        let history = HistoryStore.shared.entries
+        pending.prune(existing: Set(history.map(\.id)),
+                      alreadySummarized: Set(history.filter { !$0.text.contains(Self.rawMarker) }.map(\.id)))
+        defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
     }
 
     /// The heading a meeting whose summary failed keeps in History.

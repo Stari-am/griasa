@@ -11,6 +11,7 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
     private let expected: PinnedModel
     private let onProgress: @Sendable (Int) -> Void
     private let onWaiting: @Sendable (Bool) -> Void
+    private let onRestart: @Sendable () -> Void
     var part: URL { destination.appendingPathExtension("part") }
 
     // One attempt's state, touched only on the session's serial delegate queue
@@ -26,16 +27,25 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
     private var waiting = false
     private var continuation: CheckedContinuation<Void, Error>?
 
-    /// Flushed to disk every 64 MB, so a power loss costs at most that much.
-    private static let syncEvery: Int64 = 64 << 20
+    /// Cancellation arrives on another thread: the running task (if any) and
+    /// whether the download was cancelled, under the lock.
+    private let cancelLock = NSLock()
+    private var runningTask: URLSessionDataTask?
+    private var cancelled = false
+
+    /// Flushed to disk every `DownloadResume.syncEvery`, and a resume after a
+    /// launch starts that far back, so a power loss costs at most that much.
+    private static let syncEvery = DownloadResume.syncEvery
 
     init(destination: URL, expected: PinnedModel,
          onProgress: @escaping @Sendable (Int) -> Void,
-         onWaiting: @escaping @Sendable (Bool) -> Void) {
+         onWaiting: @escaping @Sendable (Bool) -> Void,
+         onRestart: @escaping @Sendable () -> Void = {}) {
         self.destination = destination
         self.expected = expected
         self.onProgress = onProgress
         self.onWaiting = onWaiting
+        self.onRestart = onRestart
     }
 
     private static func size(_ url: URL) -> Int64? {
@@ -51,10 +61,13 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
                                                 withIntermediateDirectories: true)
         var failures = 0
         var waited: TimeInterval = 0
+        var firstPass = true
         fetching: while true {
             try Task.checkCancellation()
             let start: Int64
-            switch DownloadResume.existing(partSize: Self.size(part), expectedSize: expected.size) {
+            let rewind = firstPass ? Self.syncEvery : 0
+            firstPass = false
+            switch DownloadResume.existing(partSize: Self.size(part), expectedSize: expected.size, rewind: rewind) {
             case .verifyNow: break fetching
             case .discard:
                 try? FileManager.default.removeItem(at: part)
@@ -63,6 +76,7 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
                 start = from
             }
             let before = Self.size(part) ?? 0
+            if start == 0, before > 0 { onRestart() }
             do {
                 try await attempt(url, from: start)
                 // Ended cleanly but short: the connection closed early. Treated
@@ -127,10 +141,34 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
         if start > 0 { request.setValue("bytes=\(start)-", forHTTPHeaderField: "Range") }
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            continuation = cont
-            session.dataTask(with: request).resume()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                let task = session.dataTask(with: request)
+                let alreadyCancelled = cancelLock.withLock { () -> Bool in
+                    if cancelled { return true }
+                    runningTask = task
+                    return false
+                }
+                if alreadyCancelled {
+                    try? handle.close()
+                    self.handle = nil
+                    cont.resume(throwing: CancellationError())
+                    return
+                }
+                continuation = cont
+                task.resume()
+            }
+        } onCancel: {
+            // Ends the data task; `didCompleteWithError` closes the file and
+            // resumes the attempt with the cancel error.
+            let task = cancelLock.withLock { () -> URLSessionDataTask? in
+                cancelled = true
+                return runningTask
+            }
+            task?.cancel()
         }
+        cancelLock.withLock { runningTask = nil }
+        try Task.checkCancellation()
     }
 
     // MARK: URLSessionDataDelegate — all on the session's serial queue.
@@ -154,7 +192,10 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
         let http = response as? HTTPURLResponse
         let status = http?.statusCode ?? -1
         let rangeStart = DownloadResume.contentRangeStart(http?.value(forHTTPHeaderField: "Content-Range"))
-        switch DownloadResume.response(status: status, requestedFrom: offset, contentRangeStart: rangeStart) {
+        let length = response.expectedContentLength >= 0 ? response.expectedContentLength : nil
+        switch DownloadResume.response(status: status, requestedFrom: offset, contentRangeStart: rangeStart,
+                                       contentLength: length, mimeType: response.mimeType,
+                                       expectedSize: expected.size) {
         case .append:
             setWaiting(false)
             completionHandler(.allow)
@@ -163,6 +204,7 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
                 try handle?.truncate(atOffset: 0)
                 offset = 0
                 setWaiting(false)
+                onRestart()
                 completionHandler(.allow)
             } catch {
                 outcome = .failure(error)
@@ -172,7 +214,12 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
             // Emptied here; the next pass sees no part and asks from 0. Said
             // as a network error so the caller tries again rather than failing.
             try? handle?.truncate(atOffset: 0)
+            onRestart()
             outcome = .failure(URLError(.networkConnectionLost))
+            completionHandler(.cancel)
+        case .retryLater:
+            // The part stays as it is; the caller waits and asks again.
+            outcome = .failure(DownloadResume.retryableError)
             completionHandler(.cancel)
         case .fail(let status):
             outcome = .failure(Self.failure(8, "Model download failed (HTTP \(status))."))

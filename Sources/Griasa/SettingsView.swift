@@ -577,10 +577,11 @@ private struct AISettings: View {
         .onChange(of: customSmart) { _, _ in scheduleLocalRefresh() }
         .onChange(of: chosenID) { _, _ in
             // A model picked here outranks a step-down Griasa made on its own.
-            LocalModelSetup.shared.modelPickedByPerson()
-            Task { await LocalModelSetup.shared.refresh() }
+            // A download of the model picked before stops.
+            Task { await LocalModelSetup.shared.modelPickedByPerson() }
         }
-        .onChange(of: preferredEngine) { _, _ in Task { await LocalModelSetup.shared.refresh() } }
+        .onChange(of: preferredEngine) { _, _ in Task { await LocalModelSetup.shared.enginePreferenceChanged() } }
+        .onChange(of: providerRaw) { _, _ in Task { await LocalModelSetup.shared.providerChanged() } }
         .onChange(of: anthropicAPIKey) { _, new in if keysLoaded { Secrets.set("anthropicAPIKey", new) } }
         .onChange(of: openAIKey) { _, new in if keysLoaded { Secrets.set("openAIKey", new) } }
         .onChange(of: geminiKey) { _, new in if keysLoaded { Secrets.set("geminiKey", new) } }

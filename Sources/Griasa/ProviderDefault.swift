@@ -47,11 +47,39 @@ enum ProviderDefault {
         return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
+    static let notSetUpAdvice = "Local AI isn't set up yet. Open Griasa's menu → Local AI to download it (one time)."
+
+    /// For a model Griasa already set up whose server is unreachable right
+    /// now. The fix depends on who runs that server: Griasa restarts its own
+    /// engine by itself, but Ollama and LM Studio are the person's programs,
+    /// and only they can start them again. `storedEngine` is the raw value of
+    /// the stored `LocalEngine`, kept a plain string so this file stays
+    /// Foundation-only without the engine type.
+    static func notAnsweringAdvice(storedEngine: String) -> String {
+        switch storedEngine {
+        case "ollama":
+            return "Ollama isn't answering. Start Ollama again, then try once more — Griasa uses the model already in it."
+        case "lmStudio":
+            return "LM Studio isn't answering. Start LM Studio's server again, then try once more — Griasa uses the model already in it."
+        default:
+            return "The local AI model isn't answering. Griasa will start it again on the next request; if this keeps happening, open Settings → AI & Actions → Local model."
+        }
+    }
+
     /// What to tell somebody whose local model is not there. Written for the
     /// moment it appears — right after they asked for something — so it says
     /// how to get the local path working first, and offers the cloud as a
     /// separate, explicit choice with its cost stated, rather than as a fix.
-    static func notRunningAdvice(baseURL: String, model: String) -> String {
+    ///
+    /// `typedByPerson` is true when the base URL came from Settings rather than
+    /// from Griasa's own setup: only then is "install Ollama" the right advice,
+    /// because otherwise Griasa downloads and runs the model itself.
+    ///
+    /// `storedEngine` is the engine Griasa's setup stored (its raw value), if
+    /// any: then the model exists and the server is merely unreachable now.
+    static func notRunningAdvice(baseURL: String, model: String, typedByPerson: Bool,
+                                 storedEngine: String? = nil) -> String {
+        if !typedByPerson { return managedAdvice(storedEngine) }
         let host = URL(string: baseURL).flatMap { url in
             url.port.map { "\(url.host ?? "localhost"):\($0)" } ?? url.host
         } ?? baseURL
@@ -65,8 +93,14 @@ enum ProviderDefault {
 
     /// Ollama is up but the model is not downloaded — the next most likely
     /// first-run state, and one with a one-line fix.
-    static func missingModelAdvice(model: String) -> String {
-        "The local model “\(model)” is not downloaded yet. Run `ollama pull \(model)`, " +
+    static func missingModelAdvice(model: String, typedByPerson: Bool, storedEngine: String? = nil) -> String {
+        if !typedByPerson { return managedAdvice(storedEngine) }
+        return "The local model “\(model)” is not downloaded yet. Run `ollama pull \(model)`, " +
         "or pick a model you already have in Settings → AI & Actions."
+    }
+
+    private static func managedAdvice(_ storedEngine: String?) -> String {
+        guard let storedEngine, !storedEngine.isEmpty else { return notSetUpAdvice }
+        return notAnsweringAdvice(storedEngine: storedEngine)
     }
 }

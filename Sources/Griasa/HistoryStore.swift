@@ -217,13 +217,27 @@ final class HistoryStore: ObservableObject {
     /// meetings the AI couldn't process the first time (no provider / failure).
     /// Rebuilds the notes, updates the entry, then refreshes commitments.
     /// Returns a short status line for the UI.
-    func reprocessMeeting(_ entry: HistoryEntry) async -> String {
+    ///
+    /// - Parameters:
+    ///   - allowCloudFallback: false for the background catch-up, which must
+    ///     never ask about, or use, a cloud provider.
+    ///   - requireExtraction: true for the catch-up, where the promises are half
+    ///     the point. A failed extraction then fails the whole run, and the
+    ///     entry keeps its raw text so the next catch-up does both again; with
+    ///     the summary saved, the meeting would count as done and its promises
+    ///     would never be looked for. Nothing is added by a failed extraction,
+    ///     so the second run cannot add them twice.
+    func reprocessMeeting(_ entry: HistoryEntry, allowCloudFallback: Bool = true,
+                          requireExtraction: Bool = false) async -> String {
         guard entry.kind == .meeting, let path = entry.filePath else {
             return "Only meeting recordings can be re-summarized."
         }
         guard AIFormatter.isConfigured else {
             return "Configure an AI provider in AI & Actions first."
         }
+        // A second run while the first is going (a click during catch-up)
+        // would summarize twice and add the promises twice.
+        guard !working.contains(entry.id) else { return "Already working on this meeting." }
         working.insert(entry.id)
         defer { working.remove(entry.id) }
         let participants = entry.participants ?? []
@@ -231,12 +245,21 @@ final class HistoryStore: ObservableObject {
         do {
             let markdown = try await MeetingTranscriber.reformat(
                 transcriptFile: URL(fileURLWithPath: path),
-                participants: participants, myName: myName)
+                participants: participants, myName: myName,
+                allowCloudFallback: allowCloudFallback)
             let title = MeetingTranscriber.title(fromMarkdown: markdown)
-            updateEntry(id: entry.id, title: title, text: markdown)
-            let added = (try? await CommitmentExtractor.extract(
-                markdown: markdown, participants: participants, myName: myName,
-                sourceTitle: title, sourceEntryID: entry.id)) ?? 0
+            let added: Int
+            if requireExtraction {
+                added = try await CommitmentExtractor.extract(
+                    markdown: markdown, participants: participants, myName: myName,
+                    sourceTitle: title, sourceEntryID: entry.id)
+                updateEntry(id: entry.id, title: title, text: markdown)
+            } else {
+                updateEntry(id: entry.id, title: title, text: markdown)
+                added = (try? await CommitmentExtractor.extract(
+                    markdown: markdown, participants: participants, myName: myName,
+                    sourceTitle: title, sourceEntryID: entry.id)) ?? 0
+            }
             return added > 0
                 ? "✓ Summary rebuilt · \(added) commitment\(added == 1 ? "" : "s") added"
                 : "✓ Summary rebuilt"

@@ -234,7 +234,7 @@ enum CommitmentExtractor {
 
         let reply = try await AIFormatter.complete(
             system: system, user: notes, tier: .fast, maxTokens: 2048,
-            timeout: 60, allowCloudFallback: false)
+            timeout: 60, allowCloudFallback: false, allowApple: false)
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,
@@ -304,9 +304,17 @@ enum CommitmentExtractor {
     ///   whether this feature finds anything at all.
     static func detectClosures(markdown: String, participants: [String] = [],
                               persist: Bool = true) async -> Detection? {
-        guard AIFormatter.isConfigured else { return nil }
+        await detectClosuresReporting(markdown: markdown, participants: participants, persist: persist).detection
+    }
+
+    /// Same question, with the provider's own words when it got no answer (for a
+    /// slow local model: that it is short of memory). The reason travels with
+    /// this call's result, so concurrent jobs cannot read each other's.
+    static func detectClosuresReporting(markdown: String, participants: [String] = [],
+                                        persist: Bool = true) async -> (detection: Detection?, failure: String?) {
+        guard AIFormatter.isConfigured else { return (nil, nil) }
         let open = await MainActor.run { CommitmentStore.shared.commitments.filter { !$0.done } }
-        guard !open.isEmpty else { return Detection() }
+        guard !open.isEmpty else { return (Detection(), nil) }
 
         // Which promises are even candidates, and why this is not simply "the
         // newest sixty". The list goes into the prompt, so it has to be capped,
@@ -338,15 +346,20 @@ enum CommitmentExtractor {
         if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
 
         let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
-        guard let reply = try? await AIFormatter.complete(
-            system: system, user: notes, tier: .smart, maxTokens: 1024,
-            timeout: 90, allowCloudFallback: false) else { return nil }
+        let reply: String
+        do {
+            reply = try await AIFormatter.complete(
+                system: system, user: notes, tier: .smart, maxTokens: 1024,
+                timeout: 90, allowCloudFallback: false, allowApple: false)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,
               let data = String(reply[start...end]).data(using: .utf8),
               let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else {
-            return nil
+            return (nil, nil)
         }
 
         let lowerNotes = notes.lowercased()
@@ -376,6 +389,6 @@ enum CommitmentExtractor {
                 await MainActor.run { CommitmentStore.shared.suggestClosure(hit.id, quote: hit.quote) }
             }
         }
-        return result
+        return (result, nil)
     }
 }

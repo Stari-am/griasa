@@ -16,6 +16,7 @@ enum HubTab: String, Identifiable {
     case newDocument
     case importNotes
     case typingDiagnostics
+    case localModel
 
     var id: String { rawValue }
 
@@ -34,6 +35,7 @@ enum HubTab: String, Identifiable {
         case .newDocument: return "📄 New Document"
         case .importNotes: return "📥 Import Notes"
         case .typingDiagnostics: return "⌨️ Typing Test"
+        case .localModel: return "🧠 Local AI"
         }
     }
 }
@@ -113,6 +115,14 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
         case .newDocument: close(.newDocument)
         case .importNotes: close(.importNotes)
         case .typingDiagnostics: close(.typingDiagnostics)
+        case .localModel:
+            // Closing the question is an answer to it, like "Not now": without
+            // this the card came back at the next meeting or Settings visit.
+            switch LocalModelSetup.shared.state {
+            case .needsConsent, .noSpace: LocalModelSetup.shared.decline()
+            default: break
+            }
+            close(.localModel)
         }
     }
 
@@ -264,6 +274,8 @@ struct HubView: View {
             ImportNotesView()
         case .typingDiagnostics:
             TypingDiagnosticsView()
+        case .localModel:
+            LocalModelCardView()
         }
     }
 }

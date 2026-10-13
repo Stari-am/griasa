@@ -31,12 +31,13 @@ enum ClosureScan {
         the call was about staffing for next quarter, which nobody committed to.
         """
 
-        let result = await CommitmentExtractor.detectClosures(
+        let (result, failure) = await CommitmentExtractor.detectClosuresReporting(
             markdown: note, participants: ["Probe Person ZZ"], persist: false)
 
         switch result {
         case nil:
-            print("FAIL: the provider gave no usable answer at all")
+            print("FAIL: the provider gave no usable answer at all"
+                + (failure.map { " — \($0)" } ?? ""))
         case let detection?:
             print("proposed: \(detection.proposed)")
             print("kept:     \(detection.found.count)")
@@ -85,7 +86,7 @@ enum ClosureScan {
                 source = full
             }
             let started = Date()
-            let result = await CommitmentExtractor.detectClosures(
+            let (result, failure) = await CommitmentExtractor.detectClosuresReporting(
                 markdown: source, participants: participants, persist: false)
             let seconds = Date().timeIntervalSince(started)
             asked += 1
@@ -94,6 +95,7 @@ enum ClosureScan {
                 unanswered += 1
                 print(String(format: "  %2d. %5d chars, %d participants — no answer (%.1fs)",
                              index + 1, source.count, participants.count, seconds))
+                if let why = failure { print("      \(why)") }
             case let detection?:
                 totalFound += detection.found.count
                 proposed += detection.proposed

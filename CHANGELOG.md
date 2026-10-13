@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased
+
+**The local model sets itself up.** Since 1.0.14 a new install is on a local
+model, but "local" meant installing Ollama and pulling a model by hand, and
+until that was done every summary and promise failed with an instruction to go
+and do it. The people this default is for do not know what a model is.
+
+Griasa now looks at the Mac instead. If Ollama or LM Studio is running with a
+suitable model, it uses that and downloads nothing. If Ollama is running
+without one, the model is pulled into it, so the Mac keeps one runtime and not
+two. Otherwise Griasa asks once, in plain words and with the size and the time
+it will take ("Not now" waits a week before asking again), and downloads a
+model into its own engine, which listens on
+`127.0.0.1:8177` only and unloads the model after ten idle minutes. The model
+is chosen by memory, from a small model on an 8 GB Mac up to a large one on 96
+GB or more, then stepped down if the disk is short; a Mac with too little disk
+for any of them is told so rather than offered a download that cannot finish.
+Once set up, the model is kept: a later launch with less free disk, or an
+Ollama still starting at login, does not start a second download. A model that
+runs out of memory when it starts is replaced, once, by the next size down.
+A model that is only slow, because the Mac is short of memory, is now waited
+for instead of given up on: Griasa's own engine reports progress while it reads
+a long meeting, and the wait ends only when that stops (or after 30 minutes).
+If it still runs out of time, the message says the model is slow and memory is
+short, instead of "no answer". Each model now needs about two and a half times
+its file size in memory (16 GB for the 9B model, 32 GB for the 12B), so that
+speech recognition and the apps in use are not squeezed into swap.
+Every file is pinned to a commit and a checksum and verified before use.
+*Settings → Local model* shows where things stand and lets an expert choose
+another.
+
+Short English jobs (dictation cleanup, classification, reminder parsing) go to
+Apple's on-device model on macOS 26, which costs no download. Russian, text with
+a mix of languages, and anything long or heavy go to the downloaded model:
+Apple's has no Russian and a window too small to hold a reply as well.
+
+A meeting that ends while the model is still downloading is remembered and
+summarized once when the model is ready — not again if you already
+re-summarized it by hand — even if Griasa was quit and reopened. That catch-up
+never asks about, or uses, a cloud provider.
+
+Ollama was also quietly cutting meetings short. Through its OpenAI-compatible
+address it ignores the requested context size and uses its default, which is
+4,096 tokens on a Mac with less than 24 GB of memory, so anything longer than a few minutes of talk was truncated before the
+model saw it. Griasa now talks to Ollama through its native API and asks for
+32k. An Ollama set up by hand with other model names keeps those names.
+
+What does not change: a server address or model names typed into Settings are
+used as typed — never replaced, never offered a download, never shown the card.
+Nor is anybody on a cloud provider. Audio and text
+still do not leave the Mac, and no cloud provider is chosen on anyone's behalf.
+An organization can set `localModelID`, `localModelAutoDownload` and
+`localEnginePreferred` with MDM (see `Support/mdm/README.md`).
+
+**Griasa has its own menu-bar icon, and says where it is.** The icon was the
+generic microphone, which is what every dictation app and the system's
+recording indicator already show, and people who had just installed Griasa could
+not find it. It is now a speech bubble with a waveform, and a first-run card
+points at it. The card also appears when Griasa is opened again while it is
+running, which is what somebody does when they cannot find it.
+
 ## 1.0.15 — 2026-10-05
 
 **Meeting notes from other tools can be imported.** ChatGPT now records

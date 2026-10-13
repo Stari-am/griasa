@@ -34,7 +34,18 @@ struct MenuView: View {
     @ObservedObject private var snippets = SnippetStore.shared
     @ObservedObject private var stats = UsageStats.shared
     @ObservedObject private var commitmentStore = CommitmentStore.shared
+    @ObservedObject private var localModel = LocalModelSetup.shared
+    @AppStorage("customBaseURL") private var customBaseURL = ""
+    @AppStorage("customFastModel") private var customFast = ""
+    @AppStorage("customSmartModel") private var customSmart = ""
+    @AppStorage("llmProvider") private var providerRaw = ""
     @Environment(\.openSettings) private var openSettings
+
+    /// Reads `providerRaw` so the menu redraws when the provider changes.
+    private var onLocalProvider: Bool {
+        _ = providerRaw
+        return LLMConfig.current().provider == .custom
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -63,6 +74,13 @@ struct MenuView: View {
                     Text(setupText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if case .downloading(let p) = localModel.state {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Downloading local AI model… \(p)%").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -222,6 +240,15 @@ struct MenuView: View {
                             Text("\(commitmentStore.openCount)")
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                }
+                // Only for people on the local provider who did not set it up by hand.
+                if !localModel.isReady, onLocalProvider,
+                   !LocalRefreshGate.isHandConfigured(typedBaseURL: customBaseURL,
+                                                      typedModelNames: [customFast, customSmart]) {
+                    Button("🧠  Local AI…") {
+                        MenuBarPanel.dismiss()
+                        HubController.shared.open(.localModel)
                     }
                 }
                 Button("📇  People") {

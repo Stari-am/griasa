@@ -58,11 +58,39 @@ check(ProviderDefault.isOnThisMac("http://localhost:11434/v1")
       meaning: "\"install Ollama\" is the right advice for localhost and the wrong one for a shared server down the hall",
       saw: "isOnThisMac disagreed for one of localhost, 127.0.0.1, a LAN host, garbage")
 
-let advice = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "qwen3:8b")
+let advice = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "qwen3:8b", typedByPerson: true)
 check(advice.contains("ollama pull qwen3:8b") && advice.contains("leaves this Mac") && advice.contains("localhost:11434"),
-      rule: "the not-running message says how to fix it locally, and what the cloud alternative costs",
+      rule: "the not-running message for a typed server says how to fix it locally, and what the cloud alternative costs",
       meaning: "this is the moment the cloud gets suggested — it has to come with what it means, and after the local fix, not instead of it",
       saw: advice)
+
+let setupAdvice = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "qwen3:8b", typedByPerson: false)
+check(setupAdvice.contains("Local AI isn't set up yet") && !setupAdvice.contains("ollama"),
+      rule: "when Griasa manages the local model, the not-running message points at Griasa's own setup, not Ollama",
+      meaning: "telling somebody to install a second program to fix something Griasa downloads itself sends them down the wrong road",
+      saw: setupAdvice)
+
+let notAnswering = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "m", typedByPerson: false, storedEngine: "griasa")
+check(notAnswering.contains("isn't answering") && !notAnswering.contains("isn't set up yet")
+        && notAnswering.contains("Griasa will start it again"),
+      rule: "when Griasa's own engine is set up and just unreachable, the message says Griasa restarts it, not that it is not set up",
+      meaning: "sending somebody to download something they already have is wrong and confusing",
+      saw: notAnswering)
+
+let ollamaDown = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "m", typedByPerson: false, storedEngine: "ollama")
+let lmDown = ProviderDefault.missingModelAdvice(model: "m", typedByPerson: false, storedEngine: "lmStudio")
+check(ollamaDown.contains("Start Ollama again") && !ollamaDown.contains("Griasa will start it")
+        && lmDown.contains("Start LM Studio's server again") && !lmDown.contains("Griasa will start it"),
+      rule: "when the stored engine is Ollama or LM Studio, the message says to start that program again",
+      meaning: "Griasa cannot start another program's server; promising it will leaves the person waiting for nothing",
+      saw: ollamaDown + " | " + lmDown)
+
+let missingTyped = ProviderDefault.missingModelAdvice(model: "qwen3:8b", typedByPerson: true)
+let missingSetup = ProviderDefault.missingModelAdvice(model: "qwen3:8b", typedByPerson: false)
+check(missingTyped.contains("ollama pull qwen3:8b") && missingSetup.contains("Local AI isn't set up yet"),
+      rule: "the missing-model message follows the same split: Ollama wording for a typed URL, Griasa's setup otherwise",
+      meaning: "the two audiences need different fixes",
+      saw: missingTyped + " | " + missingSetup)
 
 return failures
 }

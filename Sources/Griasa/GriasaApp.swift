@@ -195,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         WhisperServer.shared.stop()
+        LlamaServer.shared.stop()
         Task { @MainActor in
             if AppState.shared.isRecording {
                 await AppState.shared.stopRecording()

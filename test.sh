@@ -29,6 +29,15 @@ swiftc -O \
   Sources/Griasa/RecordingHousekeeping.swift \
   Sources/Griasa/ImportedNotes.swift \
   Sources/Griasa/FirstRunPlacement.swift \
+  Sources/Griasa/LocalModelCatalog.swift \
+  Sources/Griasa/LocalRouting.swift \
+  Sources/Griasa/LocalRuntimeParsing.swift \
+  Sources/Griasa/LocalEngineChoice.swift \
+  Sources/Griasa/LocalSetupMemory.swift \
+  Sources/Griasa/OllamaRequest.swift \
+  Sources/Griasa/LlamaStream.swift \
+  Sources/Griasa/LocalFailure.swift \
+  Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
@@ -47,6 +56,14 @@ swiftc -O \
   Tests/RecordingRulesChecks.swift \
   Tests/ImportChecks.swift \
   Tests/FirstRunChecks.swift \
+  Tests/LocalModelChecks.swift \
+  Tests/RoutingChecks.swift \
+  Tests/RuntimeParsingChecks.swift \
+  Tests/EngineChoiceChecks.swift \
+  Tests/OllamaRequestChecks.swift \
+  Tests/PendingChecks.swift \
+  Tests/SetupMemoryChecks.swift \
+  Tests/LlamaStreamChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

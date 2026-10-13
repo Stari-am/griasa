@@ -162,6 +162,7 @@ final class AppState: ObservableObject {
         Permissions.requestAll()
         installHotkey()
         setupWhisper()
+        Task { @MainActor in await LocalModelSetup.shared.refresh() }
         // Straight into the session, with no per-partial main-actor hop: those
         // hops had no FIFO guarantee, and a transposed pair left Griasa's model
         // of the field describing something that wasn't there.
@@ -533,6 +534,15 @@ final class AppState: ObservableObject {
                         let entryID = HistoryStore.shared.add(
                             kind: .meeting, title: title, text: text, filePath: url.path,
                             participants: participants.isEmpty ? nil : participants)
+                        // No model yet, or the summary fell back to the raw transcript:
+                        // summarize it when the local model is ready.
+                        // Local provider only: a cloud user's raw fallback is a
+                        // provider failure, not a model still to be set up.
+                        if LLMConfig.current().provider == .custom,
+                           !AIFormatter.isConfigured || text.contains("Meeting transcript (raw)") {
+                            if let entryID { LocalModelSetup.shared.enqueuePending(entryID) }
+                            LocalModelCard.showIfNeeded()
+                        }
                         // Quietly pull out who promised what — the list in the
                         // Commitments tab just grows, nothing pops up.
                         Task {

@@ -126,5 +126,10 @@ check(policy().anyCloudAllowed && providers.allSatisfy { policy().allows(provide
       meaning: "the unmanaged install — nearly everybody — must not lose a provider to a key nobody set",
       saw: "unmanaged policy refused a provider")
 
+check(["localModelID", "localModelAutoDownload", "localEnginePreferred"].allSatisfy(ManagedPolicy.lockableKeys.contains),
+      rule: "the local-model keys can be locked by a profile",
+      meaning: "an organisation that pins the model or pre-approves the download must see those settings as managed",
+      saw: "\(ManagedPolicy.lockableKeys)")
+
 return failures
 }

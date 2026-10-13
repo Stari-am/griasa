@@ -39,6 +39,14 @@ struct PendingSummaries: Codable, Equatable {
         if ids.contains(id), !extractionOwed.contains(id) { extractionOwed.append(id) }
     }
 
+    /// Promises for `id` were collected outside the catch-up (History's
+    /// Re-summarize or Find commitments). A meeting that owed only its
+    /// promises is then done; one still waiting for its summary stays, since
+    /// promises found in raw text do not replace the summary.
+    mutating func promisesCollected(_ id: UUID) {
+        if extractionOwed.contains(id) { remove(id) }
+    }
+
     /// Whether the next run for `id` collects promises only (its summary is in History).
     func needsOnlyExtraction(_ id: UUID, alreadySummarized: Set<UUID>) -> Bool {
         extractionOwed.contains(id) && alreadySummarized.contains(id)

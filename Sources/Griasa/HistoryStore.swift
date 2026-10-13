@@ -232,8 +232,13 @@ final class HistoryStore: ObservableObject {
     ///     only the promises are owed (`PendingSummaries.summarySaved`) and
     ///     collects them next time. Nothing is added by a failed extraction, so
     ///     that run cannot add them twice.
+    ///   - requireLocal: true for the catch-up: every request goes only to the
+    ///     model on this Mac (see `AIFormatter.complete`).
+    ///
+    /// Promises collected here, by any caller, settle the meeting in the
+    /// catch-up queue, so the catch-up never collects them a second time.
     func reprocessMeeting(_ entry: HistoryEntry, allowCloudFallback: Bool = true,
-                          requireExtraction: Bool = false) async -> String {
+                          requireExtraction: Bool = false, requireLocal: Bool = false) async -> String {
         guard entry.kind == .meeting, let path = entry.filePath else {
             return "Only meeting recordings can be re-summarized."
         }
@@ -251,23 +256,20 @@ final class HistoryStore: ObservableObject {
             let markdown = try await MeetingTranscriber.reformat(
                 transcriptFile: URL(fileURLWithPath: path),
                 participants: participants, myName: myName,
-                allowCloudFallback: allowCloudFallback)
+                allowCloudFallback: allowCloudFallback, requireLocal: requireLocal)
             let title = MeetingTranscriber.title(fromMarkdown: markdown)
             // The file now holds the new summary; History says the same.
             updateEntry(id: entry.id, title: title, text: markdown)
-            let added: Int
-            if requireExtraction {
-                do {
-                    added = try await CommitmentExtractor.extract(
-                        markdown: markdown, participants: participants, myName: myName,
-                        sourceTitle: title, sourceEntryID: entry.id)
-                } catch {
+            var added = 0
+            do {
+                added = try await CommitmentExtractor.extract(
+                    markdown: markdown, participants: participants, myName: myName,
+                    sourceTitle: title, sourceEntryID: entry.id, requireLocal: requireLocal)
+                LocalModelSetup.shared.promisesCollected(entry.id)
+            } catch {
+                if requireExtraction {
                     return "✗ Summary rebuilt, but promises could not be collected: \(error.localizedDescription)"
                 }
-            } else {
-                added = (try? await CommitmentExtractor.extract(
-                    markdown: markdown, participants: participants, myName: myName,
-                    sourceTitle: title, sourceEntryID: entry.id)) ?? 0
             }
             return added > 0
                 ? "✓ Summary rebuilt · \(added) commitment\(added == 1 ? "" : "s") added"
@@ -280,7 +282,7 @@ final class HistoryStore: ObservableObject {
     /// Mine an existing entry's text for commitments retrospectively — for
     /// meetings recorded before the tracker existed, or where extraction had
     /// failed. Returns a short status line.
-    func collectCommitments(_ entry: HistoryEntry) async -> String {
+    func collectCommitments(_ entry: HistoryEntry, requireLocal: Bool = false) async -> String {
         guard AIFormatter.isConfigured else {
             return "Configure an AI provider in AI & Actions first."
         }
@@ -291,7 +293,8 @@ final class HistoryStore: ObservableObject {
         do {
             let added = try await CommitmentExtractor.extract(
                 markdown: entry.text, participants: participants, myName: myName,
-                sourceTitle: entry.title, sourceEntryID: entry.id)
+                sourceTitle: entry.title, sourceEntryID: entry.id, requireLocal: requireLocal)
+            LocalModelSetup.shared.promisesCollected(entry.id)
             return added > 0
                 ? "✓ \(added) commitment\(added == 1 ? "" : "s") added — see the Commitments tab"
                 : "No new commitments found in this text."

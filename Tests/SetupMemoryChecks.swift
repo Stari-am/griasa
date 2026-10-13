@@ -128,11 +128,23 @@ check(picked(.griasa, .use(.griasa, model: nineEntry.id)) == .decide
       rule: "another engine picked in Settings (or by MDM) that works now moves on from a silent runtime",
       meaning: "an explicit pick must not be held hostage by a runtime that is off",
       saw: "\(picked(.griasa, .use(.griasa, model: nineEntry.id)))")
-check(picked(.griasa, .download) == .keepSilent && picked(nil, .use(.griasa, model: nineEntry.id)) == .keepSilent
-        && picked(.ollama, .download) == .keepSilent,
-      rule: "a pick that would need a download, or no pick at all, keeps the silent runtime",
+check(picked(nil, .use(.griasa, model: nineEntry.id)) == .decide
+        && picked(nil, .use(.lmStudio, model: "qwen3.5-9b")) == .decide,
+      rule: "after the waits, an engine that works with nothing to download takes over a silent runtime",
+      meaning: "the spec's \"quit later\" row: Griasa's model on disk (or LM Studio with the model) must not sit unused behind a dead Ollama",
+      saw: "\(picked(nil, .use(.griasa, model: nineEntry.id)))")
+let duringWaits = LocalRuntimeWait.verdict(stored: .ollama, answered: false, waitsSoFar: 1,
+                                           decision: .use(.griasa, model: nineEntry.id))
+check(duringWaits == .keep(retryAfter: 30),
+      rule: "…but not while the waits last, unless that engine was picked",
+      meaning: "an Ollama still starting at login is the person's runtime; swapping it out at once would flap",
+      saw: "\(duringWaits)")
+check(picked(.griasa, .download) == .keepSilent && picked(nil, .download) == .keepSilent
+        && picked(nil, .pullIntoOllama(tag: "qwen3.5:9b")) == .keepSilent
+        && picked(nil, .use(.ollama, model: "qwen3.5:9b")) == .keepSilent,
+      rule: "when the only way on is a download or a pull, the silent runtime is kept",
       meaning: "a download beside a runtime that is merely off is the duplicate this rule exists to prevent",
-      saw: "\(picked(.griasa, .download)) \(picked(nil, .use(.griasa, model: nineEntry.id)))")
+      saw: "\(picked(nil, .download)) \(picked(nil, .pullIntoOllama(tag: "qwen3.5:9b")))")
 
 // The step-down after running out of memory
 check(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: small.id)
@@ -141,6 +153,12 @@ check(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: small.id)
       rule: "the step-down stands while the stepped-down tier is in use, and goes once a larger tier is ready",
       meaning: "a remembered step-down outranks the stored model; never cleared, it pins the Mac to the smaller tier for good",
       saw: "same → \(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: small.id)), larger → \(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: nine.id))")
+let pinnedLarger = choose(pinned: nine.id, steppedDown: small.id, downloaded: [nine])
+check(pinnedLarger == nine.id
+        && !LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: pinnedLarger ?? ""),
+      rule: "an MDM pin to a larger tier is what gets chosen over the step-down, and its readiness clears the step-down",
+      meaning: "this is the path that reaches the clear; without it the Mac stays on the smaller tier for good",
+      saw: "\(pinnedLarger ?? "nil")")
 check(v(.ollama, true, 0) == .decide && v(.lmStudio, true, 2) == .decide,
       rule: "a runtime that answers is decided on at once (with or without the model)",
       meaning: "an answer without the model is the one real sign the model is gone",

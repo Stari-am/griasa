@@ -104,5 +104,13 @@ check(!catchUp(url: "http://gw.corp.example/v1", stored: .griasa),
       meaning: "a company gateway is off this Mac; background summaries must not go there unasked",
       saw: "\(catchUp(url: "http://gw.corp.example/v1", stored: .griasa))")
 
+check(LocalCatchUpGate.isLocal(providerIsCustom: true, baseURL: "http://127.0.0.1:8177/v1")
+        && LocalCatchUpGate.isLocal(providerIsCustom: true, baseURL: "http://localhost:11434/v1")
+        && !LocalCatchUpGate.isLocal(providerIsCustom: false, baseURL: "https://api.anthropic.com")
+        && !LocalCatchUpGate.isLocal(providerIsCustom: true, baseURL: "http://gw.corp.example/v1"),
+      rule: "each catch-up request may go only to the local provider at an address on this Mac",
+      meaning: "a switch to the cloud while a meeting is half done must fail that meeting, not send its notes off the Mac",
+      saw: "cloud → \(LocalCatchUpGate.isLocal(providerIsCustom: false, baseURL: "https://api.anthropic.com"))")
+
 return failures
 }

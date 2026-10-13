@@ -65,5 +65,12 @@ check(PendingSummaries.load(from: owedRound.encoded()) == owedRound,
       rule: "owed promises survive a restart", meaning: "the next launch's catch-up must still collect them",
       saw: "\(PendingSummaries.load(from: owedRound.encoded()).extractionOwed)")
 
+var manual = PendingSummaries(ids: [a, b]); manual.summarySaved(a)
+manual.promisesCollected(a); manual.promisesCollected(b)
+check(manual.ids == [b] && manual.extractionOwed.isEmpty,
+      rule: "promises collected by hand settle a meeting that owed only them, and leave one still waiting for its summary",
+      meaning: "the catch-up would otherwise collect them again (reworded, so not deduplicated), or never rebuild the summary",
+      saw: "\(manual.ids)")
+
 return failures
 }

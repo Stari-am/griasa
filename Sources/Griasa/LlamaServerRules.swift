@@ -9,24 +9,30 @@ enum LlamaServerRules {
     /// say why a start failed, which come last.
     static let stderrTailBytes = 4096
 
-    /// The file name of the model a llama-server on the port is serving, from
-    /// its `/props` (`model_path`) or `/v1/models` (`data[0].id`, the path
+    /// The model a llama-server on the port is serving, as it reports it:
+    /// `/props` → `model_path`, else `/v1/models` → `data[0].id` (the path
     /// unless an alias was set). Nil when neither says.
-    static func servedModelFile(_ data: Data) -> String? {
+    static func servedModel(_ data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        if let path = json["model_path"] as? String, !path.isEmpty { return (path as NSString).lastPathComponent }
+        if let path = json["model_path"] as? String, !path.isEmpty { return path }
         if let list = json["data"] as? [[String: Any]], let id = list.first?["id"] as? String, !id.isEmpty {
-            return (id as NSString).lastPathComponent
+            return id
         }
         return nil
     }
 
-    /// An orphan on Griasa's port is adopted only when it serves exactly the
-    /// file wanted; anything else (another tier, a model of unknown name) is
-    /// killed and started afresh.
-    static func mayAdopt(servedFile: String?, wantedFile: String) -> Bool {
-        servedFile == wantedFile
+    /// A server on Griasa's port is adopted only when it serves exactly the
+    /// wanted file, by full path: only then is it one Griasa started (and can
+    /// stop again). The same file name in another folder, an alias, or
+    /// silence is not adopted.
+    static func mayAdopt(served: String?, wantedPath: String) -> Bool {
+        guard let served else { return false }
+        return (served as NSString).standardizingPath == (wantedPath as NSString).standardizingPath
     }
+
+    /// The reason given when the port stays taken after Griasa's own
+    /// leftovers are stopped. Not a memory problem, so no step-down.
+    static let portTakenReason = "port 8177 is used by another program"
 
     /// The `pkill -f` / `pgrep -f` pattern for a llama-server Griasa started:
     /// the binary name, a model from Griasa's own models folder, and Griasa's

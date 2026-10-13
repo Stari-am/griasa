@@ -5,14 +5,11 @@ enum LocalModelCard {
     /// Probes first: the state from launch may be stale — Ollama started
     /// since, or a model arrived — and a card offering a download the Mac no
     /// longer needs is worse than no card. Concurrent refreshes are shared.
-    ///
-    /// `afterEnqueue` is the call right after a meeting was queued: its probe
-    /// never starts catch-up (see `LocalModelSetup.RefreshOrigin.enqueue`).
-    static func showIfNeeded(afterEnqueue: Bool = false) {
+    static func showIfNeeded() {
         // Cloud users never see it (also checked in `shouldOfferCard`, after the probe).
         guard LLMConfig.current().provider == .custom else { return }
         Task { @MainActor in
-            await LocalModelSetup.shared.refresh(afterEnqueue ? .enqueue : .normal)
+            await LocalModelSetup.shared.refresh()
             guard LocalModelSetup.shared.shouldOfferCard else { return }
             HubController.shared.open(.localModel, activate: false)
         }

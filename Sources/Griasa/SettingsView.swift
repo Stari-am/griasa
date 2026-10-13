@@ -592,7 +592,8 @@ private struct AISettings: View {
         localRefreshDebounce = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 600_000_000)
             guard !Task.isCancelled else { return }
-            await LocalModelSetup.shared.refresh()
+            // Status only: no catch-up against a half-typed model name.
+            await LocalModelSetup.shared.refresh(.typing)
         }
     }
 

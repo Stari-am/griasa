@@ -215,7 +215,7 @@ enum CommitmentExtractor {
     ///   can be weeks old, and a promise from last month must not look new.
     static func extract(markdown: String, participants: [String], myName: String,
                         sourceTitle: String, sourceEntryID: UUID?,
-                        meetingDate: Date = Date()) async throws -> Int {
+                        meetingDate: Date = Date(), requireLocal: Bool = false) async throws -> Int {
         guard AIFormatter.isConfigured else {
             throw NSError(domain: "Griasa", code: 10, userInfo: [
                 NSLocalizedDescriptionKey: "No AI provider configured (Settings → AI & Actions)."
@@ -234,7 +234,7 @@ enum CommitmentExtractor {
 
         let reply = try await AIFormatter.complete(
             system: system, user: notes, tier: .fast, maxTokens: 2048,
-            timeout: 60, allowCloudFallback: false, allowApple: false)
+            timeout: 60, allowCloudFallback: false, allowApple: false, requireLocal: requireLocal)
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,

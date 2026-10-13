@@ -86,4 +86,12 @@ enum LocalCatchUpGate {
         }
         return storedEngine != nil && storedEngine != .userServer
     }
+
+    /// Whether a request may go to this provider during catch-up: the local
+    /// provider, at an address on this Mac. Checked again at the moment of
+    /// sending, so a switch to the cloud while a meeting is half done cannot
+    /// send its notes off this Mac.
+    static func isLocal(providerIsCustom: Bool, baseURL: String) -> Bool {
+        providerIsCustom && ProviderDefault.isOnThisMac(baseURL)
+    }
 }

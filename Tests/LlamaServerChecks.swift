@@ -19,19 +19,22 @@ func check(_ passed: Bool, rule: String, meaning: String, saw: String) {
 // Which model an orphan on the port serves
 let props = Data(#"{"default_generation_settings":{},"model_path":"/Users/x/Library/Application Support/Griasa/models/Qwen3.5-9B-Q4_K_M.gguf","total_slots":1}"#.utf8)
 let models = Data(#"{"object":"list","data":[{"id":"/Users/x/models/gemma-4-12b-Q8_0.gguf","object":"model"}]}"#.utf8)
-check(LlamaServerRules.servedModelFile(props) == "Qwen3.5-9B-Q4_K_M.gguf"
-        && LlamaServerRules.servedModelFile(models) == "gemma-4-12b-Q8_0.gguf"
-        && LlamaServerRules.servedModelFile(Data("{}".utf8)) == nil
-        && LlamaServerRules.servedModelFile(Data("<html>".utf8)) == nil,
-      rule: "the served model's file name is read from /props, else /v1/models; nothing readable → nil",
+let wanted = "/Users/x/Library/Application Support/Griasa/models/Qwen3.5-9B-Q4_K_M.gguf"
+check(LlamaServerRules.servedModel(props) == wanted
+        && LlamaServerRules.servedModel(models) == "/Users/x/models/gemma-4-12b-Q8_0.gguf"
+        && LlamaServerRules.servedModel(Data("{}".utf8)) == nil
+        && LlamaServerRules.servedModel(Data("<html>".utf8)) == nil,
+      rule: "the served model is read from /props, else /v1/models; nothing readable → nil",
       meaning: "an orphan is only reused when it is known to serve the wanted file",
-      saw: "\(String(describing: LlamaServerRules.servedModelFile(props))) / \(String(describing: LlamaServerRules.servedModelFile(models)))")
-check(LlamaServerRules.mayAdopt(servedFile: "a.gguf", wantedFile: "a.gguf")
-        && !LlamaServerRules.mayAdopt(servedFile: "b.gguf", wantedFile: "a.gguf")
-        && !LlamaServerRules.mayAdopt(servedFile: nil, wantedFile: "a.gguf"),
-      rule: "an orphan serving another model, or one that will not say, is not reused",
-      meaning: "reusing it would answer every request with the wrong model, silently",
-      saw: "other → \(LlamaServerRules.mayAdopt(servedFile: "b.gguf", wantedFile: "a.gguf"))")
+      saw: "\(String(describing: LlamaServerRules.servedModel(props)))")
+check(LlamaServerRules.mayAdopt(served: wanted, wantedPath: wanted)
+        && !LlamaServerRules.mayAdopt(served: "/Users/x/other/Qwen3.5-9B-Q4_K_M.gguf", wantedPath: wanted)
+        && !LlamaServerRules.mayAdopt(served: "Qwen3.5-9B-Q4_K_M.gguf", wantedPath: wanted)
+        && !LlamaServerRules.mayAdopt(served: "/Users/x/models/gemma-4-12b-Q8_0.gguf", wantedPath: wanted)
+        && !LlamaServerRules.mayAdopt(served: nil, wantedPath: wanted),
+      rule: "only a server serving the wanted file at Griasa's own path is reused — not the same name elsewhere, an alias, or silence",
+      meaning: "an adopted server must be one Griasa can stop again; another program's would hold the port for good",
+      saw: "same name elsewhere → \(LlamaServerRules.mayAdopt(served: "/Users/x/other/Qwen3.5-9B-Q4_K_M.gguf", wantedPath: wanted))")
 
 // Which processes count as Griasa's orphans
 let pattern = LlamaServerRules.orphanPattern(modelsDirectory: "/Users/x/Library/Application Support/Griasa/models",

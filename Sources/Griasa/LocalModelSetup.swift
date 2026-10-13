@@ -90,10 +90,15 @@ final class LocalModelSetup: ObservableObject {
 
     /// Who asked for a refresh. `request` is the reconnect after a request
     /// failed to connect: it never spends the waits kept for a runtime still
-    /// starting. `enqueue` is the probe after a meeting was queued: it never
-    /// starts catch-up, which would run that meeting — and possibly ask about
-    /// the cloud again — seconds after the person said no.
-    enum RefreshOrigin { case normal, request, enqueue }
+    /// starting. `typing` is Settings while the server address or model names
+    /// are being typed: it updates the status only, and never starts catch-up
+    /// against a half-typed name.
+    ///
+    /// The probe after a meeting was queued is a plain refresh and does start
+    /// catch-up when the model is ready. That cannot bring back the cloud
+    /// question seconds after the person said no: catch-up sends only to the
+    /// model on this Mac (`requireLocal`), so it has no cloud fallback to offer.
+    enum RefreshOrigin { case normal, request, typing }
     private var refreshOrigin: RefreshOrigin = .normal
 
     /// Concurrent callers share one probe instead of racing each other. A
@@ -136,7 +141,7 @@ final class LocalModelSetup: ObservableObject {
             state = .ready(engine: .userServer, model: "", displayName: "Your server")
             // Meetings that waited for a model get it here too — when the
             // typed server is on this Mac (`catchUp` checks).
-            if origin != .enqueue { catchUp() }
+            if origin != .typing { catchUp() }
             return
         case .proceed: break
         }
@@ -191,7 +196,7 @@ final class LocalModelSetup: ObservableObject {
         let mayAutoDownload = defaults.bool(forKey: Self.autoDownloadKey) && onLocalProvider && answered
         switch decision {
         case .use(let engine, let model):
-            apply(engine: engine, model: model, entry: entry, startCatchUp: origin != .enqueue)
+            apply(engine: engine, model: model, entry: entry, startCatchUp: origin != .typing)
         case .pullIntoOllama(let tag):
             clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: tag)
@@ -231,6 +236,13 @@ final class LocalModelSetup: ObservableObject {
                           body: "Griasa uses the AI model already on this Mac (\(engine == .ollama ? "Ollama" : "LM Studio")).")
         }
         if startCatchUp { catchUp() }
+    }
+
+    /// Promises for `id` were collected outside the catch-up; see
+    /// `PendingSummaries.promisesCollected`.
+    func promisesCollected(_ id: UUID) {
+        pending.promisesCollected(id)
+        defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
     }
 
     /// The person picked a model in Settings: any step-down Griasa made on
@@ -396,11 +408,11 @@ final class LocalModelSetup: ObservableObject {
                 let done: Bool
                 let status: String
                 if pending.needsOnlyExtraction(id, alreadySummarized: summarized) {
-                    status = await HistoryStore.shared.collectCommitments(entry)
+                    status = await HistoryStore.shared.collectCommitments(entry, requireLocal: true)
                     done = status.hasPrefix("✓") || status.hasPrefix("No new commitments")
                 } else {
                     status = await HistoryStore.shared.reprocessMeeting(entry, allowCloudFallback: false,
-                                                                        requireExtraction: true)
+                                                                        requireExtraction: true, requireLocal: true)
                     // A transcript that is gone will never succeed, so it goes.
                     done = status.hasPrefix("✓") || status.contains("isn't on disk anymore")
                 }

@@ -131,7 +131,7 @@ enum AIFormatter {
                 return try await complete(config, system: system, user: user,
                                           model: config.model(for: tier),
                                           maxTokens: maxTokens, timeout: managed ? timeout * 3 : timeout)
-            } catch let error as URLError where managed && error.code == .timedOut {
+            } catch let error where managed && LocalFailure.kind(of: error) == .slow {
                 // Not "gone": the model is there, only slow, so this is neither
                 // retried as unreachable nor reported as a dead provider.
                 throw NSError(domain: "Griasa", code: 22, userInfo: [NSLocalizedDescriptionKey: slowModelAdvice])
@@ -166,16 +166,12 @@ enum AIFormatter {
         }
     }
 
-    static let slowModelAdvice = "The AI model on this Mac is running very slowly — it is probably short of memory. Close some apps and Griasa will try again."
+    static let slowModelAdvice = "The AI model on this Mac is busy or running very slowly — it is probably short of memory. Close some apps and try again."
 
     /// The local server did not take the connection. `openAIComplete` rewrites
     /// the first two into its own advice (code 6), so that counts too.
     private static func isUnreachable(_ error: Error) -> Bool {
-        if let error = error as? URLError {
-            return [.cannotConnectToHost, .cannotFindHost, .networkConnectionLost].contains(error.code)
-        }
-        let error = error as NSError
-        return error.domain == "Griasa" && error.code == 6
+        LocalFailure.kind(of: error) == .unreachable
     }
 
     /// Account-level failures (no credits, bad key, spend limit) would
@@ -414,6 +410,9 @@ enum AIFormatter {
         } catch let error as LlamaStream.ServerError {
             throw AIProviderError(provider: "The endpoint", status: 500, detail: error.message)
         }
+        // A connection that closes before the end marker is a lost reply, not a
+        // short one: half a summary must never pass for a whole one.
+        guard stream.complete else { throw URLError(.networkConnectionLost) }
         return (stream.text, Data(), response)
     }
 

@@ -36,6 +36,7 @@ swiftc -O \
   Sources/Griasa/LocalSetupMemory.swift \
   Sources/Griasa/OllamaRequest.swift \
   Sources/Griasa/LlamaStream.swift \
+  Sources/Griasa/LocalFailure.swift \
   Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \

@@ -52,10 +52,9 @@
                  <false/> to allow only the company's API account. -->
             <key>allowClaudeCode</key>
             <true/>
-            <!-- Optional on-device model setup (all three are ignored while
+            <!-- Griasa picks the model by the Mac's memory; localModelID is left out on purpose,
+                 because pinning skips that check (see README). Optional on-device model setup (both are ignored while
                  customBaseURL, customFastModel or customSmartModel is set):
-            <key>localModelID</key>
-            <string>qwen3.5-9b-q4</string>
             <key>localModelAutoDownload</key>
             <true/>
             <key>localEnginePreferred</key>

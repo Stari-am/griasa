@@ -27,17 +27,24 @@ struct LlamaStream {
     private(set) var progress: Progress?
     private(set) var done = false
 
+    /// The server said it was finished: the end marker, or a finish reason.
+    var complete: Bool { done || finishReason != nil }
+
     /// Feed one line as received. Blank lines and `:` comments carry nothing.
     /// An `{"error":…}` line throws with the server's own message.
     mutating func feed(line: String) throws {
-        guard line.hasPrefix("data:") else { return }
-        var payload = String(line.dropFirst(5))
+        // An error may arrive as a data line or as an SSE `error:` field.
+        let field: String
+        if line.hasPrefix("data:") { field = "data:" }
+        else if line.hasPrefix("error:") { field = "error:" }
+        else { return }
+        var payload = String(line.dropFirst(field.count))
         if payload.hasPrefix(" ") { payload.removeFirst() }
         payload = payload.trimmingCharacters(in: .whitespaces)
         if payload == "[DONE]" { done = true; return }
         guard let data = payload.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
-        if let error = json["error"] {
+        if let error = json["error"] ?? (field == "error:" ? json : nil) {
             if let object = error as? [String: Any], let message = object["message"] as? String {
                 throw ServerError(message: message)
             }

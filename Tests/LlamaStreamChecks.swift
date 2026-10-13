@@ -61,5 +61,33 @@ check(g.text == "x",
       meaning: "a stray line must not abort a summary that took ten minutes",
       saw: g.text)
 
+var cut = LlamaStream()
+try? cut.feed(line: chunk("half a summ"))
+check(!cut.complete,
+      rule: "a stream with text but no [DONE] and no finish reason is not complete",
+      meaning: "a connection dropped mid-reply must not be saved as a finished summary",
+      saw: "complete=\(cut.complete)")
+check(s.complete && f.complete && !p.complete,
+      rule: "[DONE] or a finish reason completes a stream; progress alone does not",
+      meaning: "completeness is the only proof the reply is whole",
+      saw: "\(s.complete) \(f.complete) \(p.complete)")
+
+var ev = LlamaStream()
+var evMessage: String?
+do { try ev.feed(line: #"error: {"message":"out of memory"}"#) } catch { evMessage = error.localizedDescription }
+check(evMessage == "out of memory",
+      rule: "an SSE error: field line surfaces the server's message like a data error line",
+      meaning: "which form the server uses differs by version; either must be read",
+      saw: String(describing: evMessage))
+
+check(LocalFailure.kind(of: URLError(.timedOut)) == .slow
+          && LocalFailure.kind(of: URLError(.cannotConnectToHost)) == .unreachable
+          && LocalFailure.kind(of: URLError(.networkConnectionLost)) == .unreachable
+          && LocalFailure.kind(of: NSError(domain: "Griasa", code: 6)) == .unreachable
+          && LocalFailure.kind(of: NSError(domain: "Griasa", code: 4)) == .other,
+      rule: "a timeout is slow, never unreachable; a refused or lost connection is unreachable",
+      meaning: "unreachable triggers a refresh and a second wait; doing that to a slow model doubles the wait",
+      saw: "\(LocalFailure.kind(of: URLError(.timedOut)))")
+
 return failures
 }

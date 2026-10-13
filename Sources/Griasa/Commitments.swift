@@ -196,11 +196,6 @@ enum CommitmentExport {
 /// Pulls concrete promises out of finished meeting notes. Runs quietly at the
 /// end of the meeting pipeline — a failure just means no new items appear.
 enum CommitmentExtractor {
-    /// Why the last closure question got no answer, in the provider's own words
-    /// (for a slow local model: that it is short of memory). Nil when the last
-    /// question was answered. Read by the closure scan after a nil result.
-    nonisolated(unsafe) static var lastFailure: String?
-
     private struct ExtractedItem: Decodable {
         let text: String
         let owner: String?
@@ -309,9 +304,17 @@ enum CommitmentExtractor {
     ///   whether this feature finds anything at all.
     static func detectClosures(markdown: String, participants: [String] = [],
                               persist: Bool = true) async -> Detection? {
-        guard AIFormatter.isConfigured else { return nil }
+        await detectClosuresReporting(markdown: markdown, participants: participants, persist: persist).detection
+    }
+
+    /// Same question, with the provider's own words when it got no answer (for a
+    /// slow local model: that it is short of memory). The reason travels with
+    /// this call's result, so concurrent jobs cannot read each other's.
+    static func detectClosuresReporting(markdown: String, participants: [String] = [],
+                                        persist: Bool = true) async -> (detection: Detection?, failure: String?) {
+        guard AIFormatter.isConfigured else { return (nil, nil) }
         let open = await MainActor.run { CommitmentStore.shared.commitments.filter { !$0.done } }
-        guard !open.isEmpty else { return Detection() }
+        guard !open.isEmpty else { return (Detection(), nil) }
 
         // Which promises are even candidates, and why this is not simply "the
         // newest sixty". The list goes into the prompt, so it has to be capped,
@@ -348,17 +351,15 @@ enum CommitmentExtractor {
             reply = try await AIFormatter.complete(
                 system: system, user: notes, tier: .smart, maxTokens: 1024,
                 timeout: 90, allowCloudFallback: false, allowApple: false)
-            lastFailure = nil
         } catch {
-            lastFailure = error.localizedDescription
-            return nil
+            return (nil, error.localizedDescription)
         }
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,
               let data = String(reply[start...end]).data(using: .utf8),
               let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else {
-            return nil
+            return (nil, nil)
         }
 
         let lowerNotes = notes.lowercased()
@@ -388,6 +389,6 @@ enum CommitmentExtractor {
                 await MainActor.run { CommitmentStore.shared.suggestClosure(hit.id, quote: hit.quote) }
             }
         }
-        return result
+        return (result, nil)
     }
 }

@@ -119,18 +119,20 @@ enum AIFormatter {
                 // free now, so the next request uses one size smaller.
                 if start == .died { await LocalModelSetup.shared.stepDown(from: entry) }
                 guard start == .running else {
+                    let reason = LlamaServer.shared.lastFailureReason.map { " (\($0))" } ?? ""
                     throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey:
-                        "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."])
+                        "The local AI model could not start — the Mac may be short of memory. Close some apps and try again.\(reason)"])
                 }
             }
-            // A model on this Mac writes a long summary far slower than a cloud
-            // model, which is what callers' timeouts were set for; a meeting
-            // that times out at 300 s is lost work, so local ones get three times as long.
+            // A meeting that times out at 300 s is lost work, so background
+            // jobs on a local model get three times as long; dictation keeps
+            // its short timeout (see `LocalFailure.timeout`).
             let managed = config.provider == .custom && localEngineManaged
             do {
                 return try await complete(config, system: system, user: user,
                                           model: config.model(for: tier),
-                                          maxTokens: maxTokens, timeout: managed ? timeout * 3 : timeout)
+                                          maxTokens: maxTokens,
+                                          timeout: LocalFailure.timeout(timeout, managedLocal: managed))
             } catch let error where managed && LocalFailure.kind(of: error) == .slow {
                 // Not "gone": the model is there, only slow, so this is neither
                 // retried as unreachable nor reported as a dead provider.
@@ -143,7 +145,9 @@ enum AIFormatter {
             } catch let error where config.provider == .custom && localEngineManaged && isUnreachable(error) {
                 // Ollama or LM Studio quit, or is still starting: ask again now
                 // (the setup may move to another engine) and try once more.
-                await LocalModelSetup.shared.refresh()
+                // Marked as a request's refresh: it never spends the waits
+                // kept for a runtime still starting at login.
+                await LocalModelSetup.shared.refresh(.request)
                 return try await send(LLMConfig.current())
             }
         } catch {

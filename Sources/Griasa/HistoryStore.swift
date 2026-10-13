@@ -213,6 +213,9 @@ final class HistoryStore: ObservableObject {
         return touched
     }
 
+    /// What `reprocessMeeting` returns while another run for the same meeting is going.
+    static let alreadyWorking = "Already working on this meeting."
+
     /// Re-run the AI meeting summary from the saved raw transcript — for
     /// meetings the AI couldn't process the first time (no provider / failure).
     /// Rebuilds the notes, updates the entry, then refreshes commitments.
@@ -222,11 +225,13 @@ final class HistoryStore: ObservableObject {
     ///   - allowCloudFallback: false for the background catch-up, which must
     ///     never ask about, or use, a cloud provider.
     ///   - requireExtraction: true for the catch-up, where the promises are half
-    ///     the point. A failed extraction then fails the whole run, and the
-    ///     entry keeps its raw text so the next catch-up does both again; with
-    ///     the summary saved, the meeting would count as done and its promises
-    ///     would never be looked for. Nothing is added by a failed extraction,
-    ///     so the second run cannot add them twice.
+    ///     the point. A failed extraction then fails the run (a "✗" status).
+    ///     The new summary is in History either way — `reformat` has already
+    ///     written it to the meeting's file, and History must not show the raw
+    ///     text beside a file that says otherwise — so the catch-up records that
+    ///     only the promises are owed (`PendingSummaries.summarySaved`) and
+    ///     collects them next time. Nothing is added by a failed extraction, so
+    ///     that run cannot add them twice.
     func reprocessMeeting(_ entry: HistoryEntry, allowCloudFallback: Bool = true,
                           requireExtraction: Bool = false) async -> String {
         guard entry.kind == .meeting, let path = entry.filePath else {
@@ -237,7 +242,7 @@ final class HistoryStore: ObservableObject {
         }
         // A second run while the first is going (a click during catch-up)
         // would summarize twice and add the promises twice.
-        guard !working.contains(entry.id) else { return "Already working on this meeting." }
+        guard !working.contains(entry.id) else { return Self.alreadyWorking }
         working.insert(entry.id)
         defer { working.remove(entry.id) }
         let participants = entry.participants ?? []
@@ -248,14 +253,18 @@ final class HistoryStore: ObservableObject {
                 participants: participants, myName: myName,
                 allowCloudFallback: allowCloudFallback)
             let title = MeetingTranscriber.title(fromMarkdown: markdown)
+            // The file now holds the new summary; History says the same.
+            updateEntry(id: entry.id, title: title, text: markdown)
             let added: Int
             if requireExtraction {
-                added = try await CommitmentExtractor.extract(
-                    markdown: markdown, participants: participants, myName: myName,
-                    sourceTitle: title, sourceEntryID: entry.id)
-                updateEntry(id: entry.id, title: title, text: markdown)
+                do {
+                    added = try await CommitmentExtractor.extract(
+                        markdown: markdown, participants: participants, myName: myName,
+                        sourceTitle: title, sourceEntryID: entry.id)
+                } catch {
+                    return "✗ Summary rebuilt, but promises could not be collected: \(error.localizedDescription)"
+                }
             } else {
-                updateEntry(id: entry.id, title: title, text: markdown)
                 added = (try? await CommitmentExtractor.extract(
                     markdown: markdown, participants: participants, myName: myName,
                     sourceTitle: title, sourceEntryID: entry.id)) ?? 0

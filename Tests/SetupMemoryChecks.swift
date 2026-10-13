@@ -103,10 +103,44 @@ check(v(.ollama, false, 0) == .keep(retryAfter: 5) && v(.lmStudio, false, 1) == 
       rule: "a stored Ollama or LM Studio that does not answer is kept, and asked again after 5 s, 30 s, 120 s",
       meaning: "at login the runtime is often still starting; dropping it shows the card and (under MDM) downloads a duplicate",
       saw: "\(v(.ollama, false, 0)) \(v(.lmStudio, false, 1)) \(v(.ollama, false, 2))")
-check(v(.ollama, false, 3) == .decide,
-      rule: "after the last wait a still-silent runtime goes to the ordinary decision",
-      meaning: "a runtime that was uninstalled must not keep the Mac without AI for good",
-      saw: "\(v(.ollama, false, 3))")
+check(v(.ollama, false, 3) == .keepSilent && v(.lmStudio, false, 7) == .keepSilent,
+      rule: "after the last wait a still-silent Ollama or LM Studio is still kept, with no more waits",
+      meaning: "clearing it made the next refresh see nothing set up and, under MDM auto-download, fetch a duplicate model",
+      saw: "\(v(.ollama, false, 3)) \(v(.lmStudio, false, 7))")
+check(LocalRuntimeWait.showsNotAnswering(v(.ollama, false, 3), waitsSoFar: 3)
+        && !LocalRuntimeWait.showsNotAnswering(v(.ollama, false, 1), waitsSoFar: 1)
+        && !LocalRuntimeWait.showsNotAnswering(LocalRuntimeWait.verdict(stored: .ollama, answered: false, waitsSoFar: 1,
+                                                                        fromRequest: true), waitsSoFar: 1),
+      rule: "the status says \"not answering\" once the waits are spent, not while it may still be starting",
+      meaning: "a runtime starting at login is not broken; one silent for minutes needs the person to start it",
+      saw: "spent → \(LocalRuntimeWait.showsNotAnswering(v(.ollama, false, 3), waitsSoFar: 3))")
+let fromRequest = LocalRuntimeWait.verdict(stored: .ollama, answered: false, waitsSoFar: 0, fromRequest: true)
+check(fromRequest == .keepSilent,
+      rule: "a refresh started by a failed request keeps the silent runtime without using a wait",
+      meaning: "a request during login would otherwise spend the 5/30/120 s waits in seconds",
+      saw: "\(fromRequest)")
+let nineEntry = nine
+func picked(_ preferred: LocalEngine?, _ decision: LocalEngineDecision) -> LocalRuntimeWait.Verdict {
+    LocalRuntimeWait.verdict(stored: .ollama, answered: false, waitsSoFar: 3, preferred: preferred, decision: decision)
+}
+check(picked(.griasa, .use(.griasa, model: nineEntry.id)) == .decide
+        && picked(.lmStudio, .use(.lmStudio, model: "qwen3.5-9b")) == .decide,
+      rule: "another engine picked in Settings (or by MDM) that works now moves on from a silent runtime",
+      meaning: "an explicit pick must not be held hostage by a runtime that is off",
+      saw: "\(picked(.griasa, .use(.griasa, model: nineEntry.id)))")
+check(picked(.griasa, .download) == .keepSilent && picked(nil, .use(.griasa, model: nineEntry.id)) == .keepSilent
+        && picked(.ollama, .download) == .keepSilent,
+      rule: "a pick that would need a download, or no pick at all, keeps the silent runtime",
+      meaning: "a download beside a runtime that is merely off is the duplicate this rule exists to prevent",
+      saw: "\(picked(.griasa, .download)) \(picked(nil, .use(.griasa, model: nineEntry.id)))")
+
+// The step-down after running out of memory
+check(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: small.id)
+        && !LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: nine.id)
+        && !LocalSetupMemory.keepsStepDown(steppedDownID: nil, readyID: nine.id),
+      rule: "the step-down stands while the stepped-down tier is in use, and goes once a larger tier is ready",
+      meaning: "a remembered step-down outranks the stored model; never cleared, it pins the Mac to the smaller tier for good",
+      saw: "same → \(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: small.id)), larger → \(LocalSetupMemory.keepsStepDown(steppedDownID: small.id, readyID: nine.id))")
 check(v(.ollama, true, 0) == .decide && v(.lmStudio, true, 2) == .decide,
       rule: "a runtime that answers is decided on at once (with or without the model)",
       meaning: "an answer without the model is the one real sign the model is gone",

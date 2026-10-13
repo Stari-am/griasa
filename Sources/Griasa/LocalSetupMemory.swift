@@ -52,15 +52,25 @@ enum LocalSetupMemory {
 /// at login, not one that is gone. Treating it as gone dropped the working
 /// setup, showed the download card, and with auto-download installed a second
 /// runtime and a duplicate model. So the stored setup is kept while the
-/// runtime is silent, and asked again after 5 s, 30 s and 120 s; only a
-/// runtime that answers without the model, or one still silent after the last
-/// wait, goes to the ordinary decision.
+/// runtime is silent, and asked again after 5 s, 30 s and 120 s. After the last
+/// wait it is still kept — shown as not answering, with the advice to start
+/// it — because clearing it made the next refresh see a Mac with nothing on
+/// it, and under the organization's auto-download fetch a duplicate. Only an
+/// answer moves on (a runtime that answers without the model is the one real
+/// sign the model is gone), or an explicit pick: the person's (or the
+/// organization's) preferred engine, when it can be used right now.
+///
+/// A refresh started by a failed request (the reconnect path) never uses a
+/// wait: a request during login would otherwise spend the launch waits in
+/// seconds and leave none for the runtime that is still starting.
 ///
 /// Foundation only, so `test.sh` can reach it.
 enum LocalRuntimeWait {
     enum Verdict: Equatable {
-        /// Keep the stored engine and probe again after this many seconds.
+        /// Keep the stored engine, count a wait, and probe again after this many seconds.
         case keep(retryAfter: TimeInterval)
+        /// Keep the stored engine without using a wait or scheduling another probe.
+        case keepSilent
         /// Decide afresh from what the probe found.
         case decide
     }
@@ -72,9 +82,37 @@ enum LocalRuntimeWait {
     ///   - answered: whether that engine's runtime answered the probe at all
     ///     (an empty model list is an answer).
     ///   - waitsSoFar: how many times in a row it has already been kept.
-    static func verdict(stored: LocalEngine?, answered: Bool, waitsSoFar: Int) -> Verdict {
-        guard stored == .ollama || stored == .lmStudio, !answered,
-              waitsSoFar < backoff.count else { return .decide }
+    ///   - preferred: the engine picked in Settings (or by the organization), if any.
+    ///   - decision: what `LocalEngineChoice.decide` makes of the probe.
+    ///   - fromRequest: the refresh was started by a request that failed to connect.
+    static func verdict(stored: LocalEngine?, answered: Bool, waitsSoFar: Int,
+                        preferred: LocalEngine? = nil, decision: LocalEngineDecision? = nil,
+                        fromRequest: Bool = false) -> Verdict {
+        guard stored == .ollama || stored == .lmStudio, !answered else { return .decide }
+        // Another engine was picked and works now, with nothing to download.
+        if let preferred, preferred != stored, case .use(let engine, _)? = decision, engine == preferred {
+            return .decide
+        }
+        if fromRequest || waitsSoFar >= backoff.count { return .keepSilent }
         return .keep(retryAfter: backoff[waitsSoFar])
+    }
+
+    /// Whether the status should say the stored runtime is not answering:
+    /// kept silently once the waits are spent, not while it may still be starting.
+    static func showsNotAnswering(_ verdict: Verdict, waitsSoFar: Int) -> Bool {
+        verdict == .keepSilent && waitsSoFar >= backoff.count
+    }
+}
+
+extension LocalSetupMemory {
+    /// Whether the smaller tier Griasa stepped down to still stands now that
+    /// `readyID` is working. It goes once a larger tier is ready (an explicit
+    /// pick, or a download that finished): the step-down was about a model
+    /// that could not start, and one that runs proves the reason gone.
+    static func keepsStepDown(steppedDownID: String?, readyID: String) -> Bool {
+        guard let steppedDownID, let stepped = LocalModelCatalog.entries.firstIndex(where: { $0.id == steppedDownID })
+        else { return false }
+        guard let ready = LocalModelCatalog.entries.firstIndex(where: { $0.id == readyID }) else { return true }
+        return ready <= stepped
     }
 }

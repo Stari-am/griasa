@@ -68,3 +68,22 @@ enum LocalRefreshGate {
         return .proceed
     }
 }
+
+/// Whether pending meetings may be summarized in the background right now.
+/// Catch-up runs with nobody watching, so it must never send a meeting off
+/// this Mac: only the local provider, and only an engine on this Mac — one
+/// Griasa set up, or a server the person typed whose address is this Mac
+/// (typed model names alone mean Ollama at its usual local address). Checked
+/// before every meeting, because the person may switch provider mid-way.
+/// Foundation only, so `test.sh` can reach it.
+enum LocalCatchUpGate {
+    static func mayRun(providerIsCustom: Bool, typedBaseURL: String, typedModelNames: [String],
+                       storedEngine: LocalEngine?) -> Bool {
+        guard providerIsCustom else { return false }
+        if LocalRefreshGate.isHandConfigured(typedBaseURL: typedBaseURL, typedModelNames: typedModelNames) {
+            let url = typedBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            return url.isEmpty || ProviderDefault.isOnThisMac(url)
+        }
+        return storedEngine != nil && storedEngine != .userServer
+    }
+}

@@ -196,6 +196,11 @@ enum CommitmentExport {
 /// Pulls concrete promises out of finished meeting notes. Runs quietly at the
 /// end of the meeting pipeline — a failure just means no new items appear.
 enum CommitmentExtractor {
+    /// Why the last closure question got no answer, in the provider's own words
+    /// (for a slow local model: that it is short of memory). Nil when the last
+    /// question was answered. Read by the closure scan after a nil result.
+    nonisolated(unsafe) static var lastFailure: String?
+
     private struct ExtractedItem: Decodable {
         let text: String
         let owner: String?
@@ -338,9 +343,16 @@ enum CommitmentExtractor {
         if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
 
         let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
-        guard let reply = try? await AIFormatter.complete(
-            system: system, user: notes, tier: .smart, maxTokens: 1024,
-            timeout: 90, allowCloudFallback: false, allowApple: false) else { return nil }
+        let reply: String
+        do {
+            reply = try await AIFormatter.complete(
+                system: system, user: notes, tier: .smart, maxTokens: 1024,
+                timeout: 90, allowCloudFallback: false, allowApple: false)
+            lastFailure = nil
+        } catch {
+            lastFailure = error.localizedDescription
+            return nil
+        }
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,

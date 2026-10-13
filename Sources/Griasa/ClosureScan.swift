@@ -36,7 +36,8 @@ enum ClosureScan {
 
         switch result {
         case nil:
-            print("FAIL: the provider gave no usable answer at all")
+            print("FAIL: the provider gave no usable answer at all"
+                + (CommitmentExtractor.lastFailure.map { " — \($0)" } ?? ""))
         case let detection?:
             print("proposed: \(detection.proposed)")
             print("kept:     \(detection.found.count)")
@@ -94,6 +95,7 @@ enum ClosureScan {
                 unanswered += 1
                 print(String(format: "  %2d. %5d chars, %d participants — no answer (%.1fs)",
                              index + 1, source.count, participants.count, seconds))
+                if let why = CommitmentExtractor.lastFailure { print("      \(why)") }
             case let detection?:
                 totalFound += detection.found.count
                 proposed += detection.proposed

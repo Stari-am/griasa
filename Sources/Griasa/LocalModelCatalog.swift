@@ -9,6 +9,11 @@ import Foundation
 /// how much memory the Mac has, then stepped down if the disk is short.
 /// Experts can still pick any model this Mac can run in Settings → Advanced.
 ///
+/// Memory tiers: the model file stays at or under about 40% of the Mac's RAM.
+/// Whisper, the browser and the call app share that memory, and a model that
+/// starts swapping is 15 to 20 times slower, which turns a meeting summary
+/// into a wait of many minutes.
+///
 /// Reviewed every few months: open-weight models move fast. Sources and the
 /// reasoning for each pick are in the 2026-10 research note. All Apache-2.0.
 ///
@@ -50,7 +55,7 @@ enum LocalModelCatalog {
                                 url: hf("unsloth/Qwen3.5-9B-GGUF", "3885219b6810b007914f3a7950a8d1b469d598a5", "Qwen3.5-9B-Q4_K_M.gguf"),
                                 sha256: "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
                                 size: 5_680_522_464),
-            minMemoryGB: 12, contextTokens: 32768,
+            minMemoryGB: 16, contextTokens: 32768,
             ollamaTags: ["qwen3.5:9b"], lmStudioMatch: ["qwen3.5-9b"], license: "Apache-2.0"),
         LocalModelEntry(
             id: "gemma4-12b-q8", displayName: "Gemma 4 12B",
@@ -58,7 +63,7 @@ enum LocalModelCatalog {
                                 url: hf("unsloth/gemma-4-12b-it-GGUF", "fc034cfff751157913579611efad8462ac1be606", "gemma-4-12b-it-Q8_0.gguf"),
                                 sha256: "f20e7ff1be28c283eeeb18fc895733791c56a5851d5cd3fe9691b7f7d12afa72",
                                 size: 12_669_647_680),
-            minMemoryGB: 20, contextTokens: 32768,
+            minMemoryGB: 32, contextTokens: 32768,
             ollamaTags: ["gemma4:12b"], lmStudioMatch: ["gemma-4-12b"], license: "Apache-2.0"),
         LocalModelEntry(
             id: "qwen3.6-35b-a3b-q4", displayName: "Qwen3.6 35B-A3B",
@@ -66,7 +71,7 @@ enum LocalModelCatalog {
                                 url: hf("unsloth/Qwen3.6-35B-A3B-GGUF", "a483e9e6cbd595906af30beda3187c2663a1118c", "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"),
                                 sha256: "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61",
                                 size: 22_134_528_992),
-            minMemoryGB: 28, contextTokens: 32768,
+            minMemoryGB: 56, contextTokens: 32768,
             ollamaTags: ["qwen3.6:35b-a3b"], lmStudioMatch: ["qwen3.6-35b-a3b"], license: "Apache-2.0"),
         LocalModelEntry(
             id: "qwen3.6-35b-a3b-q8", displayName: "Qwen3.6 35B-A3B (high precision)",
@@ -74,7 +79,7 @@ enum LocalModelCatalog {
                                 url: hf("unsloth/Qwen3.6-35B-A3B-GGUF", "a483e9e6cbd595906af30beda3187c2663a1118c", "Qwen3.6-35B-A3B-Q8_0.gguf"),
                                 sha256: "d1a395809f65a43a13ad119eb4e7acdef1ac6d68120f39902c8ab96e72794a59",
                                 size: 36_903_140_320),
-            minMemoryGB: 56, contextTokens: 32768,
+            minMemoryGB: 96, contextTokens: 32768,
             ollamaTags: ["qwen3.6:35b-a3b-q8_0"], lmStudioMatch: ["qwen3.6-35b-a3b"], license: "Apache-2.0"),
     ]
 

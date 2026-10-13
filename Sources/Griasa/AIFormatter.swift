@@ -127,9 +127,15 @@ enum AIFormatter {
             // model, which is what callers' timeouts were set for; a meeting
             // that times out at 300 s is lost work, so local ones get three times as long.
             let managed = config.provider == .custom && localEngineManaged
-            return try await complete(config, system: system, user: user,
-                                      model: config.model(for: tier),
-                                      maxTokens: maxTokens, timeout: managed ? timeout * 3 : timeout)
+            do {
+                return try await complete(config, system: system, user: user,
+                                          model: config.model(for: tier),
+                                          maxTokens: maxTokens, timeout: managed ? timeout * 3 : timeout)
+            } catch let error as URLError where managed && error.code == .timedOut {
+                // Not "gone": the model is there, only slow, so this is neither
+                // retried as unreachable nor reported as a dead provider.
+                throw NSError(domain: "Griasa", code: 22, userInfo: [NSLocalizedDescriptionKey: slowModelAdvice])
+            }
         }
         do {
             do {
@@ -159,6 +165,8 @@ enum AIFormatter {
             }
         }
     }
+
+    static let slowModelAdvice = "The AI model on this Mac is running very slowly — it is probably short of memory. Close some apps and Griasa will try again."
 
     /// The local server did not take the connection. `openAIComplete` rewrites
     /// the first two into its own advice (code 6), so that counts too.
@@ -312,16 +320,30 @@ enum AIFormatter {
         if config.provider == .custom && ProviderDefault.isOnThisMac(config.baseURL) {
             body["chat_template_kwargs"] = ["enable_thinking": false]
         }
+        // Griasa's own engine is asked for a stream with progress, so a model
+        // that is slow (a Mac short of memory) is told apart from one that is
+        // stuck: `timeout` then limits the silence between lines, not the whole
+        // request. Other servers get the plain request they always got.
+        let streaming = config.provider == .custom && config.baseURL == LlamaServer.baseURL
+        if streaming {
+            body["stream"] = true
+            body["return_progress"] = true
+        }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         // The default provider is a model on this Mac, so the first thing most
         // people meet is that model not being there. "Could not connect to the
         // server" says nothing about what to do; this does.
         let local = config.provider == .custom && ProviderDefault.isOnThisMac(config.baseURL)
-        let data: Data
+        var data = Data()
         let response: URLResponse
+        var streamed: String?
         do {
-            (data, response) = try await URLSession.shared.data(for: req)
+            if streaming {
+                (streamed, data, response) = try await llamaStreamed(req, idle: timeout)
+            } else {
+                (data, response) = try await URLSession.shared.data(for: req)
+            }
         } catch let error as URLError
                     where local && [.cannotConnectToHost, .cannotFindHost].contains(error.code) {
             throw NSError(domain: "Griasa", code: 6, userInfo: [
@@ -342,16 +364,57 @@ enum AIFormatter {
                 status: (response as? HTTPURLResponse)?.statusCode ?? -1,
                 detail: Self.errorDetail(from: data))
         }
-        guard
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let choices = json["choices"] as? [[String: Any]],
-            let message = choices.first?["message"] as? [String: Any],
-            let text = message["content"] as? String,
-            !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else {
+        let text: String
+        if let streamed {
+            text = streamed
+        } else if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let message = choices.first?["message"] as? [String: Any],
+                  let content = message["content"] as? String {
+            text = content
+        } else {
+            throw NSError(domain: "Griasa", code: 4, userInfo: [NSLocalizedDescriptionKey: "Unexpected API response"])
+        }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw NSError(domain: "Griasa", code: 4, userInfo: [NSLocalizedDescriptionKey: "Unexpected API response"])
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Longest a single request to Griasa's own engine may take, however
+    /// steadily it reports progress.
+    private static let llamaRequestCap: TimeInterval = 30 * 60
+
+    /// Sends a streaming request to Griasa's engine. On a 200 the text is
+    /// returned; on anything else the body is read whole so the caller's
+    /// ordinary error handling sees it. `idle` bounds the silence between
+    /// lines (progress lines arrive while the prompt is being read); the cap
+    /// bounds the whole request and fails as a timeout.
+    private static func llamaStreamed(_ req: URLRequest, idle: TimeInterval) async throws
+        -> (String?, Data, URLResponse) {
+        var req = req
+        req.timeoutInterval = idle
+        let started = Date()
+        let (bytes, response) = try await URLSession.shared.bytes(for: req)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            var body = Data()
+            for try await byte in bytes {
+                body.append(byte)
+                if body.count > 8192 { break }
+            }
+            return (nil, body, response)
+        }
+        var stream = LlamaStream()
+        do {
+            for try await line in bytes.lines {
+                if Date().timeIntervalSince(started) > llamaRequestCap { throw URLError(.timedOut) }
+                try stream.feed(line: line)
+                if stream.done { break }
+            }
+        } catch let error as LlamaStream.ServerError {
+            throw AIProviderError(provider: "The endpoint", status: 500, detail: error.message)
+        }
+        return (stream.text, Data(), response)
     }
 
     // MARK: - Ollama (native API, for its context length)

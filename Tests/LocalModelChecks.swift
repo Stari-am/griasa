@@ -23,9 +23,10 @@ check(LocalModelCatalog.entries.map(\.minMemoryGB) == LocalModelCatalog.entries.
       meaning: "pick walks the list from the top; out of order it would offer a model that does not fit",
       saw: "\(LocalModelCatalog.entries.map(\.minMemoryGB))")
 
-for (memory, expected) in [(8, "qwen3.5-4b-q4"), (16, "qwen3.5-9b-q4"), (24, "gemma4-12b-q8"),
-                           (32, "qwen3.6-35b-a3b-q4"), (48, "qwen3.6-35b-a3b-q4"), (64, "qwen3.6-35b-a3b-q8"),
-                           (128, "qwen3.6-35b-a3b-q8")] {
+for (memory, expected) in [(8, "qwen3.5-4b-q4"), (15, "qwen3.5-4b-q4"), (16, "qwen3.5-9b-q4"), (24, "qwen3.5-9b-q4"),
+                           (31, "qwen3.5-9b-q4"), (32, "gemma4-12b-q8"), (48, "gemma4-12b-q8"),
+                           (55, "gemma4-12b-q8"), (56, "qwen3.6-35b-a3b-q4"), (64, "qwen3.6-35b-a3b-q4"),
+                           (95, "qwen3.6-35b-a3b-q4"), (96, "qwen3.6-35b-a3b-q8"), (128, "qwen3.6-35b-a3b-q8")] {
     let got = LocalModelCatalog.pick(memoryGB: memory, freeDiskGB: 500)?.id
     check(got == expected,
           rule: "a \(memory) GB Mac with plenty of disk gets \(expected)",
@@ -33,13 +34,13 @@ for (memory, expected) in [(8, "qwen3.5-4b-q4"), (16, "qwen3.5-9b-q4"), (24, "ge
           saw: String(describing: got))
 }
 
-let tight = LocalModelCatalog.pick(memoryGB: 24, freeDiskGB: 9)
+let tight = LocalModelCatalog.pick(memoryGB: 32, freeDiskGB: 9)
 check(tight?.id == "qwen3.5-9b-q4",
       rule: "too little disk for the tier steps down to a smaller model",
       meaning: "a 12.7 GB download onto 9 GB free fails at 70% after ten minutes",
       saw: String(describing: tight?.id))
 
-let none = LocalModelCatalog.pick(memoryGB: 24, freeDiskGB: 3)
+let none = LocalModelCatalog.pick(memoryGB: 32, freeDiskGB: 3)
 check(none == nil,
       rule: "nothing fits → nil, not the smallest model anyway",
       meaning: "the card must say 'free up space', not offer a download that cannot finish",
@@ -63,10 +64,10 @@ check(LocalModelCatalog.entries.allSatisfy {
       meaning: "a model on `main` can change under the app; the hash is what the security review accepted",
       saw: "\(LocalModelCatalog.entries.map { $0.pinned.url.absoluteString })")
 
-check(LocalModelCatalog.runnable(memoryGB: 24).map(\.id) == ["qwen3.5-4b-q4", "qwen3.5-9b-q4", "gemma4-12b-q8"],
+check(LocalModelCatalog.runnable(memoryGB: 32).map(\.id) == ["qwen3.5-4b-q4", "qwen3.5-9b-q4", "gemma4-12b-q8"],
       rule: "Settings offers only the models this Mac can run",
-      meaning: "an expert picking a 37 GB model on a 24 GB Mac gets a server that never starts",
-      saw: "\(LocalModelCatalog.runnable(memoryGB: 24).map(\.id))")
+      meaning: "an expert picking a 37 GB model on a 32 GB Mac gets a server that never starts",
+      saw: "\(LocalModelCatalog.runnable(memoryGB: 32).map(\.id))")
 
 return failures
 }

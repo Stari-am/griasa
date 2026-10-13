@@ -14,12 +14,19 @@ two. Otherwise Griasa asks once, in plain words and with the size and the time
 it will take ("Not now" waits a week before asking again), and downloads a
 model into its own engine, which listens on
 `127.0.0.1:8177` only and unloads the model after ten idle minutes. The model
-is chosen by memory, from a small model on an 8 GB Mac up to a large one on 56
+is chosen by memory, from a small model on an 8 GB Mac up to a large one on 96
 GB or more, then stepped down if the disk is short; a Mac with too little disk
 for any of them is told so rather than offered a download that cannot finish.
 Once set up, the model is kept: a later launch with less free disk, or an
 Ollama still starting at login, does not start a second download. A model that
 runs out of memory when it starts is replaced, once, by the next size down.
+A model that is only slow, because the Mac is short of memory, is now waited
+for instead of given up on: Griasa's own engine reports progress while it reads
+a long meeting, and the wait ends only when that stops (or after 30 minutes).
+If it still runs out of time, the message says the model is slow and memory is
+short, instead of "no answer". Each model now needs about two and a half times
+its file size in memory (16 GB for the 9B model, 32 GB for the 12B), so that
+speech recognition and the apps in use are not squeezed into swap.
 Every file is pinned to a commit and a checksum and verified before use.
 *Settings → Local model* shows where things stand and lets an expert choose
 another.

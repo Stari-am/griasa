@@ -35,6 +35,7 @@ swiftc -O \
   Sources/Griasa/LocalEngineChoice.swift \
   Sources/Griasa/LocalSetupMemory.swift \
   Sources/Griasa/OllamaRequest.swift \
+  Sources/Griasa/LlamaStream.swift \
   Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Tests/StabilizerChecks.swift \
@@ -61,6 +62,7 @@ swiftc -O \
   Tests/OllamaRequestChecks.swift \
   Tests/PendingChecks.swift \
   Tests/SetupMemoryChecks.swift \
+  Tests/LlamaStreamChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

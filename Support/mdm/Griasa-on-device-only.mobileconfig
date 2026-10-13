@@ -71,7 +71,7 @@
             <key>mcpEnabled</key>
             <false/>
             <!-- Optional on-device model setup (all three are ignored while
-                 customBaseURL is set):
+                 customBaseURL, customFastModel or customSmartModel is set):
             <key>localModelID</key>
             <string>qwen3.5-9b-q4</string>
             <key>localModelAutoDownload</key>

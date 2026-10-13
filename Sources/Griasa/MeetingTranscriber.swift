@@ -76,7 +76,7 @@ enum MeetingTranscriber {
     /// transcript file, rewrites the markdown in place, and returns it. Throws
     /// if the raw file is gone or the provider errors.
     static func reformat(transcriptFile: URL, participants: [String],
-                         myName: String) async throws -> String {
+                         myName: String, allowCloudFallback: Bool = true) async throws -> String {
         let rawURL = transcriptFile.deletingLastPathComponent()
             .appendingPathComponent("transcript-raw.txt")
         guard let raw = try? String(contentsOf: rawURL, encoding: .utf8),
@@ -86,7 +86,8 @@ enum MeetingTranscriber {
             ])
         }
         let formatted = try await aiFormat(raw: raw, participants: participants,
-                                           myName: myName, hasNotes: raw.contains("📝 NOTE:"))
+                                           myName: myName, hasNotes: raw.contains("📝 NOTE:"),
+                                           allowCloudFallback: allowCloudFallback)
         try formatted.write(to: transcriptFile, atomically: true, encoding: .utf8)
         return formatted
     }
@@ -104,7 +105,7 @@ enum MeetingTranscriber {
     }
 
     private static func aiFormat(raw: String, participants: [String], myName: String,
-                                 hasNotes: Bool) async throws -> String {
+                                 hasNotes: Bool, allowCloudFallback: Bool = true) async throws -> String {
         // Very long meetings: keep the request under the provider's context
         // limit rather than failing. Cloud models have 1M-token windows
         // (~400k chars barely dents them); local models get the much smaller
@@ -154,7 +155,8 @@ enum MeetingTranscriber {
             .filling(["speakerRules": speakerRules, "noteRules": noteRules])
 
         return try await AIFormatter.complete(system: system, user: transcript,
-                                              tier: .smart, maxTokens: 16000, timeout: 300)
+                                              tier: .smart, maxTokens: 16000, timeout: 300,
+                                              allowCloudFallback: allowCloudFallback)
     }
 
     private static func timestamp(_ seconds: TimeInterval) -> String {

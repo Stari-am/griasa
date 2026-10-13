@@ -25,11 +25,23 @@ final class LocalModelSetup: ObservableObject {
     nonisolated static let preferredEngineKey = "localEnginePreferred"
     nonisolated static let chosenIDKey = "localModelID"
     nonisolated static let autoDownloadKey = "localModelAutoDownload"
+    /// The smaller tier Griasa moved to after the chosen one ran out of memory.
+    /// Its own key, not `localModelID`: that one is the organization's (and the
+    /// expert's) pin, and writing it would lock Settings and outrank a later
+    /// MDM value with a choice nobody made.
+    nonisolated static let steppedDownIDKey = "localModelSteppedDown"
 
     @Published private(set) var state: LocalModelState = .checking
     private(set) var entry: LocalModelEntry?
     private var pending = PendingSummaries.load(from: UserDefaults.standard.data(forKey: PendingSummaries.defaultsKey))
     private var catchingUp = false
+    /// Refreshes in a row that kept a silent Ollama or LM Studio; see `LocalRuntimeWait`.
+    private var runtimeWaits = 0
+    private var retryTask: Task<Void, Never>?
+    /// Stepping down is for a model that cannot fit; a second failure in the
+    /// same launch is more likely something else, and walking down every tier
+    /// on it would leave the person with the smallest model for no reason.
+    private var steppedDownThisLaunch = false
     private let defaults = UserDefaults.standard
 
     private var memoryGB: Int { Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824) }
@@ -39,15 +51,23 @@ final class LocalModelSetup: ObservableObject {
         return Int((values?.volumeAvailableCapacityForImportantUsage ?? 0) / 1_000_000_000)
     }
 
-    /// MDM / Advanced pin first; otherwise the tier for this Mac. A model
-    /// already downloaded wins over "no space" — the space is taken by it.
+    private var storedEngine: LocalEngine? { LocalEngine(rawValue: defaults.string(forKey: Self.engineKey) ?? "") }
+
+    /// The order is in `LocalSetupMemory.choose`: a pin, then what is already
+    /// set up, and only then a fresh pick from memory and free disk.
     private func chooseEntry() -> LocalModelEntry? {
-        if let id = defaults.string(forKey: Self.chosenIDKey), let pinned = LocalModelCatalog.entry(id: id) {
-            return pinned
-        }
-        if let fits = LocalModelCatalog.pick(memoryGB: memoryGB, freeDiskGB: freeDiskGB) { return fits }
-        return LocalModelCatalog.runnable(memoryGB: memoryGB).reversed().first(where: LlamaInstaller.isDownloaded)
+        LocalSetupMemory.choose(pinnedID: defaults.string(forKey: Self.chosenIDKey),
+                                steppedDownID: defaults.string(forKey: Self.steppedDownIDKey),
+                                storedEngine: storedEngine,
+                                storedModel: defaults.string(forKey: Self.modelKey),
+                                isDownloaded: LlamaInstaller.isDownloaded,
+                                memoryGB: memoryGB, freeDiskGB: freeDiskGB)
     }
+
+    /// Local setup is for people on the local provider. Somebody who chose a
+    /// cloud provider is never asked about, or sent, a multi-gigabyte download,
+    /// and nothing runs a meeting through their cloud provider in the background.
+    private var onLocalProvider: Bool { LLMConfig.current().provider == .custom }
 
     private func get(_ url: String) async -> Data? {
         guard let url = URL(string: url) else { return nil }
@@ -61,6 +81,9 @@ final class LocalModelSetup: ObservableObject {
     private var refreshTask: Task<Void, Never>?
 
     private var typedBaseURL: String { defaults.string(forKey: "customBaseURL") ?? "" }
+    private var typedModelNames: [String] {
+        [defaults.string(forKey: "customFastModel") ?? "", defaults.string(forKey: "customSmartModel") ?? ""]
+    }
 
     /// Concurrent callers share one probe instead of racing each other.
     func refresh() async {
@@ -78,7 +101,7 @@ final class LocalModelSetup: ObservableObject {
         default: busy = false
         }
         // A user-typed server is theirs; nothing to set up, whatever the disk says.
-        switch LocalRefreshGate.action(typedBaseURL: typedBaseURL, busy: busy) {
+        switch LocalRefreshGate.action(typedBaseURL: typedBaseURL, typedModelNames: typedModelNames, busy: busy) {
         case .skip: return
         case .userServer:
             state = .ready(engine: .userServer, model: "", displayName: "Your server")
@@ -97,6 +120,31 @@ final class LocalModelSetup: ObservableObject {
             ollamaModels: await get("http://127.0.0.1:11434/api/tags").flatMap(LocalRuntimeParsing.ollamaModelNames),
             lmStudioModels: await get("http://127.0.0.1:1234/api/v1/models").flatMap(LocalRuntimeParsing.lmStudioModelKeys),
             griasaModelOnDisk: LlamaInstaller.isDownloaded(entry))
+        let stored = storedEngine
+        let answered: Bool
+        switch stored {
+        case .ollama: answered = probe.ollamaModels != nil
+        case .lmStudio: answered = probe.lmStudioModels != nil
+        default: answered = true
+        }
+        if case .keep(let delay) = LocalRuntimeWait.verdict(stored: stored, answered: answered, waitsSoFar: runtimeWaits),
+           let stored {
+            // Still starting, most likely: keep what works and ask again later.
+            runtimeWaits += 1
+            let model = defaults.string(forKey: Self.modelKey) ?? ""
+            state = .ready(engine: stored, model: model, displayName: model)
+            retryTask?.cancel()
+            retryTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                if !Task.isCancelled { await LocalModelSetup.shared.refresh() }
+            }
+            return
+        }
+        runtimeWaits = 0
+        // A runtime that never answered may still be on this Mac, just not
+        // running; an organization's pre-approval is for setting up a Mac
+        // that has nothing, not for downloading beside a runtime that is off.
+        let mayAutoDownload = defaults.bool(forKey: Self.autoDownloadKey) && onLocalProvider && answered
         let preferred = LocalEngine(rawValue: defaults.string(forKey: Self.preferredEngineKey) ?? "")
         switch LocalEngineChoice.decide(probe, entry: entry, preferred: preferred) {
         case .use(let engine, let model):
@@ -104,11 +152,11 @@ final class LocalModelSetup: ObservableObject {
         case .pullIntoOllama(let tag):
             clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: tag)
-            if defaults.bool(forKey: Self.autoDownloadKey) { consent() }
+            if mayAutoDownload { consent() }
         case .download:
             clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: nil)
-            if defaults.bool(forKey: Self.autoDownloadKey) { consent() }
+            if mayAutoDownload { consent() }
         }
     }
 
@@ -127,7 +175,7 @@ final class LocalModelSetup: ObservableObject {
         }
         let name = engine == .griasa ? entry.displayName : model
         state = .ready(engine: engine, model: model, displayName: name)
-        if previous == nil, !downloaded, engine == .ollama || engine == .lmStudio {
+        if previous == nil, !downloaded, engine == .ollama || engine == .lmStudio, onLocalProvider {
             LocalNotice.post(title: "Local AI is ready",
                           body: "Griasa uses the AI model already on this Mac (\(engine == .ollama ? "Ollama" : "LM Studio")).")
         }
@@ -145,7 +193,7 @@ final class LocalModelSetup: ObservableObject {
         default: return false
         }
         if defaults.bool(forKey: Self.autoDownloadKey) { return false }
-        if !typedBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+        if !onLocalProvider || LLMConfig.localConfiguredByHand { return false }
         if let declined = defaults.object(forKey: Self.declinedKey) as? Date,
            Date().timeIntervalSince(declined) < 7 * 86_400 { return false }
         return true
@@ -195,7 +243,12 @@ final class LocalModelSetup: ObservableObject {
         request.timeoutInterval = 3600
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["model": tag, "stream": true])
         do {
-            let (bytes, _) = try await URLSession.shared.bytes(for: request)
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            guard status == 200 else {
+                state = .failed("Ollama could not start the download (it returned \(status)). Try again.")
+                return
+            }
             for try await line in bytes.lines {
                 guard let progress = LocalRuntimeParsing.ollamaPullProgress(Data(line.utf8)) else { continue }
                 if let error = progress.error { state = .failed("Ollama: \(error)"); return }
@@ -208,31 +261,65 @@ final class LocalModelSetup: ObservableObject {
                     state = .downloading(percent: Int(progress.completed * 100 / progress.total))
                 }
             }
+            // The stream ended without "success" or an error: Ollama quit or
+            // dropped the connection. Left as it was, the card and the menu
+            // would show the download running forever.
+            if case .downloading = state { state = .failed("The download from Ollama stopped. Try again.") }
         } catch {
             state = .failed(error.localizedDescription)
         }
     }
 
     func removeModel() {
-        guard let entry else { return }
+        // The file of the model in use, which after a step-down or an
+        // earlier pick need not be the one this Mac would pick today.
+        let inUse = storedEngine == .griasa
+            ? LocalModelCatalog.entry(id: defaults.string(forKey: Self.modelKey) ?? "") ?? entry
+            : entry
+        guard let inUse else { return }
         LlamaServer.shared.stop()
-        LlamaInstaller.remove(entry)
+        LlamaInstaller.remove(inUse)
         defaults.removeObject(forKey: Self.engineKey)
         defaults.removeObject(forKey: Self.modelKey)
         Task { await refresh() }
     }
 
+    /// Griasa's engine died while loading `failed`, most likely because the
+    /// model needed more memory than was free. Moves to the next tier down
+    /// once per launch, says so once, and leaves a pinned model alone — the
+    /// organization or the expert chose it.
+    func stepDown(from failed: LocalModelEntry) {
+        guard !steppedDownThisLaunch,
+              (defaults.string(forKey: Self.chosenIDKey) ?? "").isEmpty,
+              let smaller = LocalModelCatalog.smaller(than: failed) else { return }
+        steppedDownThisLaunch = true
+        defaults.set(smaller.id, forKey: Self.steppedDownIDKey)
+        LocalNotice.post(title: "Local AI switched to a smaller model",
+                         body: "The AI model needed more memory than this Mac had free; Griasa switched to a smaller one.")
+        entry = smaller
+        if LlamaInstaller.isDownloaded(smaller) {
+            apply(engine: .griasa, model: smaller.id, entry: smaller)
+        } else {
+            // The smaller file is another download, and a download still
+            // needs the person's yes.
+            clearStoredEngine()
+            state = .needsConsent(entry: smaller, intoOllama: nil)
+        }
+    }
+
     // MARK: Pending meetings
 
+    /// Only remembers the meeting. Summarizing it here would run it at once
+    /// against a model that may be busy or about to change; catch-up runs when
+    /// the model becomes ready and at launch.
     func enqueuePending(_ id: UUID) {
         pending.add(id)
         defaults.set(pending.encoded(), forKey: PendingSummaries.defaultsKey)
-        if case .ready = state { catchUp() }
     }
 
     /// Summarizes waiting meetings one at a time, oldest first.
     private func catchUp() {
-        guard !catchingUp else { return }
+        guard !catchingUp, onLocalProvider else { return }
         catchingUp = true
         Task { @MainActor in
             defer { catchingUp = false }
@@ -242,7 +329,10 @@ final class LocalModelSetup: ObservableObject {
                 let summarized = Set(history.filter { !$0.text.contains("Meeting transcript (raw)") }.map(\.id))
                 guard let id = pending.next(existing: existing, alreadySummarized: summarized),
                       let entry = history.first(where: { $0.id == id }) else { break }
-                let status = await HistoryStore.shared.reprocessMeeting(entry)
+                // Never the cloud: nobody is there to answer the question, and
+                // a meeting summarized in the background must stay on this Mac.
+                let status = await HistoryStore.shared.reprocessMeeting(entry, allowCloudFallback: false,
+                                                                        requireExtraction: true)
                 // A real failure keeps the id for the next time the model is
                 // ready; a transcript that is gone will never succeed, so it goes.
                 guard status.hasPrefix("✓") || status.contains("isn't on disk anymore") else { break }

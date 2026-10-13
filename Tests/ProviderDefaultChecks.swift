@@ -70,11 +70,20 @@ check(setupAdvice.contains("Local AI isn't set up yet") && !setupAdvice.contains
       meaning: "telling somebody to install a second program to fix something Griasa downloads itself sends them down the wrong road",
       saw: setupAdvice)
 
-let notAnswering = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "m", typedByPerson: false, modelSetUp: true)
-check(notAnswering.contains("isn't answering") && !notAnswering.contains("isn't set up yet"),
-      rule: "when the model is already set up and the server is just unreachable, the message does not claim it is not set up",
+let notAnswering = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "m", typedByPerson: false, storedEngine: "griasa")
+check(notAnswering.contains("isn't answering") && !notAnswering.contains("isn't set up yet")
+        && notAnswering.contains("Griasa will start it again"),
+      rule: "when Griasa's own engine is set up and just unreachable, the message says Griasa restarts it, not that it is not set up",
       meaning: "sending somebody to download something they already have is wrong and confusing",
       saw: notAnswering)
+
+let ollamaDown = ProviderDefault.notRunningAdvice(baseURL: ProviderDefault.localBaseURL, model: "m", typedByPerson: false, storedEngine: "ollama")
+let lmDown = ProviderDefault.missingModelAdvice(model: "m", typedByPerson: false, storedEngine: "lmStudio")
+check(ollamaDown.contains("Start Ollama again") && !ollamaDown.contains("Griasa will start it")
+        && lmDown.contains("Start LM Studio's server again") && !lmDown.contains("Griasa will start it"),
+      rule: "when the stored engine is Ollama or LM Studio, the message says to start that program again",
+      meaning: "Griasa cannot start another program's server; promising it will leaves the person waiting for nothing",
+      saw: ollamaDown + " | " + lmDown)
 
 let missingTyped = ProviderDefault.missingModelAdvice(model: "qwen3:8b", typedByPerson: true)
 let missingSetup = ProviderDefault.missingModelAdvice(model: "qwen3:8b", typedByPerson: false)

@@ -51,9 +51,20 @@ enum LocalEngineChoice {
 enum LocalRefreshGate {
     enum Action: Equatable { case skip, userServer, proceed }
 
-    static func action(typedBaseURL: String, busy: Bool) -> Action {
+    /// Whether the person configured the local provider by hand: a typed
+    /// server address, or typed model names. Names alone count, because they
+    /// are names on a server the person runs (Ollama at its usual address);
+    /// swapping them for Griasa's own engine would quietly ignore what was
+    /// typed.
+    static func isHandConfigured(typedBaseURL: String, typedModelNames: [String]) -> Bool {
+        ([typedBaseURL] + typedModelNames).contains {
+            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    static func action(typedBaseURL: String, typedModelNames: [String], busy: Bool) -> Action {
         if busy { return .skip }
-        if !typedBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .userServer }
+        if isHandConfigured(typedBaseURL: typedBaseURL, typedModelNames: typedModelNames) { return .userServer }
         return .proceed
     }
 }

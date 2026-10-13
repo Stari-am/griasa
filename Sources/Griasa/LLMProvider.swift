@@ -30,7 +30,8 @@ enum LLMProvider: String, CaseIterable, Identifiable {
     var isCLI: Bool { self == .claudeCLI || self == .codexCLI }
 
     /// Defaults verified current as of 2026-07: Haiku 4.5 / Opus 4.8,
-    /// GPT-5.6 Luna / Terra, Gemini 3.1 Flash-Lite / 3.5 Flash, Qwen3 for local.
+    /// GPT-5.6 Luna / Terra, Gemini 3.1 Flash-Lite / 3.5 Flash, Qwen3 for a local server set up by
+    /// hand (Griasa's own setup takes its model from `LocalModelCatalog`).
     /// CLI providers take the CLI's model aliases; empty = the CLI's default.
     var defaultFastModel: String {
         switch self {
@@ -128,7 +129,7 @@ struct LLMConfig: Sendable {
             // Empty means "the local model": the default is only local if it
             // works without the user typing an address in first.
             let base = stored("customBaseURL")
-            if base.isEmpty, let engine = LocalEngine(rawValue: stored(LocalModelSetup.engineKey)),
+            if !localConfiguredByHand, let engine = LocalEngine(rawValue: stored(LocalModelSetup.engineKey)),
                case let model = stored(LocalModelSetup.modelKey), !model.isEmpty {
                 // Set up by Griasa: one model for both tiers — the tier was
                 // chosen to fit this Mac, there is no second model to fall to.
@@ -138,11 +139,15 @@ struct LLMConfig: Sendable {
                 case .ollama, .userServer: url = ProviderDefault.localBaseURL
                 case .lmStudio: url = "http://localhost:1234/v1"
                 }
-                let context = LocalModelCatalog.entry(id: stored(LocalModelSetup.chosenIDKey))?.contextTokens
-                    ?? LocalModelCatalog.entry(id: model)?.contextTokens ?? 32_768
+                // Every tier runs with a 32,768-token context, and the reply
+                // shares it with the prompt: (32,768 − 16,000 reply − 1,500
+                // instructions) × 2.5 characters a token ≈ 38,000. 2.5, not
+                // the usual 4 for English, because Cyrillic takes more tokens
+                // per character; budgeting for English would overflow on a
+                // Russian meeting and lose the end of the reply.
                 return LLMConfig(provider: .custom, apiKey: "", baseURL: url,
                                  fastModel: model, smartModel: model,
-                                 contextCharLimit: context * 3)
+                                 contextCharLimit: 38_000)
             }
             return LLMConfig(provider: .custom, apiKey: Secrets.value("customAPIKey"),
                              baseURL: base.isEmpty ? ProviderDefault.localBaseURL : base,
@@ -163,6 +168,17 @@ struct LLMConfig: Sendable {
                              smartModel: model("codexCLISmartModel", or: provider.defaultSmartModel),
                              contextCharLimit: 400_000)
         }
+    }
+
+    /// Whether the local provider was configured by hand — a typed address or
+    /// typed model names (see `LocalRefreshGate.isHandConfigured`). Then the
+    /// person's settings are used as typed and Griasa's own setup stays out.
+    static var localConfiguredByHand: Bool {
+        let defaults = UserDefaults.standard
+        return LocalRefreshGate.isHandConfigured(
+            typedBaseURL: defaults.string(forKey: "customBaseURL") ?? "",
+            typedModelNames: [defaults.string(forKey: "customFastModel") ?? "",
+                              defaults.string(forKey: "customSmartModel") ?? ""])
     }
 
     /// The provider this install is on — the saved choice, or, with none

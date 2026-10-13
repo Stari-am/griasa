@@ -2,9 +2,17 @@ import SwiftUI
 
 @MainActor
 enum LocalModelCard {
+    /// Probes first: the state from launch may be stale — Ollama started
+    /// since, or a model arrived — and a card offering a download the Mac no
+    /// longer needs is worse than no card. Concurrent refreshes are shared.
     static func showIfNeeded() {
-        guard LocalModelSetup.shared.shouldOfferCard else { return }
-        HubController.shared.open(.localModel, activate: false)
+        // Cloud users never see it (also checked in `shouldOfferCard`, after the probe).
+        guard LLMConfig.current().provider == .custom else { return }
+        Task { @MainActor in
+            await LocalModelSetup.shared.refresh()
+            guard LocalModelSetup.shared.shouldOfferCard else { return }
+            HubController.shared.open(.localModel, activate: false)
+        }
     }
 }
 
@@ -14,10 +22,12 @@ struct LocalModelCardView: View {
     @ObservedObject private var setup = LocalModelSetup.shared
 
     @AppStorage("customBaseURL") private var customBaseURL = ""
+    @AppStorage("customFastModel") private var customFast = ""
+    @AppStorage("customSmartModel") private var customSmart = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !customBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if LocalRefreshGate.isHandConfigured(typedBaseURL: customBaseURL, typedModelNames: [customFast, customSmart]) {
                 // Defensive: a typed server is theirs, so there is nothing to offer.
                 Text("Griasa uses your own server — nothing to set up.")
                 Button("Close") { HubController.shared.close(.localModel) }

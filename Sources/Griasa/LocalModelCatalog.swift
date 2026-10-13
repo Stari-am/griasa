@@ -80,6 +80,13 @@ enum LocalModelCatalog {
 
     static func entry(id: String) -> LocalModelEntry? { entries.first { $0.id == id } }
 
+    /// The next tier down, for a model that ran out of memory when it started.
+    /// Nil for the smallest: there is nothing below it to fall to.
+    static func smaller(than entry: LocalModelEntry) -> LocalModelEntry? {
+        guard let index = entries.firstIndex(of: entry), index > 0 else { return nil }
+        return entries[index - 1]
+    }
+
     static func runnable(memoryGB: Int) -> [LocalModelEntry] {
         let fits = entries.filter { $0.minMemoryGB <= memoryGB }
         return fits.isEmpty ? Array(entries.prefix(1)) : fits

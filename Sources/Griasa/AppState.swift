@@ -536,7 +536,10 @@ final class AppState: ObservableObject {
                             participants: participants.isEmpty ? nil : participants)
                         // No model yet, or the summary fell back to the raw transcript:
                         // summarize it when the local model is ready.
-                        if !AIFormatter.isConfigured || text.contains("Meeting transcript (raw)") {
+                        // Local provider only: a cloud user's raw fallback is a
+                        // provider failure, not a model still to be set up.
+                        if LLMConfig.current().provider == .custom,
+                           !AIFormatter.isConfigured || text.contains("Meeting transcript (raw)") {
                             if let entryID { LocalModelSetup.shared.enqueuePending(entryID) }
                             LocalModelCard.showIfNeeded()
                         }

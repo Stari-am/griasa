@@ -43,15 +43,18 @@ struct AIProviderError: LocalizedError {
 }
 
 enum AIFormatter {
-    /// Whether the person typed the server address themselves (Settings) rather
-    /// than Griasa's own setup supplying it: decides which advice is true.
-    static var localModelSetUp: Bool {
-        !(UserDefaults.standard.string(forKey: LocalModelSetup.engineKey) ?? "").isEmpty
+    /// The engine Griasa's own setup stored (its raw value), if any: the
+    /// "isn't answering" advice depends on who runs that server.
+    static var storedLocalEngine: String? {
+        let raw = UserDefaults.standard.string(forKey: LocalModelSetup.engineKey) ?? ""
+        return raw.isEmpty ? nil : raw
     }
-    static var baseURLTypedByPerson: Bool {
-        !(UserDefaults.standard.string(forKey: "customBaseURL") ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+    /// Whether the person configured the local server themselves (Settings)
+    /// rather than Griasa's own setup supplying it: decides which advice is true.
+    static var baseURLTypedByPerson: Bool { LLMConfig.localConfiguredByHand }
+    /// Requests go to a local engine Griasa set up (its own, or Ollama / LM
+    /// Studio it found): the person typed nothing, and an engine is stored.
+    static var localEngineManaged: Bool { !LLMConfig.localConfiguredByHand && storedLocalEngine != nil }
     /// Whether AI features can run at all with the current provider settings.
     /// Replaces the old "is the Anthropic key set?" gates.
     static var isConfigured: Bool { LLMConfig.current().isConfigured }
@@ -86,16 +89,19 @@ enum AIFormatter {
     /// resolves to the provider's configured fast/smart model. On failure,
     /// `allowCloudFallback` offers (once per request, or silently after "use
     /// until restart") to retry via a configured cloud provider.
+    ///
+    /// `allowApple` false keeps the request off Apple's on-device model. Promise
+    /// extraction and closure detection pass it until local and cloud have been
+    /// compared on them: a promise missed there is missed for good.
     static func complete(system: String, user: String, tier: ModelTier,
                          maxTokens: Int, timeout: TimeInterval = 120,
-                         allowCloudFallback: Bool = true) async throws -> String {
+                         allowCloudFallback: Bool = true,
+                         allowApple: Bool = true) async throws -> String {
         let config = LLMConfig.current()
         // On-device family only: Apple's model never stands in for a cloud
         // provider the person chose.
-        // A server the person typed is their choice: Apple's model stays out.
-        let typedServer = !(UserDefaults.standard.string(forKey: "customBaseURL") ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if config.provider == .custom, !typedServer,
+        // A server the person configured is their choice: Apple's model stays out.
+        if allowApple, config.provider == .custom, !LLMConfig.localConfiguredByHand,
            LocalRouting.route(tier: tier,
                               englishConfidence: LocalModelSetup.englishConfidence(user),
                               inputTokens: LocalRouting.estimatedTokens(system + user),
@@ -103,19 +109,37 @@ enum AIFormatter {
            let text = try? await AppleOnDeviceModel.complete(system: system, user: user), !text.isEmpty {
             return text
         }
-        do {
-            // Apple refused (locale, length, rate) or was not chosen: the local
-            // LLM. Failing to start it is an ordinary provider failure.
+        // Apple refused (locale, length, rate) or was not chosen: the local
+        // LLM. Failing to start it is an ordinary provider failure.
+        func send(_ config: LLMConfig) async throws -> String {
             if config.provider == .custom, config.baseURL == LlamaServer.baseURL,
                let entry = LocalModelCatalog.entry(id: config.smartModel) {
-                guard await LlamaServer.shared.ensureRunning(entry) else {
+                let start = await LlamaServer.shared.ensureRunning(entry)
+                // The process died loading the model: too big for the memory
+                // free now, so the next request uses one size smaller.
+                if start == .died { await LocalModelSetup.shared.stepDown(from: entry) }
+                guard start == .running else {
                     throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey:
                         "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."])
                 }
             }
+            // A model on this Mac writes a long summary far slower than a cloud
+            // model, which is what callers' timeouts were set for; a meeting
+            // that times out at 300 s is lost work, so local ones get three times as long.
+            let managed = config.provider == .custom && localEngineManaged
             return try await complete(config, system: system, user: user,
                                       model: config.model(for: tier),
-                                      maxTokens: maxTokens, timeout: timeout)
+                                      maxTokens: maxTokens, timeout: managed ? timeout * 3 : timeout)
+        }
+        do {
+            do {
+                return try await send(config)
+            } catch let error where config.provider == .custom && localEngineManaged && isUnreachable(error) {
+                // Ollama or LM Studio quit, or is still starting: ask again now
+                // (the setup may move to another engine) and try once more.
+                await LocalModelSetup.shared.refresh()
+                return try await send(LLMConfig.current())
+            }
         } catch {
             guard allowCloudFallback,
                   let fallback = LLMConfig.cloudFallback(for: config) else { throw surfaced(error) }
@@ -134,6 +158,16 @@ enum AIFormatter {
                 throw surfaced(error)
             }
         }
+    }
+
+    /// The local server did not take the connection. `openAIComplete` rewrites
+    /// the first two into its own advice (code 6), so that counts too.
+    private static func isUnreachable(_ error: Error) -> Bool {
+        if let error = error as? URLError {
+            return [.cannotConnectToHost, .cannotFindHost, .networkConnectionLost].contains(error.code)
+        }
+        let error = error as NSError
+        return error.domain == "Griasa" && error.code == 6
     }
 
     /// Account-level failures (no credits, bad key, spend limit) would
@@ -293,13 +327,13 @@ enum AIFormatter {
             throw NSError(domain: "Griasa", code: 6, userInfo: [
                 NSLocalizedDescriptionKey: ProviderDefault.notRunningAdvice(baseURL: config.baseURL, model: model,
                                                                            typedByPerson: Self.baseURLTypedByPerson,
-                                                                           modelSetUp: Self.localModelSetUp)
+                                                                           storedEngine: Self.storedLocalEngine)
             ])
         }
         if local, (response as? HTTPURLResponse)?.statusCode == 404 {
             throw NSError(domain: "Griasa", code: 7, userInfo: [
                 NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model, typedByPerson: Self.baseURLTypedByPerson,
-                                                                           modelSetUp: Self.localModelSetUp)
+                                                                           storedEngine: Self.storedLocalEngine)
             ])
         }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
@@ -368,7 +402,7 @@ enum AIFormatter {
         if status == 404 {
             throw NSError(domain: "Griasa", code: 7, userInfo: [
                 NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model, typedByPerson: Self.baseURLTypedByPerson,
-                                                                           modelSetUp: Self.localModelSetUp)])
+                                                                           storedEngine: Self.storedLocalEngine)])
         }
         guard status == 200, let text = OllamaRequest.reply(data) else {
             throw AIProviderError(provider: "Ollama", status: status, detail: Self.errorDetail(from: data))

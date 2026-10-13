@@ -234,7 +234,7 @@ enum CommitmentExtractor {
 
         let reply = try await AIFormatter.complete(
             system: system, user: notes, tier: .fast, maxTokens: 2048,
-            timeout: 60, allowCloudFallback: false)
+            timeout: 60, allowCloudFallback: false, allowApple: false)
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,
@@ -340,7 +340,7 @@ enum CommitmentExtractor {
         let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
         guard let reply = try? await AIFormatter.complete(
             system: system, user: notes, tier: .smart, maxTokens: 1024,
-            timeout: 90, allowCloudFallback: false) else { return nil }
+            timeout: 90, allowCloudFallback: false, allowApple: false) else { return nil }
 
         guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
               start < end,

@@ -115,7 +115,14 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
         case .newDocument: close(.newDocument)
         case .importNotes: close(.importNotes)
         case .typingDiagnostics: close(.typingDiagnostics)
-        case .localModel: close(.localModel)
+        case .localModel:
+            // Closing the question is an answer to it, like "Not now": without
+            // this the card came back at the next meeting or Settings visit.
+            switch LocalModelSetup.shared.state {
+            case .needsConsent, .noSpace: LocalModelSetup.shared.decline()
+            default: break
+            }
+            close(.localModel)
         }
     }
 

@@ -66,13 +66,19 @@ final class LlamaServer: @unchecked Sendable {
         return (response as? HTTPURLResponse)?.statusCode == 200
     }
 
-    func ensureRunning(_ entry: LocalModelEntry) async -> Bool {
+    /// How a start ended. `died` is kept apart from the rest because it is the
+    /// one that says the model is too big for this Mac right now (the process
+    /// exits when it cannot allocate the model), and the caller steps down a
+    /// tier on it; a missing binary or file, or a slow start, is no reason to.
+    enum Start { case running, died, unavailable }
+
+    func ensureRunning(_ entry: LocalModelEntry) async -> Start {
         let current = lock.withLock { runningModel }
-        if current == entry.id, await isHealthy() { return true }
+        if current == entry.id, await isHealthy() { return .running }
         if current != nil, current != entry.id { stop() }
-        guard let binary = LlamaInstaller.serverBinary, LlamaInstaller.isDownloaded(entry) else { return false }
-        lock.withLock {
-            guard process?.isRunning != true else { return }
+        guard let binary = LlamaInstaller.serverBinary, LlamaInstaller.isDownloaded(entry) else { return .unavailable }
+        let launched: Bool = lock.withLock {
+            guard process?.isRunning != true else { return true }
             let p = Process()
             p.executableURL = URL(fileURLWithPath: binary)
             p.arguments = [
@@ -84,16 +90,17 @@ final class LlamaServer: @unchecked Sendable {
             ]
             p.standardOutput = FileHandle.nullDevice
             p.standardError = FileHandle.nullDevice
-            do { try p.run(); process = p; runningModel = entry.id }
-            catch { NSLog("Griasa: failed to launch llama-server: %@", error.localizedDescription) }
+            do { try p.run(); process = p; runningModel = entry.id; return true }
+            catch { NSLog("Griasa: failed to launch llama-server: %@", error.localizedDescription); return false }
         }
+        guard launched else { return .unavailable }
         // Loading 12 GB from disk takes a while on first start.
         for _ in 0..<240 {
-            if await isHealthy() { return true }
-            if lock.withLock({ process?.isRunning != true }) { return false }  // died: likely out of memory
+            if await isHealthy() { return .running }
+            if lock.withLock({ process?.isRunning != true }) { return .died }  // likely out of memory
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-        return false
+        return .unavailable
     }
 
     func stop() {

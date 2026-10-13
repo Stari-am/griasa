@@ -62,16 +62,26 @@ check(d(p) == .use(.griasa, model: entry.id),
       rule: "Griasa's engine is used when its model is on disk", meaning: "the normal case after setup", saw: "\(d(p))")
 check(d(empty) == .download,
       rule: "nothing anywhere → download (after consent)", meaning: "the first-run case", saw: "\(d(empty))")
-check(LocalRefreshGate.action(typedBaseURL: " http://gw.corp/v1\n", busy: false) == .userServer
-        && LocalRefreshGate.action(typedBaseURL: "  \n", busy: false) == .proceed,
+func gate(_ url: String, _ names: [String] = [], busy: Bool = false) -> LocalRefreshGate.Action {
+    LocalRefreshGate.action(typedBaseURL: url, typedModelNames: names, busy: busy)
+}
+check(gate(" http://gw.corp/v1\n") == .userServer && gate("  \n") == .proceed,
       rule: "a typed server address wins before any disk or memory decision; whitespace alone is not an address",
       meaning: "a company-gateway user must never see a download card or a no-space message",
-      saw: "typed → \(LocalRefreshGate.action(typedBaseURL: " http://gw.corp/v1", busy: false)), blank → \(LocalRefreshGate.action(typedBaseURL: "  ", busy: false))")
-check(LocalRefreshGate.action(typedBaseURL: "", busy: true) == .skip
-        && LocalRefreshGate.action(typedBaseURL: "http://x/v1", busy: true) == .skip,
+      saw: "typed → \(gate(" http://gw.corp/v1")), blank → \(gate("  "))")
+check(gate("", ["qwen3:8b", ""]) == .userServer && gate("", ["", "my-model"]) == .userServer,
+      rule: "a typed model name, with no address, is hand configuration too",
+      meaning: "somebody who typed the names of models in their own Ollama must keep them, not be moved to Griasa's engine",
+      saw: "fast only → \(gate("", ["qwen3:8b", ""])), smart only → \(gate("", ["", "my-model"]))")
+check(gate("", [" ", "\n"]) == .proceed && gate("", []) == .proceed,
+      rule: "blank model names are not hand configuration",
+      meaning: "an emptied field must give the person back the automatic setup",
+      saw: "\(gate("", [" ", "\n"]))")
+check(gate("", busy: true) == .skip && gate("http://x/v1", busy: true) == .skip
+        && gate("", ["m"], busy: true) == .skip,
       rule: "a refresh while installing or downloading does nothing",
       meaning: "a second refresh must not reset a running download to the consent card",
-      saw: "busy → \(LocalRefreshGate.action(typedBaseURL: "", busy: true))")
+      saw: "busy → \(gate("", busy: true))")
 
 return failures
 }

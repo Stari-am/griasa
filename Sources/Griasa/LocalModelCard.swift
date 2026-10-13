@@ -64,7 +64,7 @@ struct LocalModelCardView: View {
                     Button("Close") { setup.decline(); HubController.shared.close(.localModel) }
                 }
             case .installing, .downloading:
-                Text("Downloading the AI model…").font(.title2.bold())
+                Text(setup.resuming ? "Resuming the download of the AI model…" : "Downloading the AI model…").font(.title2.bold())
                 if case .downloading(let p) = setup.state { ProgressView(value: Double(p), total: 100) }
                 else { ProgressView() }
                 if setup.waitingForNetwork {

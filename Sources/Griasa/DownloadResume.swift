@@ -92,6 +92,17 @@ enum DownloadResume {
         return waited + next <= maxWait ? next : nil
     }
 
+    /// Whether a refresh continues a download by itself instead of asking.
+    /// The person already said "Download" for this very model (or the
+    /// organization turned on automatic downloads) and part of it is on disk:
+    /// asking again after a quit would be asking twice. A "Not now" since
+    /// then clears the yes, and a part of another model is no reason.
+    static func resumesWithoutAsking(partSize: Int64?, consentedID: String?,
+                                     entryID: String, autoDownload: Bool) -> Bool {
+        guard let partSize, partSize > 0 else { return false }
+        return autoDownload || consentedID == entryID
+    }
+
     static func percent(have: Int64, of total: Int64) -> Int {
         guard total > 0 else { return 0 }
         return Int(min(have, total) * 100 / total)

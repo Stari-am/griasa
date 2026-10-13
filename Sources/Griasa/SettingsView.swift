@@ -634,7 +634,7 @@ private struct AISettings: View {
                     Text("Ready · \(name) · \(engineLabel(engine))").foregroundStyle(.secondary)
                 }
             case .downloading(let p):
-                Text(localSetup.waitingForNetwork ? "Waiting for the network… \(p)%" : "Downloading… \(p)%")
+                Text(localSetup.waitingForNetwork ? "Waiting for the network… \(p)%" : localSetup.resuming ? "Resuming download… \(p)%" : "Downloading… \(p)%")
                     .foregroundStyle(.secondary)
             case .installing:
                 Text("Installing…").foregroundStyle(.secondary)

@@ -25,6 +25,9 @@ final class LocalModelSetup: ObservableObject {
     nonisolated static let preferredEngineKey = "localEnginePreferred"
     nonisolated static let chosenIDKey = "localModelID"
     nonisolated static let autoDownloadKey = "localModelAutoDownload"
+    /// The model the person said "Download" for, kept until a "Not now" or a
+    /// removal, so a download cut by a quit continues without asking again.
+    nonisolated static let consentedIDKey = "localModelDownloadConsented"
     /// The smaller tier Griasa moved to after the chosen one ran out of memory.
     /// Its own key, not `localModelID`: that one is the organization's (and the
     /// expert's) pin, and writing it would lock Settings and outrank a later
@@ -38,6 +41,8 @@ final class LocalModelSetup: ObservableObject {
     /// Griasa's own download lost the network and is waiting for it to come
     /// back; it continues from where it stopped.
     @Published private(set) var waitingForNetwork = false
+    /// The download in progress picked up a `.part` left by an earlier run.
+    @Published private(set) var resuming = false
     private(set) var entry: LocalModelEntry?
     private var pending = PendingSummaries.load(from: UserDefaults.standard.data(forKey: PendingSummaries.defaultsKey))
     private var catchingUp = false
@@ -213,7 +218,17 @@ final class LocalModelSetup: ObservableObject {
         case .download:
             clearStoredEngine()
             state = .needsConsent(entry: entry, intoOllama: nil)
-            if mayAutoDownload { consent() }
+            let partSize = (try? FileManager.default.attributesOfItem(atPath: LlamaInstaller.partURL(entry).path)[.size] as? NSNumber)?.int64Value
+            if onLocalProvider, answered,
+               DownloadResume.resumesWithoutAsking(partSize: partSize,
+                                                   consentedID: defaults.string(forKey: Self.consentedIDKey),
+                                                   entryID: entry.id,
+                                                   autoDownload: defaults.bool(forKey: Self.autoDownloadKey)) {
+                let percent = DownloadResume.percent(have: partSize ?? 0, of: entry.pinned.size)
+                resuming = true
+                state = .downloading(percent: percent)
+                Task { await downloadOwn(entry, from: percent) }
+            } else if mayAutoDownload { consent() }
         }
     }
 
@@ -279,11 +294,15 @@ final class LocalModelSetup: ObservableObject {
         return true
     }
 
-    func decline() { defaults.set(Date(), forKey: Self.declinedKey) }
+    func decline() {
+        defaults.set(Date(), forKey: Self.declinedKey)
+        defaults.removeObject(forKey: Self.consentedIDKey)
+    }
 
     func consent() {
         guard case .needsConsent(let entry, let tag) = state else { return }
         defaults.removeObject(forKey: Self.declinedKey)
+        if tag == nil { defaults.set(entry.id, forKey: Self.consentedIDKey) }
         // Set before the task starts, so a second tap or a refresh sees a busy state.
         state = tag == nil ? .installing : .downloading(percent: 0)
         Task {
@@ -291,14 +310,15 @@ final class LocalModelSetup: ObservableObject {
         }
     }
 
-    private func downloadOwn(_ entry: LocalModelEntry) async {
+    private func downloadOwn(_ entry: LocalModelEntry, from startPercent: Int = 0) async {
+        defer { resuming = false }
         guard await LlamaInstaller.installEngine() else {
             state = .failed(WhisperInstaller.brewPath == nil
                 ? "Homebrew is needed to install the AI engine — install it from brew.sh, then try again."
                 : "Installing the AI engine failed — run `brew install llama.cpp` in Terminal, then try again.")
             return
         }
-        state = .downloading(percent: 0)
+        state = .downloading(percent: startPercent)
         for attempt in 1...2 {
             do {
                 try await LlamaInstaller.download(entry, onProgress: { percent in
@@ -355,6 +375,7 @@ final class LocalModelSetup: ObservableObject {
     }
 
     func removeModel() {
+        defaults.removeObject(forKey: Self.consentedIDKey)
         // The file of the model in use, which after a step-down or an
         // earlier pick need not be the one this Mac would pick today.
         let inUse = storedEngine == .griasa

@@ -99,6 +99,20 @@ check(waited <= DownloadResume.maxWait && waited > DownloadResume.maxWait - 120,
       meaning: "a network that is gone for good ends in the usual failure, not a download that waits forever",
       saw: "waited \(waited) s over \(tries) tries")
 
+// Continuing after a relaunch without asking twice
+check(DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entryID: "m", autoDownload: false)
+        && DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: nil, entryID: "m", autoDownload: true),
+      rule: "a part on disk plus a yes for this model (or automatic downloads) → continue without asking",
+      meaning: "the person said Download once; a quit must not make them say it again",
+      saw: "\(DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entryID: "m", autoDownload: false))")
+check(!DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: nil, entryID: "m", autoDownload: false)
+        && !DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "other", entryID: "m", autoDownload: false)
+        && !DownloadResume.resumesWithoutAsking(partSize: nil, consentedID: "m", entryID: "m", autoDownload: false)
+        && !DownloadResume.resumesWithoutAsking(partSize: 0, consentedID: "m", entryID: "m", autoDownload: false),
+      rule: "no yes (or a Not now since), a yes for another model, or no part → ask as before",
+      meaning: "a multi-gigabyte download never starts on a yes that was taken back or given for something else",
+      saw: "no consent → \(DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: nil, entryID: "m", autoDownload: false))")
+
 // Progress counts what was already there
 check(DownloadResume.percent(have: 50, of: 200) == 25
         && DownloadResume.percent(have: 300, of: 200) == 100

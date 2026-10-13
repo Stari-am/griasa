@@ -82,6 +82,7 @@ struct MenuView: View {
                     ProgressView().controlSize(.small)
                     Text(localModel.waitingForNetwork
                          ? "Local AI model: waiting for the network… \(p)%"
+                         : localModel.resuming ? "Resuming download… \(p)%"
                          : "Downloading local AI model… \(p)%").font(.caption).foregroundStyle(.secondary)
                 }
             }

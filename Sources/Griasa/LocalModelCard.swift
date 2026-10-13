@@ -44,7 +44,7 @@ struct LocalModelCardView: View {
                         }.buttonStyle(.link)
                     }
                     Spacer()
-                    Button("Not now") { setup.decline(); HubController.shared.close(.localModel) }
+                    Button("Not now") { setup.decline(sweepParts: true); HubController.shared.close(.localModel) }
                     Button("Download") { setup.consent() }
                         .buttonStyle(.borderedProminent).controlSize(.large)
                         .keyboardShortcut(.defaultAction)
@@ -61,7 +61,7 @@ struct LocalModelCardView: View {
                         }.buttonStyle(.link)
                     }
                     Spacer()
-                    Button("Close") { setup.decline(); HubController.shared.close(.localModel) }
+                    Button("Close") { setup.decline(sweepParts: false); HubController.shared.close(.localModel) }
                 }
             case .installing, .downloading:
                 Text(setup.resuming ? "Resuming the download of the AI model…" : "Downloading the AI model…").font(.title2.bold())

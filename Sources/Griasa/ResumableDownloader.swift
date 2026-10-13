@@ -12,6 +12,10 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
     private let onProgress: @Sendable (Int) -> Void
     private let onWaiting: @Sendable (Bool) -> Void
     private let onRestart: @Sendable () -> Void
+    /// Asked before every attempt and every wait: false stops the download
+    /// (the part stays), as when the organization moves the Mac to a cloud
+    /// provider while the network is away.
+    private let mayContinue: @Sendable () -> Bool
     var part: URL { destination.appendingPathExtension("part") }
 
     // One attempt's state, touched only on the session's serial delegate queue
@@ -40,12 +44,14 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
     init(destination: URL, expected: PinnedModel,
          onProgress: @escaping @Sendable (Int) -> Void,
          onWaiting: @escaping @Sendable (Bool) -> Void,
-         onRestart: @escaping @Sendable () -> Void = {}) {
+         onRestart: @escaping @Sendable () -> Void = {},
+         mayContinue: @escaping @Sendable () -> Bool = { true }) {
         self.destination = destination
         self.expected = expected
         self.onProgress = onProgress
         self.onWaiting = onWaiting
         self.onRestart = onRestart
+        self.mayContinue = mayContinue
     }
 
     private static func size(_ url: URL) -> Int64? {
@@ -64,6 +70,7 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
         var firstPass = true
         fetching: while true {
             try Task.checkCancellation()
+            guard mayContinue() else { setWaiting(false); throw CancellationError() }
             let start: Int64
             let rewind = firstPass ? Self.syncEvery : 0
             firstPass = false
@@ -93,6 +100,7 @@ final class ResumableDownloader: NSObject, URLSessionDataDelegate, @unchecked Se
                     setWaiting(false)
                     throw error
                 }
+                guard mayContinue() else { setWaiting(false); throw CancellationError() }
                 setWaiting(true)
                 try await Task.sleep(nanoseconds: UInt64(pause * 1_000_000_000))
                 waited += pause

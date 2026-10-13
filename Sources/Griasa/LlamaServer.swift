@@ -44,12 +44,13 @@ enum LlamaInstaller {
     static func download(_ entry: LocalModelEntry,
                          onProgress: @escaping @Sendable (Int) -> Void,
                          onWaiting: @escaping @Sendable (Bool) -> Void = { _ in },
-                         onRestart: @escaping @Sendable () -> Void = {}) async throws {
+                         onRestart: @escaping @Sendable () -> Void = {},
+                         mayContinue: @escaping @Sendable () -> Bool = { true }) async throws {
         try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
         removeAbandonedParts(keeping: entry)
         let downloader = ResumableDownloader(destination: modelURL(entry), expected: entry.pinned,
                                              onProgress: onProgress, onWaiting: onWaiting,
-                                             onRestart: onRestart)
+                                             onRestart: onRestart, mayContinue: mayContinue)
         try await downloader.download(from: entry.pinned.url)
     }
 

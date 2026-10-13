@@ -147,6 +147,15 @@ enum DownloadResume {
         return autoDownload || consentedID == entryID
     }
 
+    /// Whether a new pick in Settings leaves the running download alone: it
+    /// does when the pick still comes to the model being downloaded, on
+    /// Griasa's own engine (or no engine preference). Stopping it then would
+    /// only make the person wait for the same file again.
+    static func keepsDownload(downloadingID: String?, resolvedID: String?, preferred: LocalEngine?) -> Bool {
+        guard let downloadingID, downloadingID == resolvedID else { return false }
+        return preferred == nil || preferred == .griasa
+    }
+
     static func percent(have: Int64, of total: Int64) -> Int {
         guard total > 0 else { return 0 }
         return Int(min(have, total) * 100 / total)

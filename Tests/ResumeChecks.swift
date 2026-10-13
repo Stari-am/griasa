@@ -157,6 +157,19 @@ check(!DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entry
       meaning: "a pulled file or a full disk would otherwise restart and fail at every refresh",
       saw: "again after a non-network failure → \(DownloadResume.resumesWithoutAsking(partSize: 40, consentedID: "m", entryID: "m", autoDownload: false, resumedThisLaunch: true, lastFailureWasNetwork: false))")
 
+// A pick in Settings while a download runs
+check(DownloadResume.keepsDownload(downloadingID: "m", resolvedID: "m", preferred: nil)
+        && DownloadResume.keepsDownload(downloadingID: "m", resolvedID: "m", preferred: .griasa),
+      rule: "a pick that still comes to the model downloading, on Griasa's engine → the download goes on",
+      meaning: "stopping it would make the person wait for the same file again",
+      saw: "\(DownloadResume.keepsDownload(downloadingID: "m", resolvedID: "m", preferred: nil))")
+check(!DownloadResume.keepsDownload(downloadingID: "m", resolvedID: "other", preferred: nil)
+        && !DownloadResume.keepsDownload(downloadingID: "m", resolvedID: "m", preferred: .ollama)
+        && !DownloadResume.keepsDownload(downloadingID: nil, resolvedID: "m", preferred: nil),
+      rule: "another model, or another engine preferred → the download stops",
+      meaning: "a finished download of a model nobody wants any more would be installed and announced",
+      saw: "other model → \(DownloadResume.keepsDownload(downloadingID: "m", resolvedID: "other", preferred: nil))")
+
 // Progress counts what was already there
 check(DownloadResume.percent(have: 50, of: 200) == 25
         && DownloadResume.percent(have: 300, of: 200) == 100

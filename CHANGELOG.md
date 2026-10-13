@@ -25,9 +25,10 @@ next to that address. A model download that is interrupted — the network drops
 the Mac sleeps or Griasa quits — now continues from where it stopped instead of
 starting over, and waits up to half an hour for the network to come back. After
 a relaunch on the local provider it picks up again on its own, without asking a
-second time, as long as the rest of the model still fits on the disk; "Not
-now", removing the model or moving to a cloud provider stops it and deletes
-the partial file.
+second time, as long as the rest of the model still fits on the disk. "Not
+now" and removing the model delete the partial file; moving to a cloud provider
+stops the download, and the partial file is deleted at the next launch if the
+provider is still a cloud one.
 
 ## 1.0.16 — 2026-10-13
 

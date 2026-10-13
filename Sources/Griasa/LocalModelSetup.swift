@@ -55,6 +55,9 @@ final class LocalModelSetup: ObservableObject {
     /// see `DownloadResume.resumesWithoutAsking`.
     private var resumedThisLaunch: Set<String> = []
     private var lastFailureWasNetwork = false
+    /// The model Griasa's own download is fetching, while it runs.
+    private var downloadingID: String?
+    private var launchHousekeepingDone = false
     /// When each meeting was queued in this session; see `PendingSummaries.isFresh`.
     private var queuedAt: [UUID: Date] = [:]
     private var delayedCatchUp: Task<Void, Never>?
@@ -135,6 +138,16 @@ final class LocalModelSetup: ObservableObject {
     /// plain refresh that found a narrower one running runs its own after it,
     /// so the waits and the catch-up it owes are not lost.
     func refresh(_ origin: RefreshOrigin = .normal) async {
+        if !launchHousekeepingDone {
+            launchHousekeepingDone = true
+            // Moved to a cloud provider in an earlier run: the parts left by
+            // the download stopped then are not coming back, and neither is
+            // the yes they were downloaded on.
+            if !onLocalProvider {
+                LlamaInstaller.removeAbandonedParts(keeping: nil)
+                defaults.removeObject(forKey: Self.consentedIDKey)
+            }
+        }
         while let running = refreshTask {
             let joined = refreshOrigin
             await running.value
@@ -300,32 +313,42 @@ final class LocalModelSetup: ObservableObject {
     /// before stops (its part stays, for if they pick it again).
     func modelPickedByPerson() async {
         defaults.removeObject(forKey: Self.steppedDownIDKey)
-        await cancelDownload()
+        await stopDownloadUnlessStillWanted()
         await refresh()
     }
 
     /// Another engine was preferred in Settings: a download for the old
     /// choice stops, and the setup is decided again.
     func enginePreferenceChanged() async {
-        await cancelDownload()
+        await stopDownloadUnlessStillWanted()
         await refresh()
     }
 
-    /// The provider changed in Settings. Away from local, a download stops
-    /// and half-downloaded models go: a cloud user is never sent gigabytes.
+    /// A pick that still comes to the model downloading leaves it running;
+    /// see `DownloadResume.keepsDownload`.
+    private func stopDownloadUnlessStillWanted() async {
+        let preferred = LocalEngine(rawValue: defaults.string(forKey: Self.preferredEngineKey) ?? "")
+        if DownloadResume.keepsDownload(downloadingID: downloadingID, resolvedID: chooseEntry()?.id,
+                                        preferred: preferred) { return }
+        await cancelDownload()
+    }
+
+    /// The provider changed in Settings. Away from local, a download stops;
+    /// its part stays until the next launch, in case this was a slip and the
+    /// person moves back (see `refresh`).
     func providerChanged() async {
         guard !onLocalProvider else { return }
-        let stopped = await cancelDownload()
-        LlamaInstaller.removeAbandonedParts(keeping: nil)
-        if stopped { await refresh() }
+        if await cancelDownload() { await refresh() }
     }
 
     /// Stops the download in progress and waits for it to end. Returns
-    /// whether there was one.
+    /// whether there was one. The person stopped it, so a later refresh may
+    /// continue that model without asking again in this launch.
     @discardableResult
     private func cancelDownload() async -> Bool {
         guard let task = downloadTask else { return false }
         downloadTask = nil
+        if let downloadingID { resumedThisLaunch.remove(downloadingID) }
         task.cancel()
         await task.value
         return true
@@ -348,11 +371,13 @@ final class LocalModelSetup: ObservableObject {
         return true
     }
 
-    func decline() {
+    /// `sweepParts` only for the "Not now" button: closing the window is a
+    /// "not now" for the question, not an order to throw away gigabytes
+    /// already downloaded (a later yes continues from them).
+    func decline(sweepParts: Bool) {
         defaults.set(Date(), forKey: Self.declinedKey)
         defaults.removeObject(forKey: Self.consentedIDKey)
-        // Without the yes, a part will never be finished.
-        LlamaInstaller.removeAbandonedParts(keeping: nil)
+        if sweepParts { LlamaInstaller.removeAbandonedParts(keeping: nil) }
     }
 
     func consent() {
@@ -378,8 +403,10 @@ final class LocalModelSetup: ObservableObject {
         // Active from before the engine install, which can take minutes: a
         // sweep meanwhile would take the part this download is about to use.
         LlamaInstaller.markActive(entry.id)
+        downloadingID = entry.id
         defer {
             LlamaInstaller.markActive(nil)
+            downloadingID = nil
             resuming = false
         }
         guard await LlamaInstaller.installEngine() else {
@@ -403,16 +430,20 @@ final class LocalModelSetup: ObservableObject {
                     Task { @MainActor in LocalModelSetup.shared.waitingForNetwork = waiting }
                 }, onRestart: {
                     Task { @MainActor in LocalModelSetup.shared.resuming = false }
+                }, mayContinue: {
+                    LLMConfig.current().provider == .custom
                 })
                 waitingForNetwork = false
                 lastFailureWasNetwork = false
-                if Task.isCancelled { settleCancelled(); return }
+                // The provider moved to the cloud meanwhile (the organization
+                // can do that without Settings): the file stays, unannounced.
+                if Task.isCancelled || !onLocalProvider { settleCancelled(); return }
                 apply(engine: .griasa, model: entry.id, entry: entry)
                 LocalNotice.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
                 return
             } catch {
                 waitingForNetwork = false
-                if Task.isCancelled { settleCancelled(); return }
+                if Task.isCancelled || error is CancellationError { settleCancelled(); return }
                 let network = DownloadResume.isNetworkError(error)
                 lastFailureWasNetwork = network
                 // The downloader already waited out the network for half an

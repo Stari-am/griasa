@@ -10,7 +10,8 @@ import Foundation
 /// an organization or an expert pinned; the smaller entry Griasa stepped down
 /// to after the model ran out of memory; the stored Griasa model if its file
 /// is still there; the stored Ollama or LM Studio model mapped back to its
-/// entry; a fresh pick for this Mac; and when even the smallest tier no longer
+/// entry; a download the person said yes to whose part is on disk, if the
+/// rest of it fits; a fresh pick for this Mac; and when even the smallest tier no longer
 /// fits the disk, the largest one already downloaded, whose space is taken by
 /// it anyway.
 ///
@@ -19,7 +20,8 @@ enum LocalSetupMemory {
     static func choose(pinnedID: String?, steppedDownID: String?,
                        storedEngine: LocalEngine?, storedModel: String?,
                        isDownloaded: (LocalModelEntry) -> Bool,
-                       memoryGB: Int, freeDiskGB: Int) -> LocalModelEntry? {
+                       memoryGB: Int, freeDiskGB: Int,
+                       consentedPart: (id: String, bytes: Int64)? = nil) -> LocalModelEntry? {
         for id in [pinnedID, steppedDownID] {
             if let id, let entry = LocalModelCatalog.entry(id: id) { return entry }
         }
@@ -41,6 +43,15 @@ enum LocalSetupMemory {
                 break
             }
         }
+        // A download the person said yes to and that was cut: its part has
+        // taken the disk a fresh pick would read, so a fresh pick would fall
+        // to a smaller tier and the part would be lost. Only the rest of it
+        // has to fit.
+        if let consentedPart, consentedPart.bytes > 0,
+           let entry = LocalModelCatalog.entry(id: consentedPart.id),
+           LocalModelCatalog.fits(entry, freeDiskGB: freeDiskGB, have: consentedPart.bytes) {
+            return entry
+        }
         if let fits = LocalModelCatalog.pick(memoryGB: memoryGB, freeDiskGB: freeDiskGB) { return fits }
         return LocalModelCatalog.runnable(memoryGB: memoryGB).reversed().first(where: isDownloaded)
     }
@@ -52,15 +63,28 @@ enum LocalSetupMemory {
 /// at login, not one that is gone. Treating it as gone dropped the working
 /// setup, showed the download card, and with auto-download installed a second
 /// runtime and a duplicate model. So the stored setup is kept while the
-/// runtime is silent, and asked again after 5 s, 30 s and 120 s; only a
-/// runtime that answers without the model, or one still silent after the last
-/// wait, goes to the ordinary decision.
+/// runtime is silent, and asked again after 5 s, 30 s and 120 s. After the
+/// last wait, an engine that works with nothing to download (Griasa's model
+/// on disk, or the other runtime answering with the model) takes over, as the
+/// spec's "quit later" row says. When the only way on is a download or a pull,
+/// the silent runtime is kept — shown as not answering, with the advice to
+/// start it — because clearing it made the next refresh see a Mac with
+/// nothing on it, and under the organization's auto-download fetch a
+/// duplicate. An answer always moves on (a runtime that answers without the
+/// model is the one real sign the model is gone), and so does an explicit
+/// pick — the preferred engine, when it can be used right now — at any time.
+///
+/// A refresh started by a failed request (the reconnect path) never uses a
+/// wait: a request during login would otherwise spend the launch waits in
+/// seconds and leave none for the runtime that is still starting.
 ///
 /// Foundation only, so `test.sh` can reach it.
 enum LocalRuntimeWait {
     enum Verdict: Equatable {
-        /// Keep the stored engine and probe again after this many seconds.
+        /// Keep the stored engine, count a wait, and probe again after this many seconds.
         case keep(retryAfter: TimeInterval)
+        /// Keep the stored engine without using a wait or scheduling another probe.
+        case keepSilent
         /// Decide afresh from what the probe found.
         case decide
     }
@@ -72,9 +96,42 @@ enum LocalRuntimeWait {
     ///   - answered: whether that engine's runtime answered the probe at all
     ///     (an empty model list is an answer).
     ///   - waitsSoFar: how many times in a row it has already been kept.
-    static func verdict(stored: LocalEngine?, answered: Bool, waitsSoFar: Int) -> Verdict {
-        guard stored == .ollama || stored == .lmStudio, !answered,
-              waitsSoFar < backoff.count else { return .decide }
+    ///   - preferred: the engine picked in Settings (or by the organization), if any.
+    ///   - decision: what `LocalEngineChoice.decide` makes of the probe.
+    ///   - fromRequest: the refresh was started by a request that failed to connect.
+    static func verdict(stored: LocalEngine?, answered: Bool, waitsSoFar: Int,
+                        preferred: LocalEngine? = nil, decision: LocalEngineDecision? = nil,
+                        fromRequest: Bool = false) -> Verdict {
+        guard stored == .ollama || stored == .lmStudio, !answered else { return .decide }
+        if case .use(let engine, _)? = decision, engine != stored {
+            // Another engine was picked and works now, with nothing to download.
+            if let preferred, preferred == engine { return .decide }
+            // The waits are spent and something else works without a download.
+            if waitsSoFar >= backoff.count { return .decide }
+        }
+        if fromRequest || waitsSoFar >= backoff.count { return .keepSilent }
         return .keep(retryAfter: backoff[waitsSoFar])
+    }
+
+    /// Whether the status should say the stored runtime is not answering:
+    /// kept silently once the waits are spent, not while it may still be starting.
+    static func showsNotAnswering(_ verdict: Verdict, waitsSoFar: Int) -> Bool {
+        verdict == .keepSilent && waitsSoFar >= backoff.count
+    }
+}
+
+extension LocalSetupMemory {
+    /// Whether the smaller tier Griasa stepped down to still stands now that
+    /// `readyID` is working. It goes once a larger tier is ready: the
+    /// step-down was about a model that could not start, and one that runs
+    /// proves the reason gone. While the step-down is stored, `choose` returns
+    /// it unless a pin outranks it, so a larger tier becomes ready in exactly
+    /// these ways: an MDM pin (also when its download finishes), or a pick in
+    /// Settings (which clears the step-down itself, at the pick).
+    static func keepsStepDown(steppedDownID: String?, readyID: String) -> Bool {
+        guard let steppedDownID, let stepped = LocalModelCatalog.entries.firstIndex(where: { $0.id == steppedDownID })
+        else { return false }
+        guard let ready = LocalModelCatalog.entries.firstIndex(where: { $0.id == readyID }) else { return true }
+        return ready <= stepped
     }
 }

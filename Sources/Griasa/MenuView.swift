@@ -80,7 +80,10 @@ struct MenuView: View {
             if case .downloading(let p) = localModel.state {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Downloading local AI model… \(p)%").font(.caption).foregroundStyle(.secondary)
+                    Text(localModel.waitingForNetwork
+                         ? "Local AI model: waiting for the network… \(p)%"
+                         : localModel.resuming ? "Resuming download… \(p)%"
+                         : "Downloading local AI model… \(p)%").font(.caption).foregroundStyle(.secondary)
                 }
             }
 

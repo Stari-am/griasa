@@ -83,5 +83,34 @@ check(gate("", busy: true) == .skip && gate("http://x/v1", busy: true) == .skip
       meaning: "a second refresh must not reset a running download to the consent card",
       saw: "busy → \(gate("", busy: true))")
 
+// Catch-up, which runs with nobody watching
+func catchUp(custom: Bool = true, url: String = "", names: [String] = [], stored: LocalEngine? = .griasa) -> Bool {
+    LocalCatchUpGate.mayRun(providerIsCustom: custom, typedBaseURL: url, typedModelNames: names, storedEngine: stored)
+}
+check(!catchUp(custom: false) && !catchUp(custom: false, url: "http://localhost:11434/v1"),
+      rule: "catch-up never runs on a cloud provider, whatever is set up locally",
+      meaning: "a meeting summarized in the background must stay on this Mac; a switch to the cloud mid-way stops it",
+      saw: "cloud → \(catchUp(custom: false))")
+check(catchUp(stored: .ollama) && catchUp(stored: .griasa) && !catchUp(stored: nil),
+      rule: "on the local provider, catch-up runs on an engine Griasa set up, and not with none",
+      meaning: "with nothing set up there is no model to summarize with",
+      saw: "ollama \(catchUp(stored: .ollama)), none \(catchUp(stored: nil))")
+check(catchUp(url: "http://127.0.0.1:1234/v1", stored: nil) && catchUp(names: ["qwen3:8b", ""], stored: nil),
+      rule: "a typed server on this Mac (or typed names, meaning the local Ollama) gets catch-up too",
+      meaning: "otherwise meetings waiting for a model wait until the next one is queued",
+      saw: "typed local → \(catchUp(url: "http://127.0.0.1:1234/v1", stored: nil))")
+check(!catchUp(url: "http://gw.corp.example/v1", stored: .griasa),
+      rule: "a typed server elsewhere never gets catch-up",
+      meaning: "a company gateway is off this Mac; background summaries must not go there unasked",
+      saw: "\(catchUp(url: "http://gw.corp.example/v1", stored: .griasa))")
+
+check(LocalCatchUpGate.isLocal(providerIsCustom: true, baseURL: "http://127.0.0.1:8177/v1")
+        && LocalCatchUpGate.isLocal(providerIsCustom: true, baseURL: "http://localhost:11434/v1")
+        && !LocalCatchUpGate.isLocal(providerIsCustom: false, baseURL: "https://api.anthropic.com")
+        && !LocalCatchUpGate.isLocal(providerIsCustom: true, baseURL: "http://gw.corp.example/v1"),
+      rule: "each catch-up request may go only to the local provider at an address on this Mac",
+      meaning: "a switch to the cloud while a meeting is half done must fail that meeting, not send its notes off the Mac",
+      saw: "cloud → \(LocalCatchUpGate.isLocal(providerIsCustom: false, baseURL: "https://api.anthropic.com"))")
+
 return failures
 }

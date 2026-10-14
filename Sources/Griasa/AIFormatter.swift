@@ -93,11 +93,26 @@ enum AIFormatter {
     /// `allowApple` false keeps the request off Apple's on-device model. Promise
     /// extraction and closure detection pass it until local and cloud have been
     /// compared on them: a promise missed there is missed for good.
+    ///
+    /// `requireLocal` is for the background catch-up: every request is sent
+    /// only to the local provider at an address on this Mac, checked at the
+    /// moment of sending (so a switch to the cloud while a meeting is half
+    /// done fails that meeting, which stays queued), and never falls back.
     static func complete(system: String, user: String, tier: ModelTier,
                          maxTokens: Int, timeout: TimeInterval = 120,
                          allowCloudFallback: Bool = true,
-                         allowApple: Bool = true) async throws -> String {
+                         allowApple: Bool = true,
+                         requireLocal: Bool = false) async throws -> String {
         let config = LLMConfig.current()
+        let allowCloudFallback = allowCloudFallback && !requireLocal
+        func ensureLocal(_ config: LLMConfig) throws {
+            guard requireLocal,
+                  !LocalCatchUpGate.isLocal(providerIsCustom: config.provider == .custom, baseURL: config.baseURL)
+            else { return }
+            throw NSError(domain: "Griasa", code: 23, userInfo: [NSLocalizedDescriptionKey:
+                "The AI provider is no longer the model on this Mac, so this meeting waits for it."])
+        }
+        try ensureLocal(config)
         // On-device family only: Apple's model never stands in for a cloud
         // provider the person chose.
         // A server the person configured is their choice: Apple's model stays out.
@@ -112,25 +127,38 @@ enum AIFormatter {
         // Apple refused (locale, length, rate) or was not chosen: the local
         // LLM. Failing to start it is an ordinary provider failure.
         func send(_ config: LLMConfig) async throws -> String {
+            try ensureLocal(config)
             if config.provider == .custom, config.baseURL == LlamaServer.baseURL,
                let entry = LocalModelCatalog.entry(id: config.smartModel) {
                 let start = await LlamaServer.shared.ensureRunning(entry)
                 // The process died loading the model: too big for the memory
                 // free now, so the next request uses one size smaller.
-                if start == .died { await LocalModelSetup.shared.stepDown(from: entry) }
+                if case .died = start { await LocalModelSetup.shared.stepDown(from: entry) }
                 guard start == .running else {
-                    throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey:
-                        "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."])
+                    let message = start.reason == LlamaServerRules.portTakenReason
+                        ? "The local AI model could not start: port 8177 is used by another program. Quit it, then try again."
+                        : "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."
+                            + (start.reason.map { " (\($0))" } ?? "")
+                    throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey: message])
                 }
             }
-            // A model on this Mac writes a long summary far slower than a cloud
-            // model, which is what callers' timeouts were set for; a meeting
-            // that times out at 300 s is lost work, so local ones get three times as long.
+            // A meeting that times out at 300 s is lost work, so background
+            // jobs on a local model get three times as long; dictation keeps
+            // its short timeout (see `LocalFailure.timeout`).
             let managed = config.provider == .custom && localEngineManaged
             do {
-                return try await complete(config, system: system, user: user,
-                                          model: config.model(for: tier),
-                                          maxTokens: maxTokens, timeout: managed ? timeout * 3 : timeout)
+                let text = try await complete(config, system: system, user: user,
+                                              model: config.model(for: tier),
+                                              maxTokens: maxTokens,
+                                              timeout: LocalFailure.timeout(timeout, managedLocal: managed))
+                // The runtime shown as not answering answered: refresh the
+                // status, which also resumes the catch-up.
+                if managed {
+                    Task { @MainActor in
+                        if LocalModelSetup.shared.notAnswering != nil { await LocalModelSetup.shared.refresh() }
+                    }
+                }
+                return text
             } catch let error where managed && LocalFailure.kind(of: error) == .slow {
                 // Not "gone": the model is there, only slow, so this is neither
                 // retried as unreachable nor reported as a dead provider.
@@ -143,7 +171,9 @@ enum AIFormatter {
             } catch let error where config.provider == .custom && localEngineManaged && isUnreachable(error) {
                 // Ollama or LM Studio quit, or is still starting: ask again now
                 // (the setup may move to another engine) and try once more.
-                await LocalModelSetup.shared.refresh()
+                // Marked as a request's refresh: it never spends the waits
+                // kept for a runtime still starting at login.
+                await LocalModelSetup.shared.refresh(.request)
                 return try await send(LLMConfig.current())
             }
         } catch {

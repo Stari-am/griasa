@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+**Local AI keeps what works, and says why when it can't start.** When Ollama or
+LM Studio is the engine and it stays silent after Griasa has waited for it,
+Griasa moves to a model that is already on the Mac if there is one; if the only
+way on would be a download, it keeps the setup and Settings says it is not
+answering, with what to do. Before, Griasa forgot it, and on a Mac where the
+organization pre-approved the download it fetched a second copy of the model.
+Meetings that wait for the local model are only ever summarized on this Mac,
+even if the provider is switched to the cloud while one is being summarized. Dictation on a local model
+again gives up after 10 seconds and uses the plain cleanup, instead of waiting
+half a minute; summaries and promises still get the longer wait. When a
+meeting's summary is rebuilt but its promises cannot be collected, History
+now shows the new summary that is already in the meeting's file, and the
+promises are collected the next time the model is ready. Griasa's own engine
+waits for the previous model to quit before starting another, stops an engine
+left behind by a crash instead of quietly using it with the wrong model, says
+so when another program holds its port, and when it cannot start, the message
+ends with the engine's own reason. The "not
+enough space" card offers a cloud provider where the organization allows one,
+and the note that the organization set the local server's address now sits
+next to that address. A model download that is interrupted — the network drops,
+the Mac sleeps or Griasa quits — now continues from where it stopped instead of
+starting over, and waits up to half an hour for the network to come back. After
+a relaunch on the local provider it picks up again on its own, without asking a
+second time, as long as the rest of the model still fits on the disk. "Not
+now" and removing the model delete the partial file; moving to a cloud provider
+stops the download, and the partial file is deleted at the next launch if the
+provider is still a cloud one.
+
 ## 1.0.16 — 2026-10-13
 
 **The local model sets itself up.** Since 1.0.14 a new install is on a local

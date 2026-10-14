@@ -44,7 +44,7 @@ struct LocalModelCardView: View {
                         }.buttonStyle(.link)
                     }
                     Spacer()
-                    Button("Not now") { setup.decline(); HubController.shared.close(.localModel) }
+                    Button("Not now") { setup.decline(sweepParts: true); HubController.shared.close(.localModel) }
                     Button("Download") { setup.consent() }
                         .buttonStyle(.borderedProminent).controlSize(.large)
                         .keyboardShortcut(.defaultAction)
@@ -53,11 +53,24 @@ struct LocalModelCardView: View {
                 Text("Not enough space for local AI").font(.title2.bold())
                 Text("The AI model needs about \(needed) GB free. Free up space, and Griasa will offer it again in a few days.")
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Close") { setup.decline(); HubController.shared.close(.localModel) }
+                HStack {
+                    // Same rule as the download question: only where the organization allows the cloud.
+                    if ManagedPolicy.live.anyCloudAllowed {
+                        Button("Use a cloud provider instead…") {
+                            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                        }.buttonStyle(.link)
+                    }
+                    Spacer()
+                    Button("Close") { setup.decline(sweepParts: false); HubController.shared.close(.localModel) }
+                }
             case .installing, .downloading:
-                Text("Downloading the AI model…").font(.title2.bold())
+                Text(setup.resuming ? "Resuming the download of the AI model…" : "Downloading the AI model…").font(.title2.bold())
                 if case .downloading(let p) = setup.state { ProgressView(value: Double(p), total: 100) }
                 else { ProgressView() }
+                if setup.waitingForNetwork {
+                    Text("Waiting for the network — the download continues from where it stopped.")
+                        .foregroundStyle(.secondary)
+                }
                 Text("You can close this — it keeps going, and meetings recorded meanwhile get their summaries when it is done.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

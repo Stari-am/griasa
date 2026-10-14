@@ -119,7 +119,8 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
             // Closing the question is an answer to it, like "Not now": without
             // this the card came back at the next meeting or Settings visit.
             switch LocalModelSetup.shared.state {
-            case .needsConsent, .noSpace: LocalModelSetup.shared.decline()
+            // Not a "Not now" for the files, though: a part already on disk stays.
+            case .needsConsent, .noSpace: LocalModelSetup.shared.decline(sweepParts: false)
             default: break
             }
             close(.localModel)

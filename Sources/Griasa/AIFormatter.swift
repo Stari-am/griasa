@@ -128,20 +128,7 @@ enum AIFormatter {
         // LLM. Failing to start it is an ordinary provider failure.
         func send(_ config: LLMConfig) async throws -> String {
             try ensureLocal(config)
-            if config.provider == .custom, config.baseURL == LlamaServer.baseURL,
-               let entry = LocalModelCatalog.entry(id: config.smartModel) {
-                let start = await LlamaServer.shared.ensureRunning(entry)
-                // The process died loading the model: too big for the memory
-                // free now, so the next request uses one size smaller.
-                if case .died = start { await LocalModelSetup.shared.stepDown(from: entry) }
-                guard start == .running else {
-                    let message = start.reason == LlamaServerRules.portTakenReason
-                        ? "The local AI model could not start: port 8177 is used by another program. Quit it, then try again."
-                        : "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."
-                            + (start.reason.map { " (\($0))" } ?? "")
-                    throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey: message])
-                }
-            }
+            try await startOwnEngine(config)
             // A meeting that times out at 300 s is lost work, so background
             // jobs on a local model get three times as long; dictation keeps
             // its short timeout (see `LocalFailure.timeout`).
@@ -255,6 +242,26 @@ enum AIFormatter {
         }
     }
 
+    /// Griasa's own engine is started on demand and unloads after ten idle
+    /// minutes, so every request to it — the Settings test included — has to
+    /// start it first; otherwise a cold engine reads as "not answering".
+    private static func startOwnEngine(_ config: LLMConfig) async throws {
+        if config.provider == .custom, config.baseURL == LlamaServer.baseURL,
+           let entry = LocalModelCatalog.entry(id: config.smartModel) {
+            let start = await LlamaServer.shared.ensureRunning(entry)
+            // The process died loading the model: too big for the memory
+            // free now, so the next request uses one size smaller.
+            if case .died = start { await LocalModelSetup.shared.stepDown(from: entry) }
+            guard start == .running else {
+                let message = start.reason == LlamaServerRules.portTakenReason
+                    ? "The local AI model could not start: port 8177 is used by another program. Quit it, then try again."
+                    : "The local AI model could not start — the Mac may be short of memory. Close some apps and try again."
+                        + (start.reason.map { " (\($0))" } ?? "")
+                throw NSError(domain: "Griasa", code: 21, userInfo: [NSLocalizedDescriptionKey: message])
+            }
+        }
+    }
+
     /// Settings → Test: one tiny request against a specific provider's fast
     /// model, reporting latency or the error.
     static func test(provider: LLMProvider) async -> String {
@@ -262,6 +269,7 @@ enum AIFormatter {
         guard config.isConfigured else { return "Not configured yet." }
         let started = Date()
         do {
+            try await startOwnEngine(config)
             _ = try await complete(config, system: Prompts.text(.connectionTest),
                                    user: "ping", model: config.fastModel,
                                    maxTokens: 16, timeout: 60)

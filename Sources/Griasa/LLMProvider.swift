@@ -4,11 +4,13 @@ import Foundation
 /// Which backend answers AI requests. `custom` is any OpenAI-compatible
 /// endpoint — Ollama, LM Studio, OpenRouter, Groq… — so one integration
 /// covers local models and every aggregator.
+/// Declaration order is the order of Settings' provider menu: the local model
+/// is the default and comes first.
 enum LLMProvider: String, CaseIterable, Identifiable {
+    case custom
     case anthropic
     case openAI
     case gemini
-    case custom
     case claudeCLI
     case codexCLI
 
@@ -19,7 +21,7 @@ enum LLMProvider: String, CaseIterable, Identifiable {
         case .anthropic: return "Anthropic (Claude)"
         case .openAI: return "OpenAI"
         case .gemini: return "Google (Gemini)"
-        case .custom: return "Custom / local (OpenAI-compatible)"
+        case .custom: return "Local / custom (OpenAI-compatible)"
         case .claudeCLI: return "Claude Code (subscription, no API key)"
         case .codexCLI: return "Codex CLI (ChatGPT subscription)"
         }

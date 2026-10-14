@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.17 — 2026-10-13
 
 **Local AI keeps what works, and says why when it can't start.** When Ollama or
 LM Studio is the engine and it stays silent after Griasa has waited for it,

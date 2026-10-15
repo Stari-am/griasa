@@ -31,6 +31,14 @@ enum GriasaMain {
             await MainActor.run { }
             await PeopleProbe.attendance(limit: limit)
         }
+        // `Griasa --long-meeting-eval N [--cloud <provider>]` writes the three
+        // versions of the notes (and their promises) for the N longest meetings
+        // to dist/eval-2026-10/, run from the repo root. Changes no store.
+        if let flag = args.firstIndex(of: "--long-meeting-eval") {
+            let count = args.count > flag + 1 ? Int(args[flag + 1]) ?? 3 : 3
+            let cloud = args.firstIndex(of: "--cloud").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
+            await LongMeetingEval.run(count: count, cloudRaw: cloud)
+        }
         if args.contains("--closure-selftest") { await ClosureScan.selfTest() }
         if let flag = args.firstIndex(of: "--closure-scan") {
             let limit = args.count > flag + 1 ? Int(args[flag + 1]) ?? 8 : 8

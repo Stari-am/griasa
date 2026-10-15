@@ -40,13 +40,20 @@ struct Commitment: Identifiable, Codable, Equatable {
     /// enough to be worth asking about.
     var reviewedAt: Date?
 
+    /// The words in the meeting this promise was taken from, and where they
+    /// were said ("mm:ss"), when the transcript showed it. Optional: promises
+    /// saved before this field, and ones added by hand, have neither.
+    var sourceQuote: String?
+    var sourceAt: String?
+
     var hasClosureSuggestion: Bool { !done && suggestedDoneQuote != nil }
 
     init(id: UUID = UUID(), text: String, owner: String, isMine: Bool,
          dueHint: String? = nil, dueDate: Date? = nil, sourceTitle: String,
          sourceEntryID: UUID? = nil, date: Date = Date(), done: Bool = false,
          doneAt: Date? = nil, suggestedDoneQuote: String? = nil,
-         suggestedDoneAt: Date? = nil, reviewedAt: Date? = nil) {
+         suggestedDoneAt: Date? = nil, reviewedAt: Date? = nil,
+         sourceQuote: String? = nil, sourceAt: String? = nil) {
         self.id = id
         self.text = text
         self.owner = owner
@@ -61,6 +68,8 @@ struct Commitment: Identifiable, Codable, Equatable {
         self.suggestedDoneQuote = suggestedDoneQuote
         self.suggestedDoneAt = suggestedDoneAt
         self.reviewedAt = reviewedAt
+        self.sourceQuote = sourceQuote
+        self.sourceAt = sourceAt
     }
 
     init(from decoder: Decoder) throws {
@@ -79,5 +88,7 @@ struct Commitment: Identifiable, Codable, Equatable {
         suggestedDoneQuote = try container.decodeIfPresent(String.self, forKey: .suggestedDoneQuote)
         suggestedDoneAt = try container.decodeIfPresent(Date.self, forKey: .suggestedDoneAt)
         reviewedAt = try container.decodeIfPresent(Date.self, forKey: .reviewedAt)
+        sourceQuote = try container.decodeIfPresent(String.self, forKey: .sourceQuote)
+        sourceAt = try container.decodeIfPresent(String.self, forKey: .sourceAt)
     }
 }

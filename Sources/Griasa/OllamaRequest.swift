@@ -11,8 +11,11 @@ import Foundation
 enum OllamaRequest {
     static let contextTokens = 32768
 
-    static func chatBody(model: String, system: String, user: String, maxTokens: Int) -> [String: Any] {
-        [
+    /// `schema` (a JSON Schema object) constrains the reply to it — Ollama's
+    /// `format` field; nil leaves the reply free.
+    static func chatBody(model: String, system: String, user: String, maxTokens: Int,
+                         schema: Any? = nil) -> [String: Any] {
+        var body: [String: Any] = [
             "model": model,
             "stream": false,
             // Qwen thinks by default; the <think> block breaks JSON replies and
@@ -24,6 +27,8 @@ enum OllamaRequest {
             ],
             "options": ["num_ctx": contextTokens, "num_predict": maxTokens],
         ]
+        if let schema { body["format"] = schema }
+        return body
     }
 
     static func root(fromOpenAIBase base: String) -> String {

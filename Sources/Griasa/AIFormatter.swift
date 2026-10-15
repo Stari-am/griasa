@@ -94,6 +94,11 @@ enum AIFormatter {
     /// extraction and closure detection pass it until local and cloud have been
     /// compared on them: a promise missed there is missed for good.
     ///
+    /// `jsonSchema` (a JSON Schema as text) makes a local engine — Griasa's own,
+    /// Ollama, or a server on this Mac — constrain its reply to that shape; cloud
+    /// and CLI providers ignore it. `config` sends the request to that provider
+    /// instead of the configured one (the evaluation probe compares providers).
+    ///
     /// `requireLocal` is for the background catch-up: every request is sent
     /// only to the local provider at an address on this Mac, checked at the
     /// moment of sending (so a switch to the cloud while a meeting is half
@@ -102,8 +107,10 @@ enum AIFormatter {
                          maxTokens: Int, timeout: TimeInterval = 120,
                          allowCloudFallback: Bool = true,
                          allowApple: Bool = true,
-                         requireLocal: Bool = false) async throws -> String {
-        let config = LLMConfig.current()
+                         requireLocal: Bool = false,
+                         config configOverride: LLMConfig? = nil,
+                         jsonSchema: String? = nil) async throws -> String {
+        let config = configOverride ?? LLMConfig.current()
         let allowCloudFallback = allowCloudFallback && !requireLocal
         func ensureLocal(_ config: LLMConfig) throws {
             guard requireLocal,
@@ -137,7 +144,8 @@ enum AIFormatter {
                 let text = try await complete(config, system: system, user: user,
                                               model: config.model(for: tier),
                                               maxTokens: maxTokens,
-                                              timeout: LocalFailure.timeout(timeout, managedLocal: managed))
+                                              timeout: LocalFailure.timeout(timeout, managedLocal: managed),
+                                              jsonSchema: jsonSchema)
                 // The runtime shown as not answering answered: refresh the
                 // status, which also resumes the catch-up.
                 if managed {
@@ -214,7 +222,7 @@ enum AIFormatter {
 
     private static func complete(_ config: LLMConfig, system: String, user: String,
                                  model: String, maxTokens: Int,
-                                 timeout: TimeInterval) async throws -> String {
+                                 timeout: TimeInterval, jsonSchema: String? = nil) async throws -> String {
         guard config.isConfigured else {
             throw NSError(domain: "Griasa", code: 2, userInfo: [
                 NSLocalizedDescriptionKey: "No AI provider configured (Settings → AI & Actions)."
@@ -231,15 +239,22 @@ enum AIFormatter {
         case .custom:
             if await isOllama(config.baseURL) {
                 return try await ollamaComplete(config, system: system, user: user, model: model,
-                                                maxTokens: maxTokens, timeout: timeout)
+                                                maxTokens: maxTokens, timeout: timeout,
+                                                schema: schemaObject(jsonSchema))
             }
             return try await openAIComplete(config, system: system, user: user, model: model,
-                                            maxTokens: maxTokens, timeout: timeout)
+                                            maxTokens: maxTokens, timeout: timeout,
+                                            schema: schemaObject(jsonSchema))
         case .claudeCLI, .codexCLI:
             // maxTokens doesn't apply — the CLIs have no such flag.
             return try await CLIRunner.complete(config, system: system, user: user,
                                                 model: model, timeout: timeout)
         }
+    }
+
+    private static func schemaObject(_ text: String?) -> Any? {
+        guard let data = text?.data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data)
     }
 
     /// Griasa's own engine is started on demand and unloads after ten idle
@@ -320,7 +335,7 @@ enum AIFormatter {
 
     private static func openAIComplete(_ config: LLMConfig, system: String, user: String,
                                        model: String, maxTokens: Int,
-                                       timeout: TimeInterval) async throws -> String {
+                                       timeout: TimeInterval, schema: Any? = nil) async throws -> String {
         var base = config.baseURL
         while base.hasSuffix("/") { base.removeLast() }
         guard let url = URL(string: base + "/chat/completions") else {
@@ -353,6 +368,13 @@ enum AIFormatter {
         // endpoints: a strict gateway may reject fields it does not know.
         if config.provider == .custom && ProviderDefault.isOnThisMac(config.baseURL) {
             body["chat_template_kwargs"] = ["enable_thinking": false]
+            // A reply that must be JSON of a given shape: llama-server and LM
+            // Studio constrain decoding to the schema. Local only, for the same
+            // reason as above.
+            if let schema {
+                body["response_format"] = ["type": "json_schema",
+                                           "json_schema": ["name": "reply", "strict": true, "schema": schema]]
+            }
         }
         // Griasa's own engine is asked for a stream with progress, so a model
         // that is slow (a Mac short of memory) is told apart from one that is
@@ -485,7 +507,7 @@ enum AIFormatter {
 
     private static func ollamaComplete(_ config: LLMConfig, system: String, user: String,
                                        model: String, maxTokens: Int,
-                                       timeout: TimeInterval) async throws -> String {
+                                       timeout: TimeInterval, schema: Any? = nil) async throws -> String {
         let root = OllamaRequest.root(fromOpenAIBase: config.baseURL)
         guard let url = URL(string: root + "/api/chat") else {
             throw NSError(domain: "Griasa", code: 5, userInfo: [
@@ -496,7 +518,8 @@ enum AIFormatter {
         req.timeoutInterval = timeout
         req.setValue("application/json", forHTTPHeaderField: "content-type")
         req.httpBody = try JSONSerialization.data(
-            withJSONObject: OllamaRequest.chatBody(model: model, system: system, user: user, maxTokens: maxTokens))
+            withJSONObject: OllamaRequest.chatBody(model: model, system: system, user: user, maxTokens: maxTokens,
+                                   schema: schema))
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         if status == 404 {

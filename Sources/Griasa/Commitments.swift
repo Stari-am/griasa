@@ -202,6 +202,20 @@ enum CommitmentExtractor {
         let mine: Bool?
         let due: String?
         let dueHint: String?
+        let quote: String?
+        let at: String?
+    }
+
+    /// What one extraction found, before anything is saved.
+    struct Found {
+        var commitments: [Commitment] = []
+        /// Requests made: one for a meeting that fits, one per part for a long one on a local model.
+        var requests = 0
+        var proposed = 0
+        /// Promises thrown away because their quote is not in the text.
+        var unquoted = 0
+        /// Replies that could not be read as a list at all.
+        var unreadable = 0
     }
 
     /// Extracts commitments and adds the genuinely new ones to the store,
@@ -216,7 +230,43 @@ enum CommitmentExtractor {
     static func extract(markdown: String, participants: [String], myName: String,
                         sourceTitle: String, sourceEntryID: UUID?,
                         meetingDate: Date = Date(), requireLocal: Bool = false) async throws -> Int {
-        guard AIFormatter.isConfigured else {
+        // The words that were actually said are on disk next to the notes; a
+        // long meeting on a local model reads them, part by part, instead of
+        // the notes. Only looked up when it can matter.
+        var raw: String?
+        if markdown.count > TranscriptChunker.maxChars, let sourceEntryID {
+            raw = await MainActor.run {
+                HistoryStore.shared.entries.first { $0.id == sourceEntryID }?.filePath
+            }.flatMap { MeetingTranscriber.rawTranscript(besideNotes: $0) }
+        }
+        let found = try await findCommitments(
+            markdown: markdown, rawTranscript: raw, participants: participants, myName: myName,
+            sourceTitle: sourceTitle, sourceEntryID: sourceEntryID,
+            meetingDate: meetingDate, requireLocal: requireLocal)
+        guard !found.commitments.isEmpty else { return 0 }
+
+        return await MainActor.run {
+            withAnimation(.snappy) {
+                found.commitments.reduce(0) { CommitmentStore.shared.add($1) ? $0 + 1 : $0 }
+            }
+        }
+    }
+
+    /// The extraction itself, without saving: what the evaluation probe runs on
+    /// each version of the notes. `config` sends it to a particular provider;
+    /// `inParts` forces (or forbids) reading the text in parts, nil being the
+    /// rule the app follows.
+    ///
+    /// A promise is kept only if the words the model says it came from are in
+    /// the text it was shown — after ignoring case and punctuation. A model that
+    /// cannot point at the sentence has made the promise up.
+    static func findCommitments(markdown: String, rawTranscript: String? = nil,
+                                participants: [String], myName: String,
+                                sourceTitle: String, sourceEntryID: UUID?,
+                                meetingDate: Date = Date(), requireLocal: Bool = false,
+                                config: LLMConfig? = nil, inParts: Bool? = nil) async throws -> Found {
+        let resolved = config ?? LLMConfig.current()
+        guard resolved.isConfigured else {
             throw NSError(domain: "Griasa", code: 10, userInfo: [
                 NSLocalizedDescriptionKey: "No AI provider configured (Settings → AI & Actions)."
             ])
@@ -225,44 +275,72 @@ enum CommitmentExtractor {
         let mine = myName.isEmpty ? "You" : myName
         let today = meetingDate.formatted(.iso8601.year().month().day())
         let people = participants.isEmpty ? mine : participants.joined(separator: ", ")
-
-        let system = Prompts.text(.commitments)
+        let instructions = Prompts.text(.commitments)
             .filling(["today": today, "me": mine, "participants": people])
 
-        var notes = markdown
-        if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
+        // What is asked, and the text each answer is checked against.
+        var requests: [(system: String, user: String, shown: String, checkedAgainst: String, timeout: TimeInterval)] = []
+        let parts = inParts ?? TranscriptChunker.shouldChunk(isLocal: resolved.runsOnThisMac,
+                                                            characters: markdown.count)
+        if parts {
+            // Too long for one request to a local model, and the first 60,000
+            // characters would lose the end of the meeting: ask part by part.
+            let source = rawTranscript ?? TranscriptAssembler.transcriptSection(of: markdown)
+            for chunk in TranscriptChunker.chunks(source) {
+                requests.append((Prompts.text(.longMeetingSystem),
+                                 chunk.modelInput + "\n\n" + instructions,
+                                 chunk.modelInput, chunk.body, 120))
+            }
+        } else {
+            var notes = markdown
+            if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
+            requests.append((instructions, notes, notes, notes, 60))
+        }
 
-        let reply = try await AIFormatter.complete(
-            system: system, user: notes, tier: .fast, maxTokens: 2048,
-            timeout: 60, allowCloudFallback: false, allowApple: false, requireLocal: requireLocal)
-
-        guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
-              start < end,
-              let data = String(reply[start...end]).data(using: .utf8),
-              let items = try? JSONDecoder().decode([ExtractedItem].self, from: data) else { return 0 }
-
+        var found = Found()
+        var seen = Set<String>()
         let dateParser = ISO8601DateFormatter()
         dateParser.formatOptions = [.withFullDate]
-        let parsed: [Commitment] = items.compactMap { item in
-            let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return nil }
-            return Commitment(
-                text: text,
-                owner: item.owner?.isEmpty == false ? item.owner! : mine,
-                isMine: item.mine ?? true,
-                dueHint: item.dueHint,
-                dueDate: item.due.flatMap { dateParser.date(from: $0) },
-                sourceTitle: sourceTitle,
-                sourceEntryID: sourceEntryID,
-                date: meetingDate)
-        }
-        guard !parsed.isEmpty else { return 0 }
+        for request in requests {
+            let reply = try await AIFormatter.complete(
+                system: request.system, user: request.user, tier: .fast, maxTokens: 2048,
+                timeout: request.timeout, allowCloudFallback: false, allowApple: false,
+                requireLocal: requireLocal, config: config)
+            found.requests += 1
 
-        return await MainActor.run {
-            withAnimation(.snappy) {
-                parsed.reduce(0) { CommitmentStore.shared.add($1) ? $0 + 1 : $0 }
+            guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
+                  start < end,
+                  let data = String(reply[start...end]).data(using: .utf8),
+                  let items = try? JSONDecoder().decode([ExtractedItem].self, from: data) else {
+                found.unreadable += 1
+                continue
+            }
+            let prepared = QuoteMatch.prepare(request.checkedAgainst)
+            for item in items {
+                let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                found.proposed += 1
+                guard let quote = item.quote?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      QuoteMatch.contains(prepared, quote: quote) else {
+                    found.unquoted += 1
+                    continue
+                }
+                // The same promise in the overlap of two parts, or said twice.
+                guard seen.insert(QuoteMatch.normalize(text)).inserted else { continue }
+                found.commitments.append(Commitment(
+                    text: text,
+                    owner: item.owner?.isEmpty == false ? item.owner! : mine,
+                    isMine: item.mine ?? true,
+                    dueHint: item.dueHint,
+                    dueDate: item.due.flatMap { dateParser.date(from: $0) },
+                    sourceTitle: sourceTitle,
+                    sourceEntryID: sourceEntryID,
+                    date: meetingDate,
+                    sourceQuote: quote,
+                    sourceAt: QuoteMatch.visibleTimestamp(item.at, in: request.shown)))
             }
         }
+        return found
     }
 
     private struct ClosedItem: Decodable {
@@ -342,48 +420,62 @@ enum CommitmentExtractor {
             .map { "\($0.offset + 1). \($0.element.owner): \($0.element.text)" }
             .joined(separator: "\n")
 
-        var notes = markdown
-        if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
+        // Long notes on a local model are read in parts, as for extraction; a
+        // meeting that fits is asked once, as before.
+        var asks: [(user: String, checkedAgainst: String)]
+        if TranscriptChunker.shouldChunk(isLocal: LLMConfig.current().runsOnThisMac, characters: markdown.count) {
+            asks = TranscriptChunker.chunks(markdown).map { ($0.modelInput, $0.body) }
+        } else {
+            var notes = markdown
+            if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
+            asks = [(notes, notes)]
+        }
 
         let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
-        let reply: String
-        do {
-            reply = try await AIFormatter.complete(
-                system: system, user: notes, tier: .smart, maxTokens: 1024,
-                timeout: 90, allowCloudFallback: false, allowApple: false)
-        } catch {
-            return (nil, error.localizedDescription)
-        }
-
-        guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
-              start < end,
-              let data = String(reply[start...end]).data(using: .utf8),
-              let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else {
-            return (nil, nil)
-        }
-
-        let lowerNotes = notes.lowercased()
         var result = Detection()
-        result.proposed = closed.count
-        for item in closed {
-            guard item.n >= 1, item.n <= candidates.count else {
-                result.rejectedOutOfRange += 1
-                continue
+        var answered = 0
+        var flagged = Set<UUID>()
+        for ask in asks {
+            let reply: String
+            do {
+                reply = try await AIFormatter.complete(
+                    system: system, user: ask.user, tier: .smart, maxTokens: 1024,
+                    timeout: 90, allowCloudFallback: false, allowApple: false)
+            } catch {
+                return (nil, error.localizedDescription)
             }
-            let quote = item.quote.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard quote.count >= 8 else {
-                result.rejectedTooShort += 1
-                continue
+
+            guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
+                  start < end,
+                  let data = String(reply[start...end]).data(using: .utf8),
+                  let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else { continue }
+            answered += 1
+
+            let prepared = QuoteMatch.prepare(ask.checkedAgainst)
+            result.proposed += closed.count
+            for item in closed {
+                guard item.n >= 1, item.n <= candidates.count else {
+                    result.rejectedOutOfRange += 1
+                    continue
+                }
+                let quote = item.quote.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard quote.count >= 8 else {
+                    result.rejectedTooShort += 1
+                    continue
+                }
+                // The quote has to be in the notes. Without this the evidence can be
+                // a plausible sentence the model wrote itself, which is the one
+                // thing that would make a suggestion impossible to judge.
+                guard QuoteMatch.contains(prepared, quote: quote) else {
+                    result.rejectedNotInNotes += 1
+                    continue
+                }
+                let id = candidates[item.n - 1].id
+                if flagged.insert(id).inserted { result.found.append((id, quote)) }
             }
-            // The quote has to be in the notes. Without this the evidence can be
-            // a plausible sentence the model wrote itself, which is the one
-            // thing that would make a suggestion impossible to judge.
-            guard lowerNotes.contains(quote.lowercased()) else {
-                result.rejectedNotInNotes += 1
-                continue
-            }
-            result.found.append((candidates[item.n - 1].id, quote))
         }
+        // Not one answer could be read: we do not know, which is not "nothing closed".
+        if answered == 0 { return (nil, nil) }
         if persist {
             for hit in result.found {
                 await MainActor.run { CommitmentStore.shared.suggestClosure(hit.id, quote: hit.quote) }

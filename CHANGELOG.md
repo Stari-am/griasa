@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+**Long meetings complete on the local model, and every promise keeps the words it
+came from.** A meeting longer than about 20,000 characters (roughly 30 to 40
+minutes of talk) used to be cut when the local model summarized it: the start, with
+the agenda and the first decisions, was dropped. Griasa now reads such a meeting
+in parts, merges what it found into one set of notes, and builds the transcript
+itself, so nothing is cut and nothing waits for the model to retype the whole
+conversation. Shorter meetings, and meetings on a cloud model, are summarized as
+before. Promises are collected from every part of a long meeting too, not just its
+first hour. Each promise is now kept only if the words it was taken from are really
+in the meeting, and those words (with the time, when known) appear under it in
+Commitments.
+
 ## 1.0.18 — 2026-10-14
 
 **Testing the local model works.** *Test* in Settings → AI & Actions said the

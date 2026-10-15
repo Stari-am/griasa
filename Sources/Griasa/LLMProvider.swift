@@ -83,6 +83,31 @@ struct LLMConfig: Sendable {
         }
     }
 
+    /// The provider is a model on this Mac (Griasa's engine, Ollama, LM Studio or
+    /// a typed server at a local address) — the models that read a long meeting
+    /// in parts. Cloud and CLI providers never are.
+    var runsOnThisMac: Bool {
+        LocalCatchUpGate.isLocal(providerIsCustom: provider == .custom, baseURL: baseURL)
+    }
+
+    /// Griasa's own engine with the model this Mac was set up with, whatever
+    /// provider is selected — nil when no model is downloaded. Reads settings,
+    /// writes none. For the evaluation probe, which has to compare the local
+    /// model on every Mac regardless of the provider the person chose.
+    static func ownEngine() -> LLMConfig? {
+        let defaults = UserDefaults.standard
+        let engine = LocalEngine(rawValue: defaults.string(forKey: LocalModelSetup.engineKey) ?? "")
+        let memoryGB = Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824)
+        guard let entry = LocalSetupMemory.choose(
+                pinnedID: defaults.string(forKey: LocalModelSetup.chosenIDKey),
+                steppedDownID: defaults.string(forKey: LocalModelSetup.steppedDownIDKey),
+                storedEngine: engine, storedModel: defaults.string(forKey: LocalModelSetup.modelKey),
+                isDownloaded: LlamaInstaller.isDownloaded, memoryGB: memoryGB, freeDiskGB: 0),
+              LlamaInstaller.isDownloaded(entry) else { return nil }
+        return LLMConfig(provider: .custom, apiKey: "", baseURL: LlamaServer.baseURL,
+                         fastModel: entry.id, smartModel: entry.id, contextCharLimit: 38_000)
+    }
+
     static func current() -> LLMConfig {
         // An organisation that forbids cloud AI gets the local provider whatever
         // was saved; with no profile this changes nothing.

@@ -41,6 +41,10 @@ swiftc -O \
   Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Sources/Griasa/DownloadResume.swift \
+  Sources/Griasa/TranscriptChunker.swift \
+  Sources/Griasa/TranscriptAssembler.swift \
+  Sources/Griasa/QuoteMatch.swift \
+  Sources/Griasa/LongMeetingMap.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
@@ -68,6 +72,7 @@ swiftc -O \
   Tests/LlamaStreamChecks.swift \
   Tests/LlamaServerChecks.swift \
   Tests/ResumeChecks.swift \
+  Tests/LongMeetingChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

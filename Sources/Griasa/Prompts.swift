@@ -138,10 +138,10 @@ enum Prompts {
     """
 
     /// An explicit line naming the language of the meeting; a model left to guess
-    /// answers in English for a Russian meeting. Empty when it is not known.
+    /// answers in English for a Russian meeting. When it is not known the line says "the language the speakers use".
     static func languageLine(_ language: String?) -> String {
-        guard let language, !language.isEmpty else { return "" }
-        return "\nThe meeting is in \(language). Write everything in \(language); keep English tech terms as spoken."
+        let name = (language?.isEmpty == false) ? language! : "the language the speakers use"
+        return "\nThe meeting is in \(name). Write everything in \(name); keep English tech terms as spoken."
     }
 
     /// The language rules of `.meetingNotes`, shared by the long-meeting prompts.

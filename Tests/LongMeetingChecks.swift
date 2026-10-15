@@ -374,11 +374,34 @@ do {
     """
     let people = ["Aik", "Maria", "Pavel"]
     let index = PromiseOwner.Index(text: raw, myName: "Aik")
-    let mine = index.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Maria", participants: people)
-    check(mine.isMine && mine.owner == "Aik" && mine.at == "00:05",
-          rule: "a quote from a \"You\" line is the user's promise, whatever owner the model named",
-          meaning: "the microphone track is the user; a 9B model marked 17 of 19 promises as the user's own",
-          saw: "\(mine)")
+    let mine = index.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Aik", participants: people)
+    let mineUnknown = index.resolve(quote: "I will prepare the budget by Monday", modelOwner: nil, participants: people)
+    let handed = index.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Maria", participants: people)
+    check(mine.isMine && mine.owner == "Aik" && mine.at == "00:05" && mineUnknown.isMine
+          && !handed.isMine && handed.owner == "Maria",
+          rule: "a quote from a \"You\" line is the user's promise when the model says the user or does not know; another participant named is an assignment",
+          meaning: "the microphone track is the user, but the user also hands out tasks",
+          saw: "\(mine) / \(handed)")
+    let lead = PromiseOwner.Index(text: "[00:05] You: Pavel, please review the contract draft by Friday.\n[00:09] Them: Okay.", myName: "Aik")
+    let assigned = lead.resolve(quote: "Pavel, please review the contract draft by Friday", modelOwner: nil, participants: people)
+    let assignedMe = lead.resolve(quote: "Pavel, please review the contract draft by Friday", modelOwner: "Aik", participants: people)
+    check(!assigned.isMine && assigned.owner == "Pavel" && assignedMe.isMine,
+          rule: "on a \"You\" line a participant addressed by name gets the task when the owner is unknown",
+          meaning: "a lead who says \"Pavel, review this\" is not promising to do it; 13 of 17 promises came back as the user's",
+          saw: "\(assigned) / \(assignedMe)")
+    let ru = PromiseOwner.Index(text: "[00:05] You: Вика, посмотри договор до пятницы.", myName: "Аик")
+    let vika = ru.resolve(quote: "Вика, посмотри договор до пятницы", modelOwner: "", participants: ["Аик", "Вика"])
+    check(!vika.isMine && vika.owner == "Вика",
+          rule: "a participant's name is found in the line whatever its form",
+          meaning: "Russian names change endings; \"Вике\" and \"Вику\" are Вика",
+          saw: "\(vika)")
+    let called = PromiseOwner.Index(text: "[00:05] Them: Aik, send the invoice today please.", myName: "Aik")
+    let c1 = called.resolve(quote: "Aik, send the invoice today please", modelOwner: "Aik", participants: people)
+    let c2 = called.resolve(quote: "Aik, send the invoice today please", modelOwner: "Maria", participants: people)
+    check(c1.isMine && !c2.isMine && c2.owner == "Maria",
+          rule: "a \"Them\" line is the user's only if it names the user and the model says the user",
+          meaning: "someone asking the user to do something is a task for the user; anything else said by them is not",
+          saw: "\(c1) / \(c2)")
     let theirs = index.resolve(quote: "I will send the contract to the client tomorrow", modelOwner: "Aik", participants: people)
     check(!theirs.isMine && theirs.owner == "Them" && theirs.at == "00:20",
           rule: "a quote from a \"Them\" line is never the user's, and the owner is \"Them\" unless the model named another participant",
@@ -391,7 +414,7 @@ do {
           rule: "for a \"Them\" line the model's owner is used only if it is a participant other than the user",
           meaning: "an invented or user name on someone else's sentence is wrong either way",
           saw: "\(named)")
-    let note = index.resolve(quote: "ask Maria about the venue", modelOwner: "Maria", participants: people)
+    let note = index.resolve(quote: "ask Maria about the venue", modelOwner: "Aik", participants: people)
     check(note.isMine, rule: "a typed note is the user's own words",
           meaning: "the user wrote it; a promise in it is theirs", saw: "\(note)")
     let across = index.resolve(quote: "prepare the budget by Monday I will send the contract to the client tomorrow morning", modelOwner: "Aik", participants: people)
@@ -408,12 +431,36 @@ do {
           saw: "\(legacy)")
     let notes = "## Summary\n\nStuff.\n\n## Transcript\n\n[00:05] **Aik:** I will prepare the budget by Monday.\n\n**Maria:** I will send the contract tomorrow morning to the client.\n\n**Speaker:** Maybe the venue gets booked."
     let labelled = PromiseOwner.Index(text: notes, myName: "Aik")
-    let a = labelled.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Maria", participants: people)
+    let a = labelled.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Aik", participants: people)
     let b = labelled.resolve(quote: "I will send the contract tomorrow morning to the client", modelOwner: "Aik", participants: people)
     check(a.isMine && !b.isMine && b.owner == "Maria" && a.at == "00:05",
           rule: "in finished notes the speaker label of the quoted line decides: the user's name is the user, another name is that person",
           meaning: "cloud notes carry real names; the promise belongs to the one who said it",
           saw: "\(a) / \(b)")
+}
+
+// MARK: the language of the meeting
+
+do {
+    let russian = """
+    [00:05] You: Привет, давайте начнём. Сегодня обсуждаем деплой нового релиза и стейкинг.
+    [00:12] Them: Да, я проверил GitHub, пулл-реквест уже смержили, осталось только прогнать тесты на мейннете.
+    [00:25] You: Хорошо, Вика, посмотри, пожалуйста, договор до пятницы и пришли мне.
+    [00:41] Them: Договорились, я отправлю вам обновлённый документ завтра утром.
+    [01:02] 📝 NOTE: спросить про бюджет
+    """
+    let name = MeetingLanguage.name(of: russian, dictationLocales: [])
+    check(name == "Russian",
+          rule: "a Russian transcript with English tech terms is recognized as Russian",
+          meaning: "an unconstrained recognizer said Kazakh and the notes and promises came back in Kazakh",
+          saw: "\(String(describing: name))")
+    check(MeetingLanguage.name(of: "[00:05] 1234 5678 -- 42", dictationLocales: []) == nil
+          && MeetingLanguage.allowed(dictationLocales: ["fr-FR, es"]).contains("fr")
+          && MeetingLanguage.allowed(dictationLocales: []).sorted() == ["de", "en", "hy", "ru", "uk"]
+          && Prompts.languageLine(nil).contains("the language the speakers use"),
+          rule: "with no clear language nothing is named; the supported set grows with the dictation locales",
+          meaning: "a wrong name is worse than none: the model writes everything in it",
+          saw: "\(String(describing: MeetingLanguage.name(of: "[00:05] 1234 5678 -- 42", dictationLocales: [])))")
 }
 
 // MARK: the record and the request

@@ -98,9 +98,9 @@ enum LongMeetingEval {
                 guard let found else { return }
                 variant.promises = found.commitments.count
                 let list: [[String: Any]] = found.commitments.map { item in
-                    ["text": item.text, "owner": item.owner, "mine": item.isMine,
-                     "dueHint": item.dueHint ?? NSNull(), "quote": item.sourceQuote ?? NSNull(),
-                     "at": item.sourceAt ?? NSNull()]
+                    ["text": item.text, "owner": item.owner, "isMine": item.isMine,
+                     "dueHint": item.dueHint ?? NSNull(), "sourceQuote": item.sourceQuote ?? NSNull(),
+                     "sourceAt": item.sourceAt ?? NSNull()]
                 }
                 let document: [String: Any] = [
                     "promises": list, "requests": found.requests, "proposed": found.proposed,

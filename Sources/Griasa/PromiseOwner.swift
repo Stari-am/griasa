@@ -74,23 +74,50 @@ enum PromiseOwner {
             let hasYou = span.contains { $0.speaker == .you }
             let named = span.compactMap { p -> String? in if case let .named(n) = p.speaker { return n }; return nil }
             let hasThem = span.contains { $0.speaker == .them } || !named.isEmpty
-            let hasUnknown = span.contains { $0.speaker == .unknown }
+            let lineText = span.map(\.text).joined(separator: " ") + " " + quote
+            // A participant other than the user who is addressed in the line.
+            let addressee = participants.first { !isMe($0) && PromiseOwner.mentions($0, in: lineText) }
+            let modelSaysMe = isMe(owner)
+            let modelSaysOther = other(owner)
 
-            if hasYou && !hasThem { return Resolution(isMine: true, owner: me, at: at, located: true) }
+            func result(mine: Bool, owner: String) -> Resolution {
+                Resolution(isMine: mine, owner: owner, at: at, located: true)
+            }
+            if hasYou && !hasThem {
+                // The user speaking: their own promise, unless they are handing the task to someone.
+                if let who = modelSaysOther { return result(mine: false, owner: who) }
+                if modelSaysMe { return result(mine: true, owner: me) }
+                if let addressee { return result(mine: false, owner: addressee) }
+                return result(mine: true, owner: me)
+            }
             if hasThem && !hasYou {
-                let who = Set(named.map { $0.lowercased() }).count == 1 ? named[0] : (other(owner) ?? "Them")
-                return Resolution(isMine: false, owner: who, at: at, located: true)
+                // Someone else speaking: the user's only when they are named in the
+                // line and the model says it is theirs.
+                if modelSaysMe, PromiseOwner.mentions(me == "You" ? "" : me, in: lineText) {
+                    return result(mine: true, owner: me)
+                }
+                if Set(named.map { $0.lowercased() }).count == 1 { return result(mine: false, owner: named[0]) }
+                return result(mine: false, owner: modelSaysOther ?? "Them")
             }
             if hasYou && hasThem {
                 // Said across both: the user's only if the model says so and the user spoke in it.
-                let mine = isMe(owner)
-                return Resolution(isMine: mine, owner: mine ? me : (other(owner) ?? "Them"), at: at, located: true)
+                return result(mine: modelSaysMe, owner: modelSaysMe ? me : (modelSaysOther ?? "Them"))
             }
-            _ = hasUnknown
             var r = legacy
             r.at = at
             return r
         }
+    }
+
+    /// Whether a name — or a form of it ("Вика" → "Вике", "Вику") — is a word of the text.
+    static func mentions(_ name: String, in text: String) -> Bool {
+        let words = Set(QuoteMatch.normalize(text).split(separator: " ").map(String.init))
+        for part in QuoteMatch.normalize(name).split(separator: " ") where part.count >= 3 {
+            var stem = String(part)
+            if stem.count >= 4, "аяйьуюеиыо".contains(stem.last!) { stem.removeLast() }
+            if words.contains(where: { $0.hasPrefix(stem) && $0.count <= stem.count + 3 }) { return true }
+        }
+        return false
     }
 
     static func isMe(_ name: String, myName: String) -> Bool {

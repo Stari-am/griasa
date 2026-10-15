@@ -234,7 +234,7 @@ enum CommitmentExtractor {
         // long meeting on a local model reads them, part by part, instead of
         // the notes. Only looked up when it can matter.
         var raw: String?
-        if markdown.count > TranscriptChunker.maxChars, let sourceEntryID {
+        if markdown.count > 4_000, let sourceEntryID {
             raw = await MainActor.run {
                 HistoryStore.shared.entries.first { $0.id == sourceEntryID }?.filePath
             }.flatMap { MeetingTranscriber.rawTranscript(besideNotes: $0) }
@@ -275,30 +275,33 @@ enum CommitmentExtractor {
         let mine = myName.isEmpty ? "You" : myName
         let today = meetingDate.formatted(.iso8601.year().month().day())
         let people = participants.isEmpty ? mine : participants.joined(separator: ", ")
-        let instructions = Prompts.text(.commitments)
-            .filling(["today": today, "me": mine, "participants": people])
-
+        var instructions = Prompts.text(.commitments) + Prompts.commitmentQuoteRules
         // What is asked, and the text each answer is checked against.
-        var requests: [(system: String, user: String, shown: String, checkedAgainst: String, timeout: TimeInterval)] = []
-        let parts = inParts ?? TranscriptChunker.shouldChunk(isLocal: resolved.runsOnThisMac,
-                                                            characters: markdown.count)
+        var requests: [(system: String, user: String, shown: String, haystack: QuoteMatch.Haystack, timeout: TimeInterval)] = []
+        // The notes whenever they fit the model's window; parts only when they do not.
+        let parts = inParts ?? (resolved.runsOnThisMac && markdown.count > resolved.contextCharLimit)
         if parts {
-            // Too long for one request to a local model, and the first 60,000
-            // characters would lose the end of the meeting: ask part by part.
+            // The first 60,000 characters would lose the end of the meeting: ask
+            // part by part, from the transcript itself.
+            instructions += Prompts.commitmentPartRules
+            instructions = instructions.filling(["today": today, "me": mine, "participants": people])
             let source = rawTranscript ?? TranscriptAssembler.transcriptSection(of: markdown)
-            for chunk in TranscriptChunker.chunks(source) {
+            let size = TranscriptChunker.chunkSize(contextCharLimit: resolved.contextCharLimit)
+            for chunk in TranscriptChunker.chunks(source, maxChars: size) {
                 requests.append((Prompts.text(.longMeetingSystem),
                                  chunk.modelInput + "\n\n" + instructions,
-                                 chunk.modelInput, chunk.body, 120))
+                                 chunk.modelInput,
+                                 QuoteMatch.Haystack(overlap: chunk.overlap, body: chunk.body), 120))
             }
         } else {
+            instructions = instructions.filling(["today": today, "me": mine, "participants": people])
             var notes = markdown
             if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
-            requests.append((instructions, notes, notes, notes, 60))
+            requests.append((instructions, notes, notes, QuoteMatch.Haystack(body: notes), 60))
         }
 
         var found = Found()
-        var seen = Set<String>()
+        var seen: [PromiseDuplicate.Seen] = []
         let dateParser = ISO8601DateFormatter()
         dateParser.formatOptions = [.withFullDate]
         for request in requests {
@@ -315,29 +318,42 @@ enum CommitmentExtractor {
                 found.unreadable += 1
                 continue
             }
-            let prepared = QuoteMatch.prepare(request.checkedAgainst)
+            // A reply with no "quote" at all comes from a prompt that never asked
+            // for one (an old edited prompts file): keep it, unverified. A quote
+            // that is given and not in the text is what gets a promise dropped.
+            let legacy = !items.contains { $0.quote != nil }
             for item in items {
                 let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }
                 found.proposed += 1
-                guard let quote = item.quote?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      QuoteMatch.contains(prepared, quote: quote) else {
+                var quote: String?
+                if let given = item.quote?.trimmingCharacters(in: .whitespacesAndNewlines), !given.isEmpty {
+                    guard QuoteMatch.contains(request.haystack, quote: given) else {
+                        found.unquoted += 1
+                        continue
+                    }
+                    quote = given
+                } else if !legacy {
+                    // Quotes were given for the others; a promise with none of its own.
                     found.unquoted += 1
                     continue
                 }
+                let isMine = item.mine ?? false
+                let owner = item.owner?.isEmpty == false ? item.owner! : (isMine ? mine : "Unknown")
                 // The same promise in the overlap of two parts, or said twice.
-                guard seen.insert(QuoteMatch.normalize(text)).inserted else { continue }
+                guard !PromiseDuplicate.isDuplicate(text: text, owner: owner, quote: quote, of: seen) else { continue }
+                seen.append(PromiseDuplicate.entry(text: text, owner: owner, quote: quote))
                 found.commitments.append(Commitment(
                     text: text,
-                    owner: item.owner?.isEmpty == false ? item.owner! : mine,
-                    isMine: item.mine ?? true,
+                    owner: owner,
+                    isMine: isMine,
                     dueHint: item.dueHint,
                     dueDate: item.due.flatMap { dateParser.date(from: $0) },
                     sourceTitle: sourceTitle,
                     sourceEntryID: sourceEntryID,
                     date: meetingDate,
                     sourceQuote: quote,
-                    sourceAt: QuoteMatch.visibleTimestamp(item.at, in: request.shown)))
+                    sourceAt: quote == nil ? nil : QuoteMatch.visibleTimestamp(item.at, in: request.shown)))
             }
         }
         return found
@@ -422,13 +438,16 @@ enum CommitmentExtractor {
 
         // Long notes on a local model are read in parts, as for extraction; a
         // meeting that fits is asked once, as before.
-        var asks: [(user: String, checkedAgainst: String)]
-        if TranscriptChunker.shouldChunk(isLocal: LLMConfig.current().runsOnThisMac, characters: markdown.count) {
-            asks = TranscriptChunker.chunks(markdown).map { ($0.modelInput, $0.body) }
+        var asks: [(user: String, haystack: QuoteMatch.Haystack)]
+        let current = LLMConfig.current()
+        if TranscriptChunker.shouldChunk(isLocal: current.runsOnThisMac, characters: markdown.count,
+                                         maxChars: current.contextCharLimit) {
+            asks = TranscriptChunker.chunks(markdown, maxChars: TranscriptChunker.chunkSize(contextCharLimit: current.contextCharLimit))
+                .map { ($0.modelInput, QuoteMatch.Haystack(overlap: $0.overlap, body: $0.body)) }
         } else {
             var notes = markdown
             if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
-            asks = [(notes, notes)]
+            asks = [(notes, QuoteMatch.Haystack(body: notes))]
         }
 
         let system = Prompts.text(.commitmentsDone).filling(["items": numbered])
@@ -451,7 +470,6 @@ enum CommitmentExtractor {
                   let closed = try? JSONDecoder().decode([ClosedItem].self, from: data) else { continue }
             answered += 1
 
-            let prepared = QuoteMatch.prepare(ask.checkedAgainst)
             result.proposed += closed.count
             for item in closed {
                 guard item.n >= 1, item.n <= candidates.count else {
@@ -466,7 +484,7 @@ enum CommitmentExtractor {
                 // The quote has to be in the notes. Without this the evidence can be
                 // a plausible sentence the model wrote itself, which is the one
                 // thing that would make a suggestion impossible to judge.
-                guard QuoteMatch.contains(prepared, quote: quote) else {
+                guard QuoteMatch.contains(ask.haystack, quote: quote) else {
                     result.rejectedNotInNotes += 1
                     continue
                 }

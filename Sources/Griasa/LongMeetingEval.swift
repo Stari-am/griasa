@@ -36,6 +36,10 @@ enum LongMeetingEval {
                 print("--cloud needs a provider name such as anthropic, openAI, gemini, claudeCLI, codexCLI.")
                 exit(2)
             }
+            guard ManagedPolicy.live.allows(provider: provider.rawValue) else {
+                print("This organization's policy does not allow \(provider.rawValue).")
+                exit(2)
+            }
             cloud = LLMConfig.config(for: provider)
         } else {
             let current = LLMConfig.current()
@@ -63,7 +67,8 @@ enum LongMeetingEval {
             let hasNotes = raw.contains("📝 NOTE:")
             let folder = root.appendingPathComponent(meeting.entry.id.uuidString, isDirectory: true)
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let chunkCount = TranscriptChunker.chunks(raw).count
+            let chunkCount = TranscriptChunker.chunks(
+                raw, maxChars: TranscriptChunker.chunkSize(contextCharLimit: local.contextCharLimit)).count
 
             var single = Variant(), chunked = Variant(), reference = Variant()
             var droppedActions = 0

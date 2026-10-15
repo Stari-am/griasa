@@ -114,6 +114,29 @@ enum Prompts {
 
     // MARK: - Shipped wording
 
+    /// Appended to `.commitments` in code, outside the text a person can edit: the
+    /// quote is what lets a promise be checked, so an edited prompts file cannot
+    /// lose it.
+    static let commitmentQuoteRules = """
+
+    Every element must also carry these two keys:
+      "quote": the exact words from the input where the promise was made, copied word for \
+    word exactly as they stand — never translated, corrected or tidied up,
+      "at": "mm:ss" of the nearest [mm:ss] timestamp before the quote if the input shows one, else null
+    A promise you cannot quote is dropped. Text marked "context only" is already covered: \
+    do not extract from it.
+    """
+
+    /// Added when the input is one part of a longer transcript, where "You" and "Them" are tracks.
+    static let commitmentPartRules = """
+
+    The input is one part of a longer meeting transcript, not finished notes. "You" is the \
+    user's microphone ({{me}}); "Them" is everything the computer played — the other \
+    participants ({{participants}}). Attribute each promise to the person who made it; set \
+    "mine" to true only when the speaker is "You". When you cannot tell who a "Them" speaker \
+    is, use "Them" as the owner and set "mine" to false.
+    """
+
     /// The language rules of `.meetingNotes`, shared by the long-meeting prompts.
     private static let languageRules = """
     Language rules:
@@ -223,17 +246,12 @@ enum Prompts {
              "owner": "name of who promised it (from the participants; use "{{me}}" for the user)",
              "mine": true if the user promised it, false otherwise,
              "due": "YYYY-MM-DD" resolved from phrases like "by Friday" relative to today, or null,
-             "dueHint": "the deadline exactly as phrased, or null",
-             "quote": "the exact words from the input where the promise was made, copied word for word",
-             "at": "mm:ss" of the nearest [mm:ss] timestamp before the quote if the input shows one, else null}
+             "dueHint": "the deadline exactly as phrased, or null"}
 
             Rules:
             - Only real, actionable promises a person explicitly took on. Skip vague intentions,
               group decisions with no owner, and things already done.
             - Keep each text self-contained (a week later it must still make sense on its own).
-            - The quote must appear in the input exactly as written; never translate it or
-              tidy it up. A promise you cannot quote is dropped.
-            - Text marked "context only" is already covered: do not extract from it.
             - 0 items is a valid answer: return [].
             """
 
@@ -259,7 +277,7 @@ enum Prompts {
             - "decisions": what was decided or agreed.
             - "actions": things a person took on to do. Each: {"owner": who promised it, "task": \
             what, "due": the deadline as spoken or "", "quote": the exact words from the transcript \
-            where it was promised, copied word for word}. Skip vague intentions.
+            where it was promised, copied exactly as it stands in the transcript — do not correct, translate or tidy it, even if a word looks mis-recognised}. Skip vague intentions.
             - "questions": questions left open.
             - "speakers": clues about who the "Them" speakers are, e.g. someone addressed by name \
             or introducing themselves. Each: {"name": the person, "clue": the words that tell}.

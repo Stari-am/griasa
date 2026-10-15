@@ -50,18 +50,37 @@ enum LongMeetingMap {
     }
 
     /// Keeps only the promises whose quote is really in this part of the
-    /// transcript (the new lines, not the context repeated from before).
+    /// transcript (not only in the context repeated from the part before).
     /// `dropped` counts the rest.
-    static func believed(_ result: Result, chunkBody: String) -> (result: Result, dropped: Int) {
-        let prepared = QuoteMatch.prepare(chunkBody)
+    static func believed(_ result: Result, chunk: TranscriptChunk) -> (result: Result, dropped: Int) {
+        let haystack = QuoteMatch.Haystack(overlap: chunk.overlap, body: chunk.body)
         var kept = result
         let all = result.actions ?? []
         kept.actions = all.filter { action in
             guard let task = action.task, !task.trimmingCharacters(in: .whitespaces).isEmpty,
                   let quote = action.quote else { return false }
-            return QuoteMatch.contains(prepared, quote: quote)
+            return QuoteMatch.contains(haystack, quote: quote)
         }
         return (kept, all.count - (kept.actions?.count ?? 0))
+    }
+
+    /// Splits the parts' notes into groups that each fit `budget` characters, in
+    /// order, for a merge in two levels when all of them together do not fit.
+    static func group(_ sections: [String], budget: Int) -> [[String]] {
+        var groups: [[String]] = []
+        var current: [String] = []
+        var size = 0
+        for section in sections {
+            if !current.isEmpty, size + section.count + 2 > budget {
+                groups.append(current)
+                current = []
+                size = 0
+            }
+            current.append(section)
+            size += section.count + 2
+        }
+        if !current.isEmpty { groups.append(current) }
+        return groups
     }
 
     /// Names the model has pinned to "Them" so far, newest clue winning, in
@@ -109,7 +128,9 @@ enum LongMeetingMap {
     /// The merge step's reply with any transcript it added anyway removed — the
     /// transcript is built in code, and a model's copy would be a second one.
     static func withoutTranscript(_ markdown: String) -> String {
-        guard let range = markdown.range(of: "\n## Transcript") else { return markdown.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let range = markdown.range(of: #"(?m)^## Transcript\b"#, options: .regularExpression) else {
+            return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         return String(markdown[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

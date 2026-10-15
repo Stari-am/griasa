@@ -16,7 +16,8 @@ enum LongMeetingNotes {
     static func make(raw: String, participants: [String], myName: String, hasNotes: Bool,
                      allowCloudFallback: Bool = true, requireLocal: Bool = false,
                      config: LLMConfig? = nil) async throws -> Output {
-        let chunks = TranscriptChunker.chunks(raw)
+        let limit = (config ?? LLMConfig.current()).contextCharLimit
+        let chunks = TranscriptChunker.chunks(raw, maxChars: TranscriptChunker.chunkSize(contextCharLimit: limit))
         let system = Prompts.text(.longMeetingSystem)
         let speakerRules = speakerRules(participants: participants, myName: myName)
         let noteRules = hasNotes
@@ -26,6 +27,9 @@ enum LongMeetingNotes {
         var known: [(name: String, clue: String)] = []
         var sections: [String] = []
         var dropped = 0
+        // The question "send this to the cloud instead?" is asked by the first
+        // request only: a meeting is not asked about once per part.
+        var mayAsk = allowCloudFallback
         for chunk in chunks {
             let instructions = Prompts.text(.meetingChunk).filling([
                 "part": "\(chunk.index + 1)", "parts": "\(chunks.count)",
@@ -40,26 +44,48 @@ enum LongMeetingNotes {
             for _ in 0..<2 where result == nil {
                 let reply = try await AIFormatter.complete(
                     system: system, user: user, tier: .smart, maxTokens: 4096, timeout: 300,
-                    allowCloudFallback: allowCloudFallback, requireLocal: requireLocal,
+                    allowCloudFallback: mayAsk, requireLocal: requireLocal,
                     config: config, jsonSchema: LongMeetingMap.schema)
+                mayAsk = false
                 result = LongMeetingMap.decode(reply)
             }
             guard let result else {
                 throw NSError(domain: "Griasa", code: 12, userInfo: [NSLocalizedDescriptionKey:
                     "The local model's notes for part \(chunk.index + 1) of \(chunks.count) could not be read."])
             }
-            let (believed, count) = LongMeetingMap.believed(result, chunkBody: chunk.body)
+            let (believed, count) = LongMeetingMap.believed(result, chunk: chunk)
             dropped += count
             LongMeetingMap.merge(believed.speakers, into: &known)
             sections.append(LongMeetingMap.render(believed, part: chunk.index + 1, parts: chunks.count,
                                                   range: chunk.rangeLabel))
         }
 
+        // All the parts' notes in one request when they fit; otherwise merged in
+        // groups first, and the groups' notes merged again.
         let reduce = Prompts.text(.meetingReduce).filling(["speakerRules": speakerRules])
-        let merged = try await AIFormatter.complete(
-            system: system, user: sections.joined(separator: "\n\n") + "\n\n" + reduce,
-            tier: .smart, maxTokens: 6000, timeout: 300,
-            allowCloudFallback: allowCloudFallback, requireLocal: requireLocal, config: config)
+        func merge(_ parts: [String]) async throws -> String {
+            let reply = try await AIFormatter.complete(
+                system: system, user: parts.joined(separator: "\n\n") + "\n\n" + reduce,
+                tier: .smart, maxTokens: 6000, timeout: 300,
+                allowCloudFallback: mayAsk, requireLocal: requireLocal, config: config)
+            mayAsk = false
+            return LongMeetingMap.withoutTranscript(reply)
+        }
+        let budget = max(limit - 8_000, TranscriptChunker.chunkSize(contextCharLimit: limit))
+        var level = sections
+        var merged = ""
+        while true {
+            let groups = LongMeetingMap.group(level, budget: budget)
+            if groups.count <= 1 {
+                merged = try await merge(groups.first ?? level)
+                break
+            }
+            var next: [String] = []
+            for (index, group) in groups.enumerated() {
+                next.append("### Group \(index + 1) of \(groups.count)\n" + (try await merge(group)))
+            }
+            level = next
+        }
         let notes = LongMeetingMap.withoutTranscript(merged)
         let transcript = TranscriptAssembler.assemble(raw: raw, myName: myName)
         NSLog("Griasa: long meeting notes — %d parts, %d unquoted promises dropped", chunks.count, dropped)

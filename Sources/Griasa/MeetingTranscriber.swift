@@ -127,13 +127,25 @@ enum MeetingTranscriber {
         // A long meeting on a local model is read in parts rather than cut: the
         // single pass kept only the end and lost the agenda and the early decisions.
         let inParts = mode == .chunked
-            || (mode == .automatic && TranscriptChunker.shouldChunk(isLocal: config.runsOnThisMac,
-                                                                    characters: raw.count))
+            || (mode == .automatic && TranscriptChunker.shouldChunk(
+                    isLocal: config.runsOnThisMac, characters: raw.count,
+                    maxChars: TranscriptChunker.chunkSize(contextCharLimit: config.contextCharLimit)))
         if inParts {
-            return try await LongMeetingNotes.make(
-                raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
-                allowCloudFallback: allowCloudFallback, requireLocal: requireLocal,
-                config: configOverride).markdown
+            do {
+                return try await LongMeetingNotes.make(
+                    raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
+                    allowCloudFallback: allowCloudFallback, requireLocal: requireLocal,
+                    config: configOverride).markdown
+            } catch {
+                // A summary is worth more than the better way of making it: fall
+                // back to today's single pass, which keeps the end of the meeting.
+                // Not when the catch-up is waiting for a model that is slow or
+                // away — that meeting stays queued and is tried again whole.
+                let kind = LocalFailure.kind(of: error)
+                if error is CancellationError || mode == .chunked
+                    || (requireLocal && (kind == .slow || kind == .unreachable)) { throw error }
+                NSLog("Griasa: notes in parts failed (%@), using the single pass", error.localizedDescription)
+            }
         }
 
         // Keep the request under the provider's context limit rather than
@@ -186,7 +198,9 @@ enum MeetingTranscriber {
 
         return try await AIFormatter.complete(system: system, user: transcript,
                                               tier: .smart, maxTokens: 16000, timeout: 300,
-                                              allowCloudFallback: allowCloudFallback,
+                                              // The chunked attempt has already had its one
+                                              // chance to ask about the cloud.
+                                              allowCloudFallback: allowCloudFallback && !inParts,
                                               requireLocal: requireLocal, config: configOverride)
     }
 

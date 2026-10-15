@@ -63,9 +63,11 @@ enum TranscriptAssembler {
     /// `## Transcript` heading — or the whole text when there is no such heading
     /// (notes imported from another tool).
     static func transcriptSection(of markdown: String) -> String {
-        guard let range = markdown.range(of: "## Transcript") else { return markdown }
-        let rest = markdown[range.upperBound...]
-        let body = rest.drop { $0 != "\n" }
+        // The heading is a line of its own; the words "## Transcript" inside a
+        // sentence are not it.
+        guard let range = markdown.range(of: #"(?m)^## Transcript[ \t]*$"#, options: .regularExpression)
+        else { return markdown }
+        let body = markdown[range.upperBound...]
         return body.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

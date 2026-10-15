@@ -246,7 +246,7 @@ do {
           rule: "a reply wrapped in prose is still read as the JSON object it holds",
           meaning: "a model that adds a greeting must not cost a whole part of the meeting",
           saw: "\(String(describing: decoded))")
-    let (kept, dropped) = LongMeetingMap.believed(decoded!, chunkBody: part)
+    let (kept, dropped) = LongMeetingMap.believed(decoded!, chunk: TranscriptChunk(index: 0, body: part, overlap: "", startSeconds: nil, endSeconds: nil))
     check(kept.actions?.map { $0.task ?? "" } == ["send the deck"] && dropped == 2,
           rule: "an action is kept only when its quote is in the part",
           meaning: "the notes must not carry a promise the transcript does not hold",
@@ -278,6 +278,89 @@ do {
           rule: "the map schema is valid JSON and requires all five keys",
           meaning: "an invalid schema is rejected by the engine; a missing key lets a part skip a list",
           saw: "\(String(describing: schema?["required"]))")
+}
+
+// MARK: quote tolerance
+
+do {
+    let text = "[05:03] Them: Мы пришлём всё на 1 000 человек, ещё до пятницы. Потом обсудим бюджет проекта и сроки."
+    let hay = QuoteMatch.prepare(text)
+    check(QuoteMatch.contains(hay, quote: "Мы пришлем все на 1000 человек, еще до пятницы"),
+          rule: "ё and е, and the space inside 1 000, do not stop a quote matching",
+          meaning: "recognizers and models disagree on both; the sentence is still the one that was said",
+          saw: hay)
+    check(QuoteMatch.contains(hay, quote: "Them: Мы пришлём всё на 1 000 человек ещё до пятницы")
+          && QuoteMatch.contains(hay, quote: "Мария: Мы пришлём всё на 1 000 человек ещё до пятницы"),
+          rule: "a speaker label at the start of a quote is ignored",
+          meaning: "models copy the label with the sentence",
+          saw: "—")
+    check(QuoteMatch.contains(hay, quote: "Мы пришлём всё на 1 000 человек … Потом обсудим бюджет проекта")
+          && QuoteMatch.contains(hay, quote: "Мы пришлём всё на [...] ещё до пятницы Потом")
+          && !QuoteMatch.contains(hay, quote: "Потом обсудим бюджет … Мы пришлём всё на 1 000"),
+          rule: "a quote with a gap marked … is found when each piece is, in order",
+          meaning: "models skip words with an ellipsis; but pieces in the wrong order are not the text",
+          saw: "—")
+    check(!QuoteMatch.contains(hay, quote: "Мы пришлём … человек"),
+          rule: "a piece of fewer than three words between gaps is refused",
+          meaning: "two words match anywhere and prove nothing",
+          saw: "found")
+    check(QuoteMatch.contains(hay, quote: "Мы пришлём всё человек ещё до пятницы Потом обсудим бюджет")
+          && !QuoteMatch.contains(hay, quote: "Мы отправим всё на 2 000 человек ещё после пятницы"),
+          rule: "a copy missing a word or two still matches; a rewritten sentence does not",
+          meaning: "80% of the words in order is a copy with slips; less is another sentence",
+          saw: "—")
+    check(!QuoteMatch.contains(hay, quote: "до пятницы") && !QuoteMatch.contains(hay, quote: "бюджет проекта"),
+          rule: "a quote of fewer than four words is refused",
+          meaning: "a few words are in every transcript",
+          saw: "found")
+    check(QuoteMatch.visibleTimestamp("5:03", in: text) == "05:03"
+          && QuoteMatch.visibleTimestamp("05:03", in: text) == "05:03"
+          && QuoteMatch.visibleTimestamp("5:04", in: text) == nil,
+          rule: "\"5:03\" is the time \"[05:03]\" and is returned zero-padded",
+          meaning: "models drop the zero; the time is still the one the transcript shows",
+          saw: "—")
+    // Overlap: a sentence only in the repeated context belongs to the part before.
+    let overlap = "[10:00] You: I will send the final contract to the client tomorrow."
+    let body = "[10:30] Them: Thanks. Then we agree on the timeline for the launch."
+    let both = QuoteMatch.Haystack(overlap: overlap, body: body)
+    check(!QuoteMatch.contains(both, quote: "I will send the final contract to the client tomorrow")
+          && QuoteMatch.contains(both, quote: "we agree on the timeline for the launch")
+          && QuoteMatch.contains(both, quote: "send the final contract to the client tomorrow Thanks Then we agree on"),
+          rule: "a quote found only in the repeated context is refused; one that crosses into the new lines is kept",
+          meaning: "the previous part already answered for the context; a sentence cut by the boundary must not be lost",
+          saw: "—")
+}
+
+// MARK: duplicates, merging in groups, sizes, headings
+
+do {
+    let a = PromiseDuplicate.entry(text: "Send the pricing deck to Maria", owner: "Aik", quote: "I'll send the deck")
+    check(PromiseDuplicate.isDuplicate(text: "Send the pricing deck to Maria today", owner: "aik", quote: nil, of: [a])
+          && PromiseDuplicate.isDuplicate(text: "Totally different words here", owner: "Bob", quote: "ill SEND the deck", of: [a])
+          && !PromiseDuplicate.isDuplicate(text: "Send the pricing deck to Maria today", owner: "Bob", quote: nil, of: [a])
+          && !PromiseDuplicate.isDuplicate(text: "Book the venue for the offsite", owner: "Aik", quote: "x", of: [a]),
+          rule: "the same promise from two parts is one: same quote, or same owner and nearly the same words",
+          meaning: "the repeated context makes two parts report one sentence; the list must show it once",
+          saw: "—")
+    let groups = LongMeetingMap.group(["aaaa", "bbbb", "cccc", "dddd"], budget: 12)
+    check(groups == [["aaaa", "bbbb"], ["cccc", "dddd"]]
+          && LongMeetingMap.group(["a", "b"], budget: 100).count == 1,
+          rule: "part notes too long for one merge are split into ordered groups that each fit",
+          meaning: "the merge request must fit the model's window like every other request",
+          saw: "\(groups)")
+    check(TranscriptChunker.chunkSize(contextCharLimit: 38_000) == 20_000
+          && TranscriptChunker.chunkSize(contextCharLimit: 24_000) == 18_000
+          && TranscriptChunker.chunkSize(contextCharLimit: 8_000) == 4_000
+          && TranscriptChunker.chunkSize(contextCharLimit: 400_000) == 20_000,
+          rule: "a part is 20,000 characters, or the model's window less 6,000 when that is smaller, never under 4,000",
+          meaning: "a part plus its overlap, instructions and reply must fit the window",
+          saw: "\(TranscriptChunker.chunkSize(contextCharLimit: 24_000))")
+    let md = "# Meeting notes — X\n\nWe discussed the ## Transcript section.\n\n## Transcript\n\n[00:01] **A:** hi there\n"
+    check(TranscriptAssembler.transcriptSection(of: md) == "[00:01] **A:** hi there"
+          && LongMeetingMap.withoutTranscript(md).hasSuffix("section."),
+          rule: "the transcript heading is a line of its own; the same words in a sentence are not it",
+          meaning: "cutting at the sentence would lose the summary or split the transcript",
+          saw: LongMeetingMap.withoutTranscript(md))
 }
 
 // MARK: the record and the request

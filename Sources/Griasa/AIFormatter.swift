@@ -169,7 +169,7 @@ enum AIFormatter {
                 // Marked as a request's refresh: it never spends the waits
                 // kept for a runtime still starting at login.
                 await LocalModelSetup.shared.refresh(.request)
-                return try await send(LLMConfig.current())
+                return try await send(configOverride ?? LLMConfig.current())
             }
         } catch {
             guard allowCloudFallback,
@@ -408,6 +408,12 @@ enum AIFormatter {
                                                                            storedEngine: Self.storedLocalEngine)
             ])
         }
+        // An engine that does not take `response_format` answers 400: ask again
+        // without it (the reply is read leniently for JSON).
+        if schema != nil, (response as? HTTPURLResponse)?.statusCode == 400 {
+            return try await openAIComplete(config, system: system, user: user, model: model,
+                                            maxTokens: maxTokens, timeout: timeout, schema: nil)
+        }
         if local, (response as? HTTPURLResponse)?.statusCode == 404 {
             throw NSError(domain: "Griasa", code: 7, userInfo: [
                 NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model, typedByPerson: Self.baseURLTypedByPerson,
@@ -522,6 +528,10 @@ enum AIFormatter {
                                    schema: schema))
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        if status == 400, schema != nil {
+            return try await ollamaComplete(config, system: system, user: user, model: model,
+                                            maxTokens: maxTokens, timeout: timeout, schema: nil)
+        }
         if status == 404 {
             throw NSError(domain: "Griasa", code: 7, userInfo: [
                 NSLocalizedDescriptionKey: ProviderDefault.missingModelAdvice(model: model, typedByPerson: Self.baseURLTypedByPerson,

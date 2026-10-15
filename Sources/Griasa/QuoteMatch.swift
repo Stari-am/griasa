@@ -4,15 +4,19 @@ import Foundation
 ///
 /// A promise with no real source is the costliest thing this app can invent —
 /// somebody is then told they owe something nobody asked of them — so a
-/// promise is kept only when its quote is found in the input. The comparison
-/// ignores case, punctuation and line breaks, because the model re-wraps what it
-/// copies; it does not ignore words.
+/// promise with a quote is kept only when the quote is found in the input. The
+/// comparison ignores case, punctuation, line breaks, "ё" against "е", and the
+/// space inside "1 000"; a model re-wraps and slightly tidies what it copies.
+/// It tolerates a copy with a few words dropped (80% of the words, in order,
+/// close together) and a quote with "…" in the middle, but never a made-up one.
 enum QuoteMatch {
     /// Shorter than this is a word or two that matches anywhere.
     static let minLength = 8
+    static let minWords = 4
 
     /// Lower case, letters and digits only, one space between words.
-    /// Apostrophes vanish ("don't" = "dont"); every other mark is a space.
+    /// Apostrophes vanish ("don't" = "dont"); every other mark is a space;
+    /// "ё" is "е"; a space between two digits is closed.
     static func normalize(_ text: String) -> String {
         var out = ""
         var pendingSpace = false
@@ -20,14 +24,14 @@ enum QuoteMatch {
             if ch.isLetter || ch.isNumber {
                 if pendingSpace, !out.isEmpty { out.append(" ") }
                 pendingSpace = false
-                out.append(ch)
+                out.append(ch == "ё" ? "е" : ch)
             } else if ch == "'" || ch == "\u{2019}" {
                 continue
             } else {
                 pendingSpace = true
             }
         }
-        return out
+        return out.replacingOccurrences(of: #"(?<=\d) (?=\d)"#, with: "", options: .regularExpression)
     }
 
     /// The text a quote is looked for in, prepared once per input: speaker and
@@ -37,18 +41,102 @@ enum QuoteMatch {
         normalize(stripMarkers(text))
     }
 
-    static func contains(_ preparedText: String, quote: String) -> Bool {
-        let wanted = normalize(stripMarkers(quote))
-        guard wanted.count >= minLength else { return false }
-        return preparedText.contains(wanted)
+    /// The new lines of a part and the context repeated before it, prepared.
+    struct Haystack {
+        let combined: String
+        let overlap: String
+        let body: String
+        init(overlap: String = "", body: String) {
+            self.overlap = QuoteMatch.prepare(overlap)
+            self.body = QuoteMatch.prepare(body)
+            combined = QuoteMatch.prepare(overlap.isEmpty ? body : overlap + "\n" + body)
+        }
     }
 
-    /// A timestamp the model gave, kept only if the input really shows it.
+    /// Found in the part, and not only in the context repeated from the part
+    /// before — that sentence belongs to the previous part's answer.
+    static func contains(_ haystack: Haystack, quote: String) -> Bool {
+        guard contains(haystack.combined, quote: quote) else { return false }
+        if haystack.overlap.isEmpty { return true }
+        return contains(haystack.body, quote: quote) || !contains(haystack.overlap, quote: quote)
+    }
+
+    static func contains(_ preparedText: String, quote: String) -> Bool {
+        var candidates = [quote]
+        // "Maria: I'll send it" — the model copies the speaker label too.
+        let stripped = quote.replacingOccurrences(of: #"^\s*[^\s:]{1,30}:\s+"#, with: "",
+                                                  options: .regularExpression)
+        if stripped != quote { candidates.append(stripped) }
+        return candidates.contains { matches(preparedText, quote: $0) }
+    }
+
+    private static func matches(_ preparedText: String, quote: String) -> Bool {
+        let cleaned = stripMarkers(quote)
+        // "…", "..." and "[...]" mark words left out: each fragment must be found, in order.
+        let fragments = cleaned
+            .replacingOccurrences(of: #"\[\s*(\.\.\.|…)\s*\]|\.\.\.|…"#, with: "\u{1}", options: .regularExpression)
+            .components(separatedBy: "\u{1}")
+            .map(normalize)
+            .filter { !$0.isEmpty }
+        guard !fragments.isEmpty else { return false }
+        let whole = fragments.joined(separator: " ")
+        guard whole.count >= minLength, whole.split(separator: " ").count >= minWords else { return false }
+        if fragments.count == 1 { return fuzzy(preparedText, fragments[0]) }
+        guard fragments.allSatisfy({ $0.split(separator: " ").count >= 3 }) else { return false }
+        var from = preparedText.startIndex
+        for fragment in fragments {
+            guard let end = fuzzyEnd(preparedText, fragment, from: from) else { return false }
+            from = end
+        }
+        return true
+    }
+
+    private static func fuzzy(_ text: String, _ wanted: String) -> Bool {
+        fuzzyEnd(text, wanted, from: text.startIndex) != nil
+    }
+
+    /// Where the match ends: an exact hit, or else 80% of the words in order
+    /// inside a window of the quote's length plus three.
+    private static func fuzzyEnd(_ text: String, _ wanted: String, from: String.Index) -> String.Index? {
+        let tail = text[from...]
+        if let range = tail.range(of: wanted) { return range.upperBound }
+        let q = wanted.split(separator: " ")
+        // Words of the tail with where each one ends.
+        var words: [(word: Substring, end: String.Index)] = []
+        var index = tail.startIndex
+        while index < tail.endIndex {
+            while index < tail.endIndex, tail[index] == " " { index = tail.index(after: index) }
+            let start = index
+            while index < tail.endIndex, tail[index] != " " { index = tail.index(after: index) }
+            if start < index { words.append((tail[start..<index], index)) }
+        }
+        let need = Int((Double(q.count) * 0.8).rounded(.up))
+        let window = q.count + 3
+        let early = Set(q.prefix(3))
+        for i in words.indices where early.contains(words[i].word) {
+            let upper = min(words.count, i + window)
+            var matched = 0, position = i, last = i
+            for word in q {
+                if let hit = (position..<upper).first(where: { words[$0].word == word }) {
+                    matched += 1
+                    position = hit + 1
+                    last = hit
+                }
+            }
+            if matched >= need { return words[last].end }
+        }
+        return nil
+    }
+
+    /// A time the model gave, kept only if the input shows it; "5:03" is
+    /// "[05:03]". Returns it zero-padded as the transcript writes it.
     static func visibleTimestamp(_ claimed: String?, in text: String) -> String? {
         guard let claimed = claimed?.trimmingCharacters(in: CharacterSet(charactersIn: "[] ")),
-              claimed.range(of: #"^\d{1,3}:\d{2}(:\d{2})?$"#, options: .regularExpression) != nil,
-              text.contains("[\(claimed)]") else { return nil }
-        return claimed
+              claimed.range(of: #"^\d{1,3}:\d{2}(:\d{2})?$"#, options: .regularExpression) != nil else { return nil }
+        var parts = claimed.split(separator: ":").map(String.init)
+        if parts[0].count < 2 { parts[0] = "0" + parts[0] }
+        let padded = parts.joined(separator: ":")
+        return text.contains("[\(padded)]") ? padded : nil
     }
 
     private static func stripMarkers(_ text: String) -> String {
@@ -57,5 +145,31 @@ enum QuoteMatch {
             out = out.replacingOccurrences(of: pattern, with: " ", options: .regularExpression)
         }
         return out
+    }
+}
+
+/// The same promise reported twice: by two parts that share an overlap, or
+/// said twice in one meeting.
+enum PromiseDuplicate {
+    struct Seen { let text: String; let owner: String; let quote: String }
+
+    static func isDuplicate(text: String, owner: String, quote: String?, of seen: [Seen]) -> Bool {
+        let t = QuoteMatch.normalize(text), o = owner.lowercased()
+        let q = quote.map(QuoteMatch.normalize) ?? ""
+        let words = Set(t.split(separator: " "))
+        for s in seen {
+            if s.text == t { return true }
+            if !q.isEmpty, s.quote == q { return true }
+            if s.owner == o {
+                let other = Set(s.text.split(separator: " "))
+                let union = words.union(other).count
+                if union > 0, Double(words.intersection(other).count) / Double(union) >= 0.8 { return true }
+            }
+        }
+        return false
+    }
+
+    static func entry(text: String, owner: String, quote: String?) -> Seen {
+        Seen(text: QuoteMatch.normalize(text), owner: owner.lowercased(), quote: quote.map(QuoteMatch.normalize) ?? "")
     }
 }

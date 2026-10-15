@@ -85,6 +85,13 @@ enum TranscriptChunker {
     static let maxChars = 20_000
     static let overlapChars = 1_500
 
+    /// The part size for a model whose request budget is `contextCharLimit`
+    /// characters: the 20,000 default, smaller when the model's window is, leaving
+    /// room for the overlap, the instructions and the reply.
+    static func chunkSize(contextCharLimit: Int) -> Int {
+        min(maxChars, max(4_000, contextCharLimit - 6_000))
+    }
+
     /// Whether a transcript of this length is worth the map/reduce path: only on
     /// a local model, and only when one request would not hold it. Cloud models
     /// read the whole meeting in one request.
@@ -95,6 +102,7 @@ enum TranscriptChunker {
     static func chunks(_ text: String, maxChars: Int = TranscriptChunker.maxChars,
                        overlapChars: Int = TranscriptChunker.overlapChars) -> [TranscriptChunk] {
         let maxChars = max(maxChars, 2)
+        let overlapChars = min(overlapChars, maxChars / 4)
         guard text.count > maxChars else {
             return [make(index: 0, lines: [text], overlap: [], whole: text)]
         }

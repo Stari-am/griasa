@@ -172,7 +172,9 @@ enum LongMeetingEval {
                   + " · promises: single \(count(single)), chunked \(count(chunked)), cloud \(count(reference))")
         }
 
-        LlamaServer.shared.stop()
+        // No stop(): when Griasa itself is running, the probe adopted Griasa's
+        // engine on 8177, and stopping it would kill the app's server. A server
+        // the probe started is adopted by the app later, or unloads when idle.
         print("\nfiles: \(root.path)/<entry-id>/ — nothing in any store was changed.")
         exit(0)
     }

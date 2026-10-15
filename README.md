@@ -47,7 +47,8 @@ the kind that never surfaces on its own. Every colleague gets a page built from
 the meeting roster, with no setup step.
 
 **And your own assistant can read it.** Claude Code, Codex, Cursor — anything
-speaking MCP — over a local, token-protected, read-only endpoint.
+speaking MCP — over a local, token-protected, read-only endpoint, and Claude Desktop
+installs it in one click.
 
 Everything runs at once: you can dictate while a conversation is being recorded.
 Most of the pieces are small, and Apple could ship several of them tomorrow. What
@@ -293,6 +294,15 @@ Every history entry — dictation, meeting, capture result — is filed into a *
 Each project is mirrored on disk as plain Markdown: `~/Documents/Griasa/Projects/<Project>/YYYY-MM-DD-HHmm-<kind>-<id>.md` with YAML frontmatter — browsable, git/Obsidian-friendly, and never deleted (removing a project moves its files to Inbox).
 
 **🗂 Ask project** (⌃⌥⌘P or menu) opens a window where the smart model answers questions using the project's entries **plus attached source folders** as context — attach a repo, a docs folder, anything; text files are read newest-entries-first up to ~150k characters. Answers are saved back into the project's history. ([Projects.swift](Sources/Griasa/Projects.swift), [ProjectFiles.swift](Sources/Griasa/ProjectFiles.swift), [ProjectAI.swift](Sources/Griasa/ProjectAI.swift), [AskProjectWindow.swift](Sources/Griasa/AskProjectWindow.swift))
+
+### Let an assistant read your meetings (MCP)
+Switch on *Settings → System → AI assistants (MCP)* and Griasa serves a read-only endpoint on this Mac (`127.0.0.1`, port 8179 or the next free one, bearer token). It answers eight questions: open promises (yours and what you are waiting on), one colleague, meetings by search, one meeting's summary, a transcript (only when asked for), the next meeting's brief, people, projects. Nothing can be changed through it.
+
+- **Claude Desktop — one click.** Press **Add to Claude Desktop**. Griasa writes `Griasa.mcpb` into its store folder and opens it in Claude Desktop, which asks you to confirm the install. The extension is a small Node script (Node ships inside Claude Desktop) that forwards Claude's requests to the app; it reads the port and token from `mcp.json` each time, so a new token or a different port needs no reinstall. Griasa has to be running — if it is not, Claude is told to open it from the menu bar.
+- **Claude Code, Codex, Cursor and others.** Press **Copy client configuration** and paste the block into the client's MCP settings. It looks like `{"mcpServers": {"griasa": {"type": "http", "url": "http://127.0.0.1:8179/mcp", "headers": {"Authorization": "Bearer …"}}}}`.
+- **Protocol.** Streamable HTTP, MCP 2026-07-28 (stateless; `server/discover`; per-request version and headers) and, on the same endpoint, 2025-06-18 and 2025-11-25 clients with their `initialize` handshake. Tools carry titles, read-only annotations and output schemas. Source: [MCPEndpoint.swift](Sources/Griasa/MCPEndpoint.swift), [MCPTools.swift](Sources/Griasa/MCPTools.swift), [MCPBundle.swift](Sources/Griasa/MCPBundle.swift).
+
+What an assistant reads goes wherever that assistant sends its context; transcripts are a separate tool so a question about promises cannot pull one in by accident.
 
 ### Live notes during a call
 Enable *Show live notes while recording* (Settings → Meetings). While a recording runs, the hub's **Recording tab** transcribes both tracks in ~18-second chunks against the warm Whisper server and shows a **running summary** (headline, key points, open questions, action items). The summary refreshes every minute when the **Auto** toggle is on, or only when you press **⟳ Summarize now** — your choice. Below the transcript there's a **note field**: anything you type is pinned into the transcript at the current timecode (📝 rows), fed to the live summary as high-signal input, and woven into the final meeting notes — the model reflects your notes in the Summary/Key points/Action items and keeps them in the transcript as `> 📝 **Note [mm:ss]:**` blockquotes.

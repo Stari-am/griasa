@@ -40,11 +40,14 @@ swiftc -O \
   Sources/Griasa/LlamaServerRules.swift \
   Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
+  Sources/Griasa/MCPEndpoint.swift \
+  Sources/Griasa/MCPBundle.swift \
   Sources/Griasa/DownloadResume.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
   Tests/MCPChecks.swift \
+  Tests/MCPEndpointChecks.swift \
   Tests/ScopeChecks.swift \
   Tests/CommitmentChecks.swift \
   Tests/AttendanceChecks.swift \

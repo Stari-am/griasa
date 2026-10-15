@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Network
 
@@ -19,6 +20,7 @@ final class MCPServer: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var port: UInt16 = MCPServer.preferredPort
     @Published private(set) var lastError: String?
+    @Published private(set) var lastInstallMessage: String?
 
     private var listener: NWListener?
     private var connections: [ObjectIdentifier: NWConnection] = [:]
@@ -43,6 +45,50 @@ final class MCPServer: ObservableObject {
           }
         }
         """
+    }
+
+    /// Builds the Claude Desktop extension and hands it to Claude Desktop, which
+    /// shows its own install dialog. The file goes in the store folder, next to
+    /// mcp.json, so it can be found again; it holds no token — the extension
+    /// reads that from mcp.json when it runs.
+    func installInClaudeDesktop() {
+        lastInstallMessage = nil
+        let destination = StoreRoot.file(MCPBundle.fileName)
+        do {
+            try FileManager.default.createDirectory(at: StoreRoot.url, withIntermediateDirectories: true)
+            try MCPBundle.build(
+                into: destination, appVersion: Self.appVersion,
+                tools: MCPTools.listings.map { (name: $0["name"] as? String ?? "",
+                                                description: $0["description"] as? String ?? "") },
+                iconPNG: Self.iconPNG())
+        } catch {
+            lastInstallMessage = error.localizedDescription
+            return
+        }
+        // Claude Desktop registers for .mcpb. Without it, the file is revealed so
+        // it can be dropped onto Claude Desktop by hand.
+        if let claude = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") {
+            NSWorkspace.shared.open([destination], withApplicationAt: claude,
+                                    configuration: NSWorkspace.OpenConfiguration())
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+            lastInstallMessage = "Claude Desktop was not found. The extension is in the Griasa folder; "
+                + "install Claude Desktop, then open that file."
+        }
+    }
+
+    private static func iconPNG() -> Data? {
+        let image = NSApp.applicationIconImage ?? NSImage()
+        let size = NSSize(width: 512, height: 512)
+        guard let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        image.draw(in: NSRect(origin: .zero, size: size))
+        NSGraphicsContext.restoreGraphicsState()
+        return bitmap.representation(using: .png, properties: [:])
     }
 
     // MARK: - Lifecycle
@@ -182,70 +228,27 @@ final class MCPServer: ObservableObject {
             send(status: status, reason: reason, on: connection)
             return
         }
-        switch JSONRPC.decode(request.body) {
-        case .failure(let failure):
-            send(body: JSONRPC.failure(id: nil, failure.code, failure.message), on: connection)
-        case .success(let call):
-            // A notification gets an empty 202 and no JSON-RPC reply. Answering
-            // one is a protocol violation that some clients report as a failed
-            // session rather than ignoring.
-            guard !call.isNotification else {
-                send(status: 202, reason: "", on: connection)
-                return
-            }
-            send(body: dispatch(call), on: connection)
+        let environment = MCPEndpoint.Environment(
+            serverVersion: Self.appVersion,
+            tools: MCPTools.listings,
+            invoke: { MCPTools.invoke($0, $1) })
+        let reply = MCPEndpoint.handle(body: request.body, headers: request.headers,
+                                       environment: environment)
+        if let body = reply.body {
+            send(body: body, status: reply.status, on: connection)
+        } else {
+            send(status: reply.status, reason: "", on: connection)
         }
     }
 
-    private func dispatch(_ call: JSONRPC.Request) -> Data {
-        switch call.method {
-        case "initialize":
-            return JSONRPC.result(id: call.id, [
-                // Echoed from the client when it names one, because a server that
-                // insists on its own version fails the handshake with anything
-                // newer than itself.
-                "protocolVersion": call.params["protocolVersion"]?.stringValue ?? "2025-06-18",
-                "capabilities": ["tools": [String: Any]()],
-                "serverInfo": ["name": "griasa", "version": (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "dev"],
-            ])
-        case "ping":
-            return JSONRPC.result(id: call.id, [:])
-        case "tools/list":
-            return JSONRPC.result(id: call.id, [
-                "tools": MCPTools.readOnly.map { tool in
-                    ["name": tool.name, "description": tool.summary, "inputSchema": tool.schema]
-                }
-            ])
-        case "tools/call":
-            guard let name = call.params["name"]?.stringValue else {
-                return JSONRPC.failure(id: call.id, .invalidParams, "missing tool name")
-            }
-            guard let tool = MCPTools.readOnly.first(where: { $0.name == name }) else {
-                return JSONRPC.failure(id: call.id, .methodNotFound, "no tool named \(name)")
-            }
-            var arguments: [String: JSONValue] = [:]
-            if case .object(let raw)? = call.params["arguments"] {
-                for (key, value) in raw { arguments[key] = JSONValue(value) }
-            }
-            let payload = tool.run(arguments)
-            let text = String(data: (try? JSONSerialization.data(withJSONObject: payload,
-                                                                options: [.sortedKeys])) ?? Data("{}".utf8),
-                              encoding: .utf8) ?? "{}"
-            // Tool results travel as text content. Structured output exists in
-            // newer protocol revisions, but text is what every client reads.
-            return JSONRPC.result(id: call.id, [
-                "content": [["type": "text", "text": text]],
-                "isError": false,
-            ])
-        default:
-            return JSONRPC.failure(id: call.id, .methodNotFound, "unsupported method \(call.method)")
-        }
+    private static var appVersion: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "dev"
     }
 
     // MARK: - Writing
 
-    private func send(body: Data, on connection: NWConnection) {
-        var head = "HTTP/1.1 200 OK\r\n"
+    private func send(body: Data, status: Int = 200, on connection: NWConnection) {
+        var head = "HTTP/1.1 \(status) \(Self.phrase(for: status))\r\n"
         head += "Content-Type: application/json\r\n"
         head += "Content-Length: \(body.count)\r\n"
         head += "Connection: keep-alive\r\n\r\n"
@@ -267,6 +270,7 @@ final class MCPServer: ObservableObject {
 
     private static func phrase(for status: Int) -> String {
         switch status {
+        case 200: return "OK"
         case 202: return "Accepted"
         case 400: return "Bad Request"
         case 401: return "Unauthorized"

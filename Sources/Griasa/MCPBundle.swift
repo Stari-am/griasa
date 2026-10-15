@@ -70,7 +70,8 @@ enum MCPBundle {
     /// `ditto -c -k` is used without --keepParent so manifest.json sits at the
     /// root of the archive, which is where MCPB looks for it.
     static func build(into destination: URL, appVersion: String,
-                      tools: [(name: String, description: String)], iconPNG: Data?) throws {
+                      tools: [(name: String, description: String)], iconPNG: Data?,
+                      staticState: [String: Any] = [:]) throws {
         let fm = FileManager.default
         let staging = fm.temporaryDirectory.appendingPathComponent("griasa-mcpb-\(UUID().uuidString)",
                                                                    isDirectory: true)
@@ -83,6 +84,13 @@ enum MCPBundle {
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try manifestData.write(to: staging.appendingPathComponent("manifest.json"))
         try Data(bridgeSource.utf8).write(to: staging.appendingPathComponent("server/index.js"))
+        // What the app answered when the bundle was built: the tool list, the
+        // instructions and the protocol versions. The bridge serves it when the
+        // app cannot be reached, so Claude Desktop still learns the tools if it
+        // started before Griasa did.
+        let state = try JSONSerialization.data(withJSONObject: staticState,
+                                               options: [.sortedKeys, .withoutEscapingSlashes])
+        try state.write(to: staging.appendingPathComponent("server/static.json"))
         if let iconPNG { try iconPNG.write(to: staging.appendingPathComponent("icon.png")) }
 
         try? fm.removeItem(at: destination)
@@ -121,10 +129,20 @@ enum MCPBundle {
     const path = require('path');
     const readline = require('readline');
 
-    const NOT_RUNNING = 'Griasa is not running — open it from the menu bar.';
-    const NOT_ENABLED = 'Griasa is running but is not letting assistants in — switch on ' +
-      'Settings → System → AI assistants (MCP) in Griasa.';
+    const NOT_RUNNING = "Griasa is not running, or 'AI assistants (MCP)' is off in its Settings.";
+    const REFUSED = "Griasa refused the connection — click 'Add to Claude Desktop' again in Griasa's Settings.";
+    const TOO_SLOW = 'Griasa took too long to answer.';
     const REQUEST_TIMEOUT_MS = 60000;
+    // No keep-alive: nothing may hold the process open once stdin has closed.
+    const agent = new http.Agent({ keepAlive: false });
+
+    // The app's own tool list, instructions and protocol versions, captured when the
+    // extension was built. Served when the app cannot be reached, so Claude Desktop
+    // still learns the tools if it started before Griasa did.
+    let fallback = { tools: [], instructions: '', versions: ['2025-11-25', '2025-06-18'] };
+    try {
+      fallback = Object.assign(fallback, JSON.parse(fs.readFileSync(path.join(__dirname, 'static.json'), 'utf8')));
+    } catch (_) { /* a bundle without it still forwards */ }
 
     function storeDir() {
       const override = process.env.GRIASA_STORE || '';
@@ -183,8 +201,8 @@ enum MCPBundle {
       return headers;
     }
 
-    // Resolves { status, body }; rejects when the app cannot be reached
-    // (ECONNREFUSED when it is not running).
+    // Resolves { status, body }; rejects with the network error (.code is
+    // ECONNREFUSED when the app is not running, ETIMEDOUT when it did not answer).
     function post(config, message) {
       return new Promise((resolve, reject) => {
         const payload = Buffer.from(JSON.stringify(message), 'utf8');
@@ -196,6 +214,7 @@ enum MCPBundle {
           path: config.url.pathname || '/mcp',
           method: 'POST',
           headers,
+          agent,
           timeout: REQUEST_TIMEOUT_MS,
         }, (res) => {
           const chunks = [];
@@ -209,9 +228,10 @@ enum MCPBundle {
       });
     }
 
-    // What to tell the model when the app cannot be reached. A tool call gets a
-    // tool result, which the model reads and relays; anything else gets a
-    // protocol error.
+    // The answer when the app cannot give one. What can be known without it is
+    // answered from the captured state, so a client that started first still sees
+    // the tools; a tool call gets a tool result the model reads and relays, and
+    // anything else a protocol error.
     function unreachable(message, text) {
       if (message.method === 'tools/call') {
         return {
@@ -219,22 +239,29 @@ enum MCPBundle {
           result: { content: [{ type: 'text', text }], isError: true },
         };
       }
-      // Answering initialize locally keeps the extension listed as connected while
-      // the app is closed, instead of failing at startup; the first tool call then
-      // explains what to do.
       if (message.method === 'initialize') {
         const asked = message.params && message.params.protocolVersion;
+        // Never a version the app does not speak: the newest it does, when the
+        // client asked for something else.
+        const version = fallback.versions.includes(asked) ? asked : fallback.versions[0];
         return {
           jsonrpc: '2.0', id: message.id,
           result: {
-            protocolVersion: typeof asked === 'string' ? asked : '2025-06-18',
+            protocolVersion: version,
             capabilities: { tools: {} },
             serverInfo: { name: 'griasa', version: 'bridge' },
-            instructions: text,
+            instructions: fallback.instructions,
           },
         };
       }
+      if (message.method === 'tools/list' && fallback.tools.length > 0) {
+        return { jsonrpc: '2.0', id: message.id, result: { tools: fallback.tools } };
+      }
       return failure(message.id, -32603, text);
+    }
+
+    function describe(error) {
+      return error && error.code === 'ETIMEDOUT' ? TOO_SLOW : NOT_RUNNING;
     }
 
     async function forward(message) {
@@ -254,12 +281,14 @@ enum MCPBundle {
           reply = await post(config, message);
         }
       } catch (error) {
-        if (isRequest) write(unreachable(message, NOT_RUNNING));
+        if (isRequest) write(unreachable(message, describe(error)));
         return;
       }
       if (!isRequest) return;
       if (reply.status === 401 || reply.status === 403) {
-        write(failure(message.id, -32603, NOT_ENABLED));
+        // A tool call still gets a result the model can relay.
+        write(message.method === 'tools/call' ? unreachable(message, REFUSED)
+                                              : failure(message.id, -32603, REFUSED));
         return;
       }
       let parsed = null;
@@ -294,7 +323,8 @@ enum MCPBundle {
       }).finally(() => pending.delete(work));
       pending.add(work);
     });
-    // Close only after the answers still in flight have been written.
-    input.on('close', () => Promise.allSettled([...pending]).then(() => process.exit(0)));
+    // No process.exit: once stdin has closed and the answers still in flight are
+    // written, nothing keeps the event loop alive, and the process ends after
+    // stdout has drained. Exiting by hand truncated large replies on a pipe.
     """#
 }

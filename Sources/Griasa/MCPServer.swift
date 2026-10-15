@@ -21,6 +21,7 @@ final class MCPServer: ObservableObject {
     @Published private(set) var port: UInt16 = MCPServer.preferredPort
     @Published private(set) var lastError: String?
     @Published private(set) var lastInstallMessage: String?
+    @Published private(set) var isInstalling = false
 
     private var listener: NWListener?
     private var connections: [ObjectIdentifier: NWConnection] = [:]
@@ -52,28 +53,57 @@ final class MCPServer: ObservableObject {
     /// mcp.json, so it can be found again; it holds no token — the extension
     /// reads that from mcp.json when it runs.
     func installInClaudeDesktop() {
+        guard !isInstalling else { return }
         lastInstallMessage = nil
+        isInstalling = true
         let destination = StoreRoot.file(MCPBundle.fileName)
-        do {
-            try FileManager.default.createDirectory(at: StoreRoot.url, withIntermediateDirectories: true)
-            try MCPBundle.build(
-                into: destination, appVersion: Self.appVersion,
-                tools: MCPTools.listings.map { (name: $0["name"] as? String ?? "",
-                                                description: $0["description"] as? String ?? "") },
-                iconPNG: Self.iconPNG())
-        } catch {
-            lastInstallMessage = error.localizedDescription
-            return
+        let listings = MCPTools.listings
+        let tools = listings.map { (name: $0["name"] as? String ?? "",
+                                    description: $0["description"] as? String ?? "") }
+        let version = Self.appVersion
+        // Snapshot of what the app answers now, handed over as bytes so it can
+        // cross to the background task; the bridge serves it while the app is shut.
+        let state = try? JSONSerialization.data(withJSONObject: [
+            "tools": listings,
+            "instructions": MCPEndpoint.instructions,
+            "versions": MCPEndpoint.legacyVersions,
+        ] as [String: Any])
+        // The icon is drawn with AppKit, so it is made here; zipping is the slow
+        // part and runs off the main actor.
+        let icon = Self.iconPNG()
+
+        Task.detached {
+            var failure: String?
+            do {
+                try FileManager.default.createDirectory(at: StoreRoot.url, withIntermediateDirectories: true)
+                let snapshot = (state.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+                try MCPBundle.build(into: destination, appVersion: version, tools: tools,
+                                    iconPNG: icon, staticState: snapshot)
+            } catch {
+                failure = error.localizedDescription
+            }
+            let message = failure
+            await MainActor.run { self.finishInstall(destination, failure: message) }
         }
+    }
+
+    private func finishInstall(_ destination: URL, failure: String?) {
+        defer { isInstalling = false }
+        if let failure { lastInstallMessage = failure; return }
         // Claude Desktop registers for .mcpb. Without it, the file is revealed so
         // it can be dropped onto Claude Desktop by hand.
-        if let claude = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") {
-            NSWorkspace.shared.open([destination], withApplicationAt: claude,
-                                    configuration: NSWorkspace.OpenConfiguration())
-        } else {
+        guard let claude = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") else {
             NSWorkspace.shared.activateFileViewerSelecting([destination])
             lastInstallMessage = "Claude Desktop was not found. The extension is in the Griasa folder; "
                 + "install Claude Desktop, then open that file."
+            return
+        }
+        NSWorkspace.shared.open([destination], withApplicationAt: claude,
+                                configuration: NSWorkspace.OpenConfiguration()) { [weak self] _, error in
+            guard let error else { return }
+            Task { @MainActor in
+                self?.lastInstallMessage = "Claude Desktop could not open the extension: \(error.localizedDescription)"
+            }
         }
     }
 

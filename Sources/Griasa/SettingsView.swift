@@ -1000,6 +1000,7 @@ private struct SystemSettings: View {
                             .font(.caption)
                         HStack {
                             Button("Add to Claude Desktop") { mcp.installInClaudeDesktop() }
+                                .disabled(mcp.isInstalling)
                                 .help("Builds a Griasa extension and opens it in Claude Desktop, which asks you to confirm")
                             Button("Copy client configuration") {
                                 NSPasteboard.general.clearContents()

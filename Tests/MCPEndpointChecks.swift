@@ -65,7 +65,7 @@ func modern(_ method: String, id: Any = 1, params: [String: Any] = [:], version:
 
 // ── Legacy initialize ────────────────────────────────────────────────────────
 
-for asked in ["2025-06-18", "2025-11-25"] {
+for asked in ["2025-06-18", "2025-11-25", "2025-03-26", "2024-11-05"] {
     let reply = send(["jsonrpc": "2.0", "id": 1, "method": "initialize",
                       "params": ["protocolVersion": asked]])
     check(reply.status == 200 && result(reply)["protocolVersion"] as? String == asked,
@@ -74,10 +74,10 @@ for asked in ["2025-06-18", "2025-11-25"] {
           saw: "status \(reply.status), \(result(reply)["protocolVersion"] ?? "none")")
 }
 do {
-    // The two versions that are not ones this server speaks: newer than any it
-    // knows, and a very old one. Each gets the newest legacy version, and the
-    // client decides whether it can live with that.
-    for asked in ["2030-01-01", "2024-11-05"] {
+    // Versions this server does not speak: newer than any it knows, and older
+    // than any it does. Each gets the newest legacy version, and the client
+    // decides whether it can live with that.
+    for asked in ["2030-01-01", "2023-01-01"] {
         let reply = send(["jsonrpc": "2.0", "id": 1, "method": "initialize",
                           "params": ["protocolVersion": asked]])
         check(result(reply)["protocolVersion"] as? String == "2025-11-25",
@@ -108,6 +108,14 @@ do {
           rule: "ping is still answered for legacy clients",
           meaning: "older clients use it as a liveness probe and drop the connection without an answer",
           saw: "status \(ping.status)")
+    for older in ["2025-03-26", "2024-11-05"] {
+        let accepted = send(["jsonrpc": "2.0", "id": 4, "method": "tools/list"],
+                            headers: ["mcp-protocol-version": older])
+        check(accepted.status == 200 && (result(accepted)["tools"] as? [Any])?.count == 1,
+              rule: "a request carrying MCP-Protocol-Version \(older) is served",
+              meaning: "clients still on that revision must not be turned away by the header check",
+              saw: "status \(accepted.status), \(error(accepted))")
+    }
     let unsupported = send(["jsonrpc": "2.0", "id": 4, "method": "tools/list"],
                            headers: ["mcp-protocol-version": "1900-01-01"])
     check(unsupported.status == 400 && error(unsupported)["code"] as? Int == -32022,
@@ -135,7 +143,7 @@ do {
     let bad = modern("tools/list", version: "1900-01-01")
     let data = error(bad)["data"] as? [String: Any]
     check(bad.status == 400 && error(bad)["code"] as? Int == -32022
-            && data?["supported"] as? [String] == ["2026-07-28", "2025-11-25", "2025-06-18"]
+            && data?["supported"] as? [String] == ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
             && data?["requested"] as? String == "1900-01-01",
           rule: "an unsupported version is UnsupportedProtocolVersionError listing what is supported",
           meaning: "the client picks a mutual version from that list and retries; without it, it gives up",
@@ -325,6 +333,35 @@ check(!MCPBundle.bridgeSource.contains("child_process") && MCPBundle.bridgeSourc
       saw: "")
 
 do {
+    // The bridge is JavaScript inside a Swift string, so nothing else would
+    // notice a syntax slip before a user's Claude Desktop did.
+    let fm = FileManager.default
+    let script = fm.temporaryDirectory.appendingPathComponent("griasa-bridge-check-\(UUID().uuidString).js")
+    try? Data(MCPBundle.bridgeSource.utf8).write(to: script)
+    defer { try? fm.removeItem(at: script) }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["node", "--check", script.path]
+    let errors = Pipe()
+    process.standardError = errors
+    process.standardOutput = Pipe()
+    if (try? process.run()) != nil {
+        process.waitUntilExit()
+        let text = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        if process.terminationStatus == 127 || text.contains("No such file or directory") {
+            print("  · node not found: bridge syntax check skipped")
+        } else {
+            check(process.terminationStatus == 0,
+                  rule: "the bridge script passes node --check",
+                  meaning: "a syntax error means Claude Desktop starts an extension that exits at once",
+                  saw: text)
+        }
+    } else {
+        print("  · node not found: bridge syntax check skipped")
+    }
+}
+
+do {
     let fm = FileManager.default
     let dir = fm.temporaryDirectory.appendingPathComponent("griasa-bundle-check-\(UUID().uuidString)")
     try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -333,14 +370,15 @@ do {
     do {
         try MCPBundle.build(into: out, appVersion: "1.0.18",
                             tools: [(name: "list_people", description: "d")],
-                            iconPNG: Data([0x89, 0x50, 0x4E, 0x47]))
+                            iconPNG: Data([0x89, 0x50, 0x4E, 0x47]),
+                            staticState: ["tools": [["name": "list_people"]]])
         let unpacked = dir.appendingPathComponent("x")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         process.arguments = ["-x", "-k", out.path, unpacked.path]
         try process.run()
         process.waitUntilExit()
-        let names = ["manifest.json", "server/index.js", "icon.png"]
+        let names = ["manifest.json", "server/index.js", "server/static.json", "icon.png"]
         let present = names.allSatisfy { fm.fileExists(atPath: unpacked.appendingPathComponent($0).path) }
         check(present && !fm.fileExists(atPath: unpacked.appendingPathComponent("__MACOSX").path),
               rule: "the built bundle has manifest.json, the bridge and the icon at the archive root",

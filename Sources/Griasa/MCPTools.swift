@@ -50,8 +50,7 @@ enum MCPTools {
 
     private static func object(_ properties: [String: [String: Any]],
                               required: [String] = []) -> [String: Any] {
-        ["type": "object", "properties": properties, "required": required,
-         "additionalProperties": false]
+        ["type": "object", "properties": properties, "required": required]
     }
     private static func string(_ note: String) -> [String: Any] { ["type": "string", "description": note] }
     private static func integer(_ note: String) -> [String: Any] { ["type": "integer", "description": note] }

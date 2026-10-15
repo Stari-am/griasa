@@ -24,7 +24,7 @@ import Foundation
 /// server-initiated message exists.
 enum MCPEndpoint {
     static let modernVersion = "2026-07-28"
-    static let legacyVersions = ["2025-11-25", "2025-06-18"]
+    static let legacyVersions = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
     /// Newest first, the order `UnsupportedProtocolVersionError.data.supported`
     /// is read in.
     static let supportedVersions = [modernVersion] + legacyVersions

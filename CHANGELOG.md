@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.18 — 2026-10-14
+
+**Testing the local model works.** *Test* in Settings → AI & Actions said the
+local AI model wasn't answering whenever Griasa's own engine had been idle for
+ten minutes and unloaded itself; summaries and promises were never affected,
+because they start the engine first. The test now does the same. The provider
+menu also lists the local model first, since it is the default.
+
 ## 1.0.17 — 2026-10-13
 
 **Local AI keeps what works, and says why when it can't start.** When Ollama or

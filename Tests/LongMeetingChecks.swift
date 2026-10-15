@@ -530,6 +530,35 @@ do {
           saw: "—")
 }
 
+// MARK: owner strings the model returns
+
+do {
+    check(PromiseOwner.normalizeOwner("Саша (Саша Файн, ведущий)") == "Саша"
+          && PromiseOwner.normalizeOwner("Все участники (команда)") == "Them"
+          && PromiseOwner.normalizeOwner("everyone") == "Them"
+          && PromiseOwner.normalizeOwner("Неопределенно (из контекста)") == ""
+          && PromiseOwner.normalizeOwner("Unknown (nobody said)") == ""
+          && PromiseOwner.normalizeOwner("—") == "" && PromiseOwner.normalizeOwner(nil) == "",
+          rule: "an owner string loses its trailing parenthetical; groups become \"Them\"; \"unknown\" in any form is unknown",
+          meaning: "models write \"Саша (Саша Файн…)\" and \"Все участники (…)\"; those are not names to store",
+          saw: PromiseOwner.normalizeOwner("Саша (Саша Файн, ведущий)"))
+    let raw = "[00:05] You: Саша, посмотри договор до пятницы.\n[00:09] Them: Хорошо."
+    let idx = PromiseOwner.Index(text: raw, myName: "Aik")
+    let q = "Саша, посмотри договор до пятницы"
+    let people = ["Aik", "Aleksandr Fain"]
+    let a = idx.resolve(quote: q, modelOwner: "Александр (Саша Файн)", participants: people)
+    let b = idx.resolve(quote: q, modelOwner: "Все участники (все)", participants: people)
+    let c = idx.resolve(quote: q, modelOwner: "Неопределенно (нет)", participants: ["Aik", "Саша"])
+    check(!a.isMine && a.owner == "Aleksandr Fain",
+          rule: "a participant named in the model's own spelling gets their canonical name",
+          meaning: "\"Александр\" and \"Aleksandr Fain\" are one person; two spellings would be two owners",
+          saw: "\(a)")
+    check(b.isMine && c.owner == "Саша" && !c.isMine,
+          rule: "a group or unknown owner on a You line follows the unknown rules: addressee if named, else the user",
+          meaning: "\"Все участники\" is not a person and must not be stored as one",
+          saw: "\(b) / \(c)")
+}
+
 // MARK: the record and the request
 
 do {

@@ -59,15 +59,17 @@ enum PromiseOwner {
         }
 
         func resolve(quote: String?, modelOwner: String?, participants: [String]) -> Resolution {
-            let owner = modelOwner?.trimmingCharacters(in: .whitespaces) ?? ""
+            var owner = PromiseOwner.normalizeOwner(modelOwner)
             let me = myName.isEmpty ? "You" : myName
             func isMe(_ name: String) -> Bool { PromiseOwner.isMe(name, myName: myName) }
             let others = participants.filter { !isMe($0) }
             func other(_ name: String) -> String? {
                 let n = name.trimmingCharacters(in: .whitespaces)
                 guard !n.isEmpty, !isMe(n) else { return nil }
-                return others.first { $0.caseInsensitiveCompare(n) == .orderedSame }
+                return others.first { PromiseOwner.sameName($0, n) }
             }
+            // A participant the model named in its own spelling: their canonical name.
+            if let canonical = other(owner) { owner = canonical }
             let generic = owner.isEmpty || ["them", "unknown", "speaker", "someone", "you"].contains(owner.lowercased())
                 && !isMe(owner)
             let modelSaysMe = isMe(owner)
@@ -127,6 +129,27 @@ enum PromiseOwner {
             if words.contains(where: { $0.hasPrefix(stem) && $0.count <= stem.count + 3 }) { return true }
         }
         return false
+    }
+
+    /// The owner string a model returned, cleaned: a trailing parenthetical is
+    /// dropped ("Саша (Саша Файн…)" is "Саша"); a group ("все участники",
+    /// "everyone", "team") is "Them"; "unknown", "неопределенно", "—" or nothing is "".
+    static func normalizeOwner(_ raw: String?) -> String {
+        var name = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let paren = name.firstIndex(where: { $0 == "(" || $0 == "（" }) {
+            name = String(name[..<paren]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let key = name.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".,;:!—–- "))
+        if ["все", "все участники", "всем", "всех", "everyone", "everybody", "all", "команда", "team", "them"].contains(key) { return "Them" }
+        if ["", "неопределенно", "неопределённо", "неопределен", "неизвестно", "unknown", "n/a", "na", "none", "someone", "speaker"].contains(key) { return "" }
+        return name
+    }
+
+    /// The same person by name: equal after folding, or the same first name.
+    static func sameName(_ a: String, _ b: String) -> Bool {
+        let x = fold(a), y = fold(b)
+        guard !x.isEmpty, !y.isEmpty else { return false }
+        return x == y || x.split(separator: " ").first == y.split(separator: " ").first
     }
 
     /// "Айк", "Aik" and "aïk" are one name: transliterated to Latin, folded for

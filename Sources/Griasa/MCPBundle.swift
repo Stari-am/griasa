@@ -130,7 +130,7 @@ enum MCPBundle {
     const readline = require('readline');
 
     const NOT_RUNNING = "Griasa is not running, or 'AI assistants (MCP)' is off in its Settings.";
-    const REFUSED = "Griasa refused the connection — click 'Add to Claude Desktop' again in Griasa's Settings.";
+    const REFUSED = "Griasa rejected the extension's token — restart Griasa, then turn the Griasa extension off and on in Claude Desktop.";
     const TOO_SLOW = 'Griasa took too long to answer.';
     const REQUEST_TIMEOUT_MS = 60000;
     // No keep-alive: nothing may hold the process open once stdin has closed.

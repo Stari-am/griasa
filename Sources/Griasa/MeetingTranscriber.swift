@@ -56,7 +56,8 @@ enum MeetingTranscriber {
         if AIFormatter.isConfigured {
             do {
                 let formatted = try await aiFormat(raw: raw, participants: participants,
-                                                   myName: myName, hasNotes: !notes.isEmpty)
+                                                   myName: myName, hasNotes: !notes.isEmpty,
+                                                   actionsFile: LongMeetingNotes.actionsFile(besideNotes: output))
                 try formatted.write(to: output, atomically: true, encoding: .utf8)
                 return output
             } catch {
@@ -77,7 +78,7 @@ enum MeetingTranscriber {
     /// if the raw file is gone or the provider errors.
     static func reformat(transcriptFile: URL, participants: [String],
                          myName: String, allowCloudFallback: Bool = true,
-                         requireLocal: Bool = false) async throws -> String {
+                         requireLocal: Bool = false, meetingDate: Date = Date()) async throws -> String {
         let rawURL = transcriptFile.deletingLastPathComponent()
             .appendingPathComponent("transcript-raw.txt")
         guard let raw = try? String(contentsOf: rawURL, encoding: .utf8),
@@ -89,7 +90,9 @@ enum MeetingTranscriber {
         let formatted = try await aiFormat(raw: raw, participants: participants,
                                            myName: myName, hasNotes: raw.contains("📝 NOTE:"),
                                            allowCloudFallback: allowCloudFallback,
-                                           requireLocal: requireLocal)
+                                           requireLocal: requireLocal,
+                                           actionsFile: LongMeetingNotes.actionsFile(besideNotes: transcriptFile),
+                                           meetingDate: meetingDate)
         try formatted.write(to: transcriptFile, atomically: true, encoding: .utf8)
         return formatted
     }
@@ -122,7 +125,10 @@ enum MeetingTranscriber {
     static func aiFormat(raw: String, participants: [String], myName: String,
                          hasNotes: Bool, allowCloudFallback: Bool = true,
                          requireLocal: Bool = false, config configOverride: LLMConfig? = nil,
-                         mode: NotesMode = .automatic) async throws -> String {
+                         mode: NotesMode = .automatic, actionsFile: URL? = nil,
+                         meetingDate: Date = Date(), timeout: TimeInterval = 300) async throws -> String {
+        // The promises of a previous summary of this meeting are not these notes'.
+        if let actionsFile { try? FileManager.default.removeItem(at: actionsFile) }
         let config = configOverride ?? LLMConfig.current()
         // A long meeting on a local model is read in parts rather than cut: the
         // single pass kept only the end and lost the agenda and the early decisions.
@@ -132,10 +138,14 @@ enum MeetingTranscriber {
                     maxChars: TranscriptChunker.chunkSize(contextCharLimit: config.contextCharLimit)))
         if inParts {
             do {
-                return try await LongMeetingNotes.make(
+                let output = try await LongMeetingNotes.make(
                     raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
                     allowCloudFallback: allowCloudFallback, requireLocal: requireLocal,
-                    config: configOverride).markdown
+                    config: configOverride, meetingDate: meetingDate, timeout: timeout)
+                if let actionsFile, let data = try? JSONEncoder().encode(output.actions) {
+                    try? data.write(to: actionsFile, options: .atomic)
+                }
+                return output.markdown
             } catch {
                 // A summary is worth more than the better way of making it: fall
                 // back to today's single pass, which keeps the end of the meeting.
@@ -197,7 +207,7 @@ enum MeetingTranscriber {
             .filling(["speakerRules": speakerRules, "noteRules": noteRules])
 
         return try await AIFormatter.complete(system: system, user: transcript,
-                                              tier: .smart, maxTokens: 16000, timeout: 300,
+                                              tier: .smart, maxTokens: 16000, timeout: timeout,
                                               // The chunked attempt has already had its one
                                               // chance to ask about the cloud.
                                               allowCloudFallback: allowCloudFallback && !inParts,

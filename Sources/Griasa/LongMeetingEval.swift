@@ -86,10 +86,11 @@ enum LongMeetingEval {
                 try? text.write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
             }
             func promises(of notes: String, config: LLMConfig, inParts: Bool, name: String,
-                          into variant: inout Variant) async {
+                          into variant: inout Variant, mapActions: [LongMeetingMap.MapAction]? = nil,
+                          timeout: TimeInterval? = nil) async {
                 let (found, seconds, error) = await timed {
                     try await CommitmentExtractor.findCommitments(
-                        markdown: notes, rawTranscript: raw, participants: participants, myName: myName,
+                        markdown: notes, rawTranscript: raw, mapActions: mapActions, timeout: timeout, participants: participants, myName: myName,
                         sourceTitle: "eval", sourceEntryID: nil, config: config, inParts: inParts)
                 }
                 variant.promisesSeconds = seconds
@@ -134,8 +135,9 @@ enum LongMeetingEval {
             if let chunkedOutput {
                 droppedActions = chunkedOutput.droppedActions
                 save(chunkedOutput.markdown, "chunked.md")
+                save(chunkedOutput.partNotes.joined(separator: "\n\n"), "chunked-parts.md")
                 await promises(of: chunkedOutput.markdown, config: local, inParts: true,
-                               name: "promises-chunked.json", into: &chunked)
+                               name: "promises-chunked.json", into: &chunked, mapActions: chunkedOutput.actions)
             }
 
             // 3. A cloud model reading the whole transcript in one request.
@@ -143,14 +145,14 @@ enum LongMeetingEval {
                 let (cloudNotes, cloudSeconds, cloudError) = await timed {
                     try await MeetingTranscriber.aiFormat(
                         raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
-                        allowCloudFallback: false, config: cloud, mode: .singlePass)
+                        allowCloudFallback: false, config: cloud, mode: .singlePass, timeout: 900)
                 }
                 reference.seconds = cloudSeconds
                 reference.error = cloudError
                 if let cloudNotes {
                     save(cloudNotes, "cloud.md")
                     await promises(of: cloudNotes, config: cloud, inParts: false,
-                                   name: "promises-cloud.json", into: &reference)
+                                   name: "promises-cloud.json", into: &reference, timeout: 300)
                 }
             }
 

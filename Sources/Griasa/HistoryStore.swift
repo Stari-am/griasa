@@ -256,7 +256,8 @@ final class HistoryStore: ObservableObject {
             let markdown = try await MeetingTranscriber.reformat(
                 transcriptFile: URL(fileURLWithPath: path),
                 participants: participants, myName: myName,
-                allowCloudFallback: allowCloudFallback, requireLocal: requireLocal)
+                allowCloudFallback: allowCloudFallback, requireLocal: requireLocal,
+                meetingDate: entry.date)
             let title = MeetingTranscriber.title(fromMarkdown: markdown)
             // The file now holds the new summary; History says the same.
             updateEntry(id: entry.id, title: title, text: markdown)

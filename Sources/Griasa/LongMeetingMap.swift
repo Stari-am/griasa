@@ -10,7 +10,22 @@ enum LongMeetingMap {
         var owner: String?
         var task: String?
         var due: String?
+        /// The deadline as YYYY-MM-DD, resolved against the meeting's date, or "".
+        var date: String?
         var quote: String?
+    }
+
+    /// A promise from one part's notes after its quote was verified and its
+    /// owner decided in code: what the extraction step uses for a long meeting
+    /// instead of asking a second time. Saved beside the notes.
+    struct MapAction: Codable, Equatable {
+        var text: String
+        var owner: String
+        var isMine: Bool
+        var dueDate: String?
+        var dueHint: String?
+        var quote: String
+        var at: String?
     }
     struct Speaker: Decodable, Equatable {
         var name: String?
@@ -34,9 +49,9 @@ enum LongMeetingMap {
       "points":{"type":"array","items":{"type":"string"}},
       "decisions":{"type":"array","items":{"type":"string"}},
       "actions":{"type":"array","items":{"type":"object","additionalProperties":false,
-        "required":["owner","task","due","quote"],
+        "required":["owner","task","due","date","quote"],
         "properties":{"owner":{"type":"string"},"task":{"type":"string"},
-                      "due":{"type":"string"},"quote":{"type":"string"}}}},
+                      "due":{"type":"string"},"date":{"type":"string"},"quote":{"type":"string"}}}},
       "questions":{"type":"array","items":{"type":"string"}},
       "speakers":{"type":"array","items":{"type":"object","additionalProperties":false,
         "required":["name","clue"],

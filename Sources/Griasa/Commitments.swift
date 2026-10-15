@@ -234,13 +234,21 @@ enum CommitmentExtractor {
         // long meeting on a local model reads them, part by part, instead of
         // the notes. Only looked up when it can matter.
         var raw: String?
-        if markdown.count > 4_000, let sourceEntryID {
-            raw = await MainActor.run {
-                HistoryStore.shared.entries.first { $0.id == sourceEntryID }?.filePath
-            }.flatMap { MeetingTranscriber.rawTranscript(besideNotes: $0) }
+        var mapActions: [LongMeetingMap.MapAction]?
+        if let sourceEntryID, let path = await MainActor.run(body: {
+            HistoryStore.shared.entries.first { $0.id == sourceEntryID }?.filePath
+        }) {
+            if markdown.count > 4_000 { raw = MeetingTranscriber.rawTranscript(besideNotes: path) }
+            // Notes made in parts brought their promises with them, already
+            // quoted and attributed; asking again would only be less accurate.
+            let file = LongMeetingNotes.actionsFile(besideNotes: URL(fileURLWithPath: path))
+            mapActions = (try? Data(contentsOf: file)).flatMap {
+                try? JSONDecoder().decode([LongMeetingMap.MapAction].self, from: $0)
+            }
         }
         let found = try await findCommitments(
-            markdown: markdown, rawTranscript: raw, participants: participants, myName: myName,
+            markdown: markdown, rawTranscript: raw, mapActions: mapActions,
+            participants: participants, myName: myName,
             sourceTitle: sourceTitle, sourceEntryID: sourceEntryID,
             meetingDate: meetingDate, requireLocal: requireLocal)
         guard !found.commitments.isEmpty else { return 0 }
@@ -261,6 +269,7 @@ enum CommitmentExtractor {
     /// the text it was shown — after ignoring case and punctuation. A model that
     /// cannot point at the sentence has made the promise up.
     static func findCommitments(markdown: String, rawTranscript: String? = nil,
+                                mapActions: [LongMeetingMap.MapAction]? = nil, timeout: TimeInterval? = nil,
                                 participants: [String], myName: String,
                                 sourceTitle: String, sourceEntryID: UUID?,
                                 meetingDate: Date = Date(), requireLocal: Bool = false,
@@ -275,7 +284,27 @@ enum CommitmentExtractor {
         let mine = myName.isEmpty ? "You" : myName
         let today = meetingDate.formatted(.iso8601.year().month().day())
         let people = participants.isEmpty ? mine : participants.joined(separator: ", ")
-        var instructions = Prompts.text(.commitments) + Prompts.commitmentQuoteRules
+
+        if let mapActions {
+            var found = Found()
+            let dateParser = ISO8601DateFormatter()
+            dateParser.formatOptions = [.withFullDate]
+            var seen: [PromiseDuplicate.Seen] = []
+            for action in mapActions {
+                found.proposed += 1
+                guard !PromiseDuplicate.isDuplicate(text: action.text, owner: action.owner, quote: action.quote, of: seen)
+                else { continue }
+                seen.append(PromiseDuplicate.entry(text: action.text, owner: action.owner, quote: action.quote))
+                found.commitments.append(Commitment(
+                    text: action.text, owner: action.owner, isMine: action.isMine,
+                    dueHint: action.dueHint, dueDate: action.dueDate.flatMap { dateParser.date(from: $0) },
+                    sourceTitle: sourceTitle, sourceEntryID: sourceEntryID, date: meetingDate,
+                    sourceQuote: action.quote.isEmpty ? nil : action.quote, sourceAt: action.at))
+            }
+            return found
+        }
+        let language = Prompts.languageLine(MeetingLanguage.name(of: rawTranscript ?? markdown))
+        var instructions = Prompts.text(.commitments) + Prompts.commitmentQuoteRules + language
         // What is asked, and the text each answer is checked against.
         var requests: [(system: String, user: String, shown: String, haystack: QuoteMatch.Haystack, timeout: TimeInterval)] = []
         // The notes whenever they fit the model's window; parts only when they do not.
@@ -291,13 +320,13 @@ enum CommitmentExtractor {
                 requests.append((Prompts.text(.longMeetingSystem),
                                  chunk.modelInput + "\n\n" + instructions,
                                  chunk.modelInput,
-                                 QuoteMatch.Haystack(overlap: chunk.overlap, body: chunk.body), 120))
+                                 QuoteMatch.Haystack(overlap: chunk.overlap, body: chunk.body), timeout ?? 120))
             }
         } else {
             instructions = instructions.filling(["today": today, "me": mine, "participants": people])
             var notes = markdown
             if notes.count > 60_000 { notes = String(notes.prefix(60_000)) }
-            requests.append((instructions, notes, notes, QuoteMatch.Haystack(body: notes), 60))
+            requests.append((instructions, notes, notes, QuoteMatch.Haystack(body: notes), timeout ?? 60))
         }
 
         var found = Found()
@@ -305,6 +334,7 @@ enum CommitmentExtractor {
         let dateParser = ISO8601DateFormatter()
         dateParser.formatOptions = [.withFullDate]
         for request in requests {
+            let owners = PromiseOwner.Index(text: request.shown, myName: myName)
             let reply = try await AIFormatter.complete(
                 system: request.system, user: request.user, tier: .fast, maxTokens: 2048,
                 timeout: request.timeout, allowCloudFallback: false, allowApple: false,
@@ -338,8 +368,10 @@ enum CommitmentExtractor {
                     found.unquoted += 1
                     continue
                 }
-                let isMine = item.mine ?? false
-                let owner = item.owner?.isEmpty == false ? item.owner! : (isMine ? mine : "Unknown")
+                // Whose it is comes from who spoke the quoted line, not from the model.
+                let who = owners.resolve(quote: quote, modelOwner: item.owner, participants: participants)
+                let isMine = quote == nil ? (item.mine == true && who.isMine) : who.isMine
+                let owner = who.owner
                 // The same promise in the overlap of two parts, or said twice.
                 guard !PromiseDuplicate.isDuplicate(text: text, owner: owner, quote: quote, of: seen) else { continue }
                 seen.append(PromiseDuplicate.entry(text: text, owner: owner, quote: quote))
@@ -353,7 +385,7 @@ enum CommitmentExtractor {
                     sourceEntryID: sourceEntryID,
                     date: meetingDate,
                     sourceQuote: quote,
-                    sourceAt: quote == nil ? nil : QuoteMatch.visibleTimestamp(item.at, in: request.shown)))
+                    sourceAt: quote == nil ? nil : (who.at ?? QuoteMatch.visibleTimestamp(item.at, in: request.shown))))
             }
         }
         return found

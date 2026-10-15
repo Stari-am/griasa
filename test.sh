@@ -45,6 +45,7 @@ swiftc -O \
   Sources/Griasa/TranscriptAssembler.swift \
   Sources/Griasa/QuoteMatch.swift \
   Sources/Griasa/LongMeetingMap.swift \
+  Sources/Griasa/PromiseOwner.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \

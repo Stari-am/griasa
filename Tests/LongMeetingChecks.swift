@@ -363,6 +363,59 @@ do {
           saw: LongMeetingMap.withoutTranscript(md))
 }
 
+// MARK: whose promise it is
+
+do {
+    let raw = """
+    [00:05] You: Let's start, I will prepare the budget by Monday.
+    [00:20] Them: I will send the contract to the client tomorrow morning.
+    [00:40] Them: Also the specification is on me for next week.
+    [01:00] 📝 NOTE: ask Maria about the venue
+    """
+    let people = ["Aik", "Maria", "Pavel"]
+    let index = PromiseOwner.Index(text: raw, myName: "Aik")
+    let mine = index.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Maria", participants: people)
+    check(mine.isMine && mine.owner == "Aik" && mine.at == "00:05",
+          rule: "a quote from a \"You\" line is the user's promise, whatever owner the model named",
+          meaning: "the microphone track is the user; a 9B model marked 17 of 19 promises as the user's own",
+          saw: "\(mine)")
+    let theirs = index.resolve(quote: "I will send the contract to the client tomorrow", modelOwner: "Aik", participants: people)
+    check(!theirs.isMine && theirs.owner == "Them" && theirs.at == "00:20",
+          rule: "a quote from a \"Them\" line is never the user's, and the owner is \"Them\" unless the model named another participant",
+          meaning: "a model that cannot tell the speakers apart defaults to the user",
+          saw: "\(theirs)")
+    let named = index.resolve(quote: "the specification is on me for next week", modelOwner: "Pavel", participants: people)
+    check(!named.isMine && named.owner == "Pavel"
+          && !index.resolve(quote: "the specification is on me for next week", modelOwner: "Stranger", participants: people).isMine
+          && index.resolve(quote: "the specification is on me for next week", modelOwner: "Stranger", participants: people).owner == "Them",
+          rule: "for a \"Them\" line the model's owner is used only if it is a participant other than the user",
+          meaning: "an invented or user name on someone else's sentence is wrong either way",
+          saw: "\(named)")
+    let note = index.resolve(quote: "ask Maria about the venue", modelOwner: "Maria", participants: people)
+    check(note.isMine, rule: "a typed note is the user's own words",
+          meaning: "the user wrote it; a promise in it is theirs", saw: "\(note)")
+    let across = index.resolve(quote: "prepare the budget by Monday I will send the contract to the client tomorrow morning", modelOwner: "Aik", participants: people)
+    let acrossOther = index.resolve(quote: "prepare the budget by Monday I will send the contract to the client tomorrow morning", modelOwner: "Maria", participants: people)
+    check(across.isMine && !acrossOther.isMine && acrossOther.owner == "Maria",
+          rule: "a quote across both speakers is the user's only if the model says so",
+          meaning: "the user spoke in it, but so did someone else; the model's word decides",
+          saw: "\(across) / \(acrossOther)")
+    let legacy = index.resolve(quote: nil, modelOwner: "Maria", participants: people)
+    check(!legacy.isMine && legacy.owner == "Maria" && index.resolve(quote: nil, modelOwner: "Aik", participants: people).isMine
+          && !index.resolve(quote: nil, modelOwner: nil, participants: people).isMine,
+          rule: "with no quote the promise is the user's only if the model's owner is the user",
+          meaning: "an unverified claim must not default to the user",
+          saw: "\(legacy)")
+    let notes = "## Summary\n\nStuff.\n\n## Transcript\n\n[00:05] **Aik:** I will prepare the budget by Monday.\n\n**Maria:** I will send the contract tomorrow morning to the client.\n\n**Speaker:** Maybe the venue gets booked."
+    let labelled = PromiseOwner.Index(text: notes, myName: "Aik")
+    let a = labelled.resolve(quote: "I will prepare the budget by Monday", modelOwner: "Maria", participants: people)
+    let b = labelled.resolve(quote: "I will send the contract tomorrow morning to the client", modelOwner: "Aik", participants: people)
+    check(a.isMine && !b.isMine && b.owner == "Maria" && a.at == "00:05",
+          rule: "in finished notes the speaker label of the quoted line decides: the user's name is the user, another name is that person",
+          meaning: "cloud notes carry real names; the promise belongs to the one who said it",
+          saw: "\(a) / \(b)")
+}
+
 // MARK: the record and the request
 
 do {

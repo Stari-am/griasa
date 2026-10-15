@@ -11,14 +11,30 @@ enum LongMeetingNotes {
         var chunks: Int
         /// Promises the model reported whose quote is not in the transcript.
         var droppedActions: Int
+        /// Every promise reported by the parts, verified and attributed in code.
+        var actions: [LongMeetingMap.MapAction] = []
+        /// What each part reported, as the merge step read it (for the probe).
+        var partNotes: [String] = []
+    }
+
+    /// Where the promises of a long meeting are saved beside its notes.
+    static func actionsFile(besideNotes notes: URL) -> URL {
+        notes.deletingLastPathComponent().appendingPathComponent("map-actions.json")
     }
 
     static func make(raw: String, participants: [String], myName: String, hasNotes: Bool,
                      allowCloudFallback: Bool = true, requireLocal: Bool = false,
-                     config: LLMConfig? = nil) async throws -> Output {
+                     config: LLMConfig? = nil, meetingDate: Date = Date(),
+                     timeout: TimeInterval = 300) async throws -> Output {
         let limit = (config ?? LLMConfig.current()).contextCharLimit
         let chunks = TranscriptChunker.chunks(raw, maxChars: TranscriptChunker.chunkSize(contextCharLimit: limit))
         let system = Prompts.text(.longMeetingSystem)
+        let language = Prompts.languageLine(MeetingLanguage.name(of: raw))
+        let today = meetingDate.formatted(.iso8601.year().month().day())
+        let ownerIndex: [Int: PromiseOwner.Index] = Dictionary(uniqueKeysWithValues: chunks.map {
+            ($0.index, PromiseOwner.Index(text: $0.modelInput, myName: myName)) })
+        var actions: [LongMeetingMap.MapAction] = []
+        var seen: [PromiseDuplicate.Seen] = []
         let speakerRules = speakerRules(participants: participants, myName: myName)
         let noteRules = hasNotes
             ? " Lines in the form \"[mm:ss] 📝 NOTE: …\" are notes the user typed by hand during the meeting — their own words, not recognized speech, so they are highly reliable; reflect their content prominently."
@@ -35,15 +51,15 @@ enum LongMeetingNotes {
                 "part": "\(chunk.index + 1)", "parts": "\(chunks.count)",
                 "range": chunk.rangeLabel.isEmpty ? "" : " (\(chunk.rangeLabel))",
                 "speakerRules": speakerRules, "noteRules": noteRules,
-                "known": LongMeetingMap.knownText(known),
-            ])
+                "known": LongMeetingMap.knownText(known), "today": today,
+            ]) + language
             // Part first, instructions last: the engine keeps what it has read
             // of the part and only reads the instructions again.
             let user = chunk.modelInput + "\n\n" + instructions
             var result: LongMeetingMap.Result?
             for _ in 0..<2 where result == nil {
                 let reply = try await AIFormatter.complete(
-                    system: system, user: user, tier: .smart, maxTokens: 4096, timeout: 300,
+                    system: system, user: user, tier: .smart, maxTokens: 4096, timeout: timeout,
                     allowCloudFallback: mayAsk, requireLocal: requireLocal,
                     config: config, jsonSchema: LongMeetingMap.schema)
                 mayAsk = false
@@ -53,7 +69,29 @@ enum LongMeetingNotes {
                 throw NSError(domain: "Griasa", code: 12, userInfo: [NSLocalizedDescriptionKey:
                     "The local model's notes for part \(chunk.index + 1) of \(chunks.count) could not be read."])
             }
-            let (believed, count) = LongMeetingMap.believed(result, chunk: chunk)
+            let (checked, count) = LongMeetingMap.believed(result, chunk: chunk)
+            var believed = checked
+            // Whose each promise is comes from who spoke the quoted line, not from the model.
+            let index = ownerIndex[chunk.index]!
+            var attributed: [LongMeetingMap.Action] = []
+            for action in believed.actions ?? [] {
+                let who = index.resolve(quote: action.quote, modelOwner: action.owner, participants: participants)
+                var tagged = action
+                tagged.owner = who.owner
+                let task = (action.task ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !PromiseDuplicate.isDuplicate(text: task, owner: who.owner, quote: action.quote, of: seen) else {
+                    continue
+                }
+                seen.append(PromiseDuplicate.entry(text: task, owner: who.owner, quote: action.quote))
+                attributed.append(tagged)
+                actions.append(.init(
+                    text: task, owner: who.owner, isMine: who.isMine,
+                    dueDate: (action.date ?? "").range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil ? action.date : nil,
+                    dueHint: (action.due ?? "").isEmpty ? nil : action.due,
+                    quote: (action.quote ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                    at: who.at))
+            }
+            believed.actions = attributed
             dropped += count
             LongMeetingMap.merge(believed.speakers, into: &known)
             sections.append(LongMeetingMap.render(believed, part: chunk.index + 1, parts: chunks.count,
@@ -62,11 +100,11 @@ enum LongMeetingNotes {
 
         // All the parts' notes in one request when they fit; otherwise merged in
         // groups first, and the groups' notes merged again.
-        let reduce = Prompts.text(.meetingReduce).filling(["speakerRules": speakerRules])
+        let reduce = Prompts.text(.meetingReduce).filling(["speakerRules": speakerRules]) + language
         func merge(_ parts: [String]) async throws -> String {
             let reply = try await AIFormatter.complete(
                 system: system, user: parts.joined(separator: "\n\n") + "\n\n" + reduce,
-                tier: .smart, maxTokens: 6000, timeout: 300,
+                tier: .smart, maxTokens: 6000, timeout: timeout,
                 allowCloudFallback: mayAsk, requireLocal: requireLocal, config: config)
             mayAsk = false
             return LongMeetingMap.withoutTranscript(reply)
@@ -90,7 +128,7 @@ enum LongMeetingNotes {
         let transcript = TranscriptAssembler.assemble(raw: raw, myName: myName)
         NSLog("Griasa: long meeting notes — %d parts, %d unquoted promises dropped", chunks.count, dropped)
         return Output(markdown: notes + "\n\n## Transcript\n\n" + transcript + "\n",
-                      chunks: chunks.count, droppedActions: dropped)
+                      chunks: chunks.count, droppedActions: dropped, actions: actions, partNotes: sections)
     }
 
     private static func speakerRules(participants: [String], myName: String) -> String {

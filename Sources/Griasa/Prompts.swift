@@ -137,6 +137,13 @@ enum Prompts {
     is, use "Them" as the owner and set "mine" to false.
     """
 
+    /// An explicit line naming the language of the meeting; a model left to guess
+    /// answers in English for a Russian meeting. Empty when it is not known.
+    static func languageLine(_ language: String?) -> String {
+        guard let language, !language.isEmpty else { return "" }
+        return "\nThe meeting is in \(language). Write everything in \(language); keep English tech terms as spoken."
+    }
+
     /// The language rules of `.meetingNotes`, shared by the long-meeting prompts.
     private static let languageRules = """
     Language rules:
@@ -275,9 +282,11 @@ enum Prompts {
             a JSON object with these keys (empty lists are fine):
             - "points": the substantive things discussed, one short sentence each.
             - "decisions": what was decided or agreed.
-            - "actions": things a person took on to do. Each: {"owner": who promised it, "task": \
-            what, "due": the deadline as spoken or "", "quote": the exact words from the transcript \
-            where it was promised, copied exactly as it stands in the transcript — do not correct, translate or tidy it, even if a word looks mis-recognised}. Skip vague intentions.
+            - "actions": everything a person is to do — promised, taken on, assigned, or agreed as a next \
+            step. List each one; do not merge or skip them. Each: {"owner": who is to do it, "task": \
+            what, "due": the deadline as spoken or "", "date": that deadline as YYYY-MM-DD \
+            counted from the meeting date {{today}}, or "", "quote": the exact words from the transcript \
+            where it was said, copied exactly as it stands in the transcript — do not correct, translate or tidy it, even if a word looks mis-recognised}. Skip only idle wishes nobody took on.
             - "questions": questions left open.
             - "speakers": clues about who the "Them" speakers are, e.g. someone addressed by name \
             or introducing themselves. Each: {"name": the person, "clue": the words that tell}.
@@ -300,6 +309,8 @@ enum Prompts {
 
             Rules:
             - Merge duplicates: the same point or promise reported by two parts appears once.
+            - Action items: every item listed under "Actions" in the parts must be in Action items. \
+            Drop one only when another entry is the same task; never drop one to make the list shorter.
             - When a later part changes an earlier decision, keep the later one and say it changed.
             - Do not add the transcript. Never add anything that is not in the notes above.
             \(languageRules)

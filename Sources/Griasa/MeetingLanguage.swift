@@ -4,10 +4,11 @@ import NaturalLanguage
 /// The dominant language of a meeting, by name in English ("Russian"), for the
 /// instruction that tells the model what to write in.
 ///
-/// An unconstrained recognizer read Russian meetings as Kazakh, and the notes
-/// came back in Kazakh. So it chooses only among the languages Griasa supports
-/// and the ones the person dictates in, and below 0.6 confidence nothing is
-/// named: the instruction then says "the language the speakers use".
+/// An unconstrained recognizer read Russian meetings as Kazakh, and even a
+/// constrained one called short Russian Ukrainian. So Cyrillic and Armenian are
+/// decided by script, and NaturalLanguage, limited to the languages Griasa
+/// supports and the ones the person dictates in, is asked only about Latin
+/// text; below 0.6 confidence nothing is named: the instruction then says "the language the speakers use".
 enum MeetingLanguage {
     static let supported = ["en", "ru", "uk", "de", "hy"]
 
@@ -33,15 +34,18 @@ enum MeetingLanguage {
     }
 
     static func name(of text: String, dictationLocales: [String]? = nil) -> String? {
+        let sample = speech(text)
+        // Cyrillic and Armenian are decided by script and letters (see `LanguageGuess`).
+        if let code = LanguageGuess.byScript(sample) { return LanguageGuess.names[code] }
         let locales = dictationLocales ?? ["dictationLocales", "dictationLocale"]
             .compactMap { UserDefaults.standard.string(forKey: $0) }
         let codes = allowed(dictationLocales: locales)
         let recognizer = NLLanguageRecognizer()
         recognizer.languageConstraints = codes.map { NLLanguage(rawValue: $0) }
-        recognizer.languageHints = [.russian: 0.4, .english: 0.3]
-        recognizer.processString(speech(text))
+        recognizer.processString(sample)
         guard let (language, confidence) = recognizer.languageHypotheses(withMaximum: 1).first,
               confidence >= 0.6, codes.contains(language.rawValue) else { return nil }
-        return Locale(identifier: "en").localizedString(forLanguageCode: language.rawValue)
+        return LanguageGuess.names[language.rawValue]
+            ?? Locale(identifier: "en").localizedString(forLanguageCode: language.rawValue)
     }
 }

@@ -454,6 +454,12 @@ do {
           rule: "a Russian transcript with English tech terms is recognized as Russian",
           meaning: "an unconstrained recognizer said Kazakh and the notes and promises came back in Kazakh",
           saw: "\(String(describing: name))")
+    let short = MeetingLanguage.name(of: "[00:05] You: Скинь пожалуйста ссылку на документ.\n[00:09] Them: Хорошо, сейчас пришлю.", dictationLocales: [])
+    let ukrainian = MeetingLanguage.name(of: "[00:05] You: Скинь будь ласка посилання на документ, який ми їхні.", dictationLocales: [])
+    check(short == "Russian" && ukrainian == "Ukrainian",
+          rule: "a short Russian exchange is Russian, and Ukrainian text with its own letters is Ukrainian",
+          meaning: "the recognizer called short Russian Ukrainian and long Russian Kazakh",
+          saw: "\(String(describing: short)) / \(String(describing: ukrainian))")
     check(MeetingLanguage.name(of: "[00:05] 1234 5678 -- 42", dictationLocales: []) == nil
           && MeetingLanguage.allowed(dictationLocales: ["fr-FR, es"]).contains("fr")
           && MeetingLanguage.allowed(dictationLocales: []).sorted() == ["de", "en", "hy", "ru", "uk"]

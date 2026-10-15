@@ -46,6 +46,7 @@ swiftc -O \
   Sources/Griasa/QuoteMatch.swift \
   Sources/Griasa/LongMeetingMap.swift \
   Sources/Griasa/PromiseOwner.swift \
+  Sources/Griasa/LanguageGuess.swift \
   Sources/Griasa/MeetingLanguage.swift \
   Sources/Griasa/Prompts.swift \
   Tests/StabilizerChecks.swift \

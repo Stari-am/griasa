@@ -182,10 +182,19 @@ enum SelectionAI {
     private static func languageAware(_ prompt: String, for text: String) -> String {
         guard prompt.contains(GrammarPrompt.languagePlaceholder)
                 || prompt.contains(GrammarPrompt.rulesPlaceholder) else { return prompt }
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(String(text.prefix(2000)))
-        let language = recognizer.dominantLanguage
-        let name = language.flatMap { Locale(identifier: "en").localizedString(forLanguageCode: $0.rawValue) }
-        return GrammarPrompt.fill(prompt, languageName: name, english: language == .english)
+        let sample = String(text.prefix(2000))
+        // Cyrillic and Armenian by their letters (NaturalLanguage mistakes
+        // Russian for Kazakh or Ukrainian); NaturalLanguage only for Latin text,
+        // and only when it is sure.
+        var code = LanguageGuess.byScript(sample)
+        if code == nil {
+            let recognizer = NLLanguageRecognizer()
+            recognizer.processString(sample)
+            if let top = recognizer.languageHypotheses(withMaximum: 1).first, top.value >= 0.6 {
+                code = top.key.rawValue
+            }
+        }
+        let name = code.flatMap { LanguageGuess.names[$0] ?? Locale(identifier: "en").localizedString(forLanguageCode: $0) }
+        return GrammarPrompt.fill(prompt, languageName: name, english: code == "en")
     }
 }

@@ -59,5 +59,25 @@ check(GrammarPrompt.fill(custom, languageName: "Russian", english: false) == cus
       meaning: "the language rules belong only to presets that ask for them",
       saw: GrammarPrompt.fill(custom, languageName: "Russian", english: false))
 
+for (text, expected, why) in [
+    ("Скинь пожалуйста ссылку на дашборд, я не могу его найти в конфлюенсе", "ru",
+     "NaturalLanguage called this Ukrainian; the reply then came back in Ukrainian"),
+    ("[00:12] You: ок, давай deploy завтра\n[00:15] Them: да, PR уже готов", "ru",
+     "a Russian meeting with English terms and labels was called Kazakh"),
+    ("Привіт, можеш скинути посилання на дашборд?", "uk",
+     "Ukrainian must still be recognised by its own letters"),
+    ("Բարև, վաղը կհանդիպենք", "hy", "Armenian has its own script"),
+] {
+    let got = LanguageGuess.byScript(text)
+    check(got == expected,
+          rule: "\(expected) text is recognised by its letters",
+          meaning: why,
+          saw: got ?? "nil")
+}
+check(LanguageGuess.byScript("I will sent you the docs tomorow") == nil,
+      rule: "Latin-script text is left to NaturalLanguage",
+      meaning: "letter counting can't tell English from German; the recogniser can",
+      saw: LanguageGuess.byScript("I will sent you the docs tomorow") ?? "nil")
+
 return failures
 }

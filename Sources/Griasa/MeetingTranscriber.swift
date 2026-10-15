@@ -152,8 +152,8 @@ enum MeetingTranscriber {
                 // Not when the catch-up is waiting for a model that is slow or
                 // away — that meeting stays queued and is tried again whole.
                 let kind = LocalFailure.kind(of: error)
-                if error is CancellationError || mode == .chunked
-                    || (requireLocal && (kind == .slow || kind == .unreachable)) { throw error }
+                if error is CancellationError || mode == .chunked || kind == .slow
+                    || (requireLocal && kind == .unreachable) { throw error }
                 NSLog("Griasa: notes in parts failed (%@), using the single pass", error.localizedDescription)
             }
         }
@@ -208,9 +208,9 @@ enum MeetingTranscriber {
 
         return try await AIFormatter.complete(system: system, user: transcript,
                                               tier: .smart, maxTokens: 16000, timeout: timeout,
-                                              // The chunked attempt has already had its one
-                                              // chance to ask about the cloud.
-                                              allowCloudFallback: allowCloudFallback && !inParts,
+                                              // The one place a meeting asks about the cloud:
+                                              // the parts never do.
+                                              allowCloudFallback: allowCloudFallback,
                                               requireLocal: requireLocal, config: configOverride)
     }
 

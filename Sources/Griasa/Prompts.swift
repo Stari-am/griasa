@@ -282,11 +282,18 @@ enum Prompts {
             a JSON object with these keys (empty lists are fine):
             - "points": the substantive things discussed, one short sentence each.
             - "decisions": what was decided or agreed.
-            - "actions": everything a person is to do — promised, taken on, assigned, or agreed as a next \
-            step. List each one; do not merge or skip them. Each: {"owner": who is to do it, "task": \
-            what, "due": the deadline as spoken or "", "date": that deadline as YYYY-MM-DD \
-            counted from the meeting date {{today}}, or "", "quote": the exact words from the transcript \
-            where it was said, copied exactly as it stands in the transcript — do not correct, translate or tidy it, even if a word looks mis-recognised}. Skip only idle wishes nobody took on.
+            - "actions": tasks someone is to do AFTER this call that produce or change something \
+            outside it (send, prepare, fix, check, schedule, pay, decide) — promised, taken on, \
+            assigned, or agreed as a next step. List each such task separately. Each: {"owner": who \
+            is to do it, "task": what, "due": the deadline as spoken or "", "date": that deadline as \
+            YYYY-MM-DD counted from the meeting date {{today}}, or "", "quote": the exact words from \
+            the transcript where it was said, copied exactly as it stands in the transcript — do not \
+            correct, translate or tidy it, even if a word looks mis-recognised}. Do NOT list: requests \
+            answered inside the meeting itself ("tell me more", "repeat that", "explain", "share your \
+            screen", "go on"), questions, conversational moves, anything already done during the call, \
+            or wishes nobody took on. Test: would it still make sense on a to-do list a week later, and \
+            was it not finished before the call ended? If unsure whether a real deliverable was \
+            promised, include it.
             - "questions": questions left open.
             - "speakers": clues about who the "Them" speakers are, e.g. someone addressed by name \
             or introducing themselves. Each: {"name": the person, "clue": the words that tell}.

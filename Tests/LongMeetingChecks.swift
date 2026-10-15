@@ -336,7 +336,7 @@ do {
 do {
     let a = PromiseDuplicate.entry(text: "Send the pricing deck to Maria", owner: "Aik", quote: "I'll send the deck")
     check(PromiseDuplicate.isDuplicate(text: "Send the pricing deck to Maria today", owner: "aik", quote: nil, of: [a])
-          && PromiseDuplicate.isDuplicate(text: "Totally different words here", owner: "Bob", quote: "ill SEND the deck", of: [a])
+          && PromiseDuplicate.isDuplicate(text: "Send the deck to Maria", owner: "Bob", quote: "ill SEND the deck", of: [a])
           && !PromiseDuplicate.isDuplicate(text: "Send the pricing deck to Maria today", owner: "Bob", quote: nil, of: [a])
           && !PromiseDuplicate.isDuplicate(text: "Book the venue for the offsite", owner: "Aik", quote: "x", of: [a]),
           rule: "the same promise from two parts is one: same quote, or same owner and nearly the same words",
@@ -467,6 +467,67 @@ do {
           rule: "with no clear language nothing is named; the supported set grows with the dictation locales",
           meaning: "a wrong name is worse than none: the model writes everything in it",
           saw: "\(String(describing: MeetingLanguage.name(of: "[00:05] 1234 5678 -- 42", dictationLocales: [])))")
+}
+
+// MARK: review fixes
+
+do {
+    let raw = "[00:05] You: Вика, посмотри договор до пятницы.\n[00:09] Them: Хорошо."
+    let idx = PromiseOwner.Index(text: raw, myName: "Aik Sargsian")
+    let q = "Вика, посмотри договор до пятницы"
+    let viaCalendar = idx.resolve(quote: q, modelOwner: "Вика", participants: ["Aik Sargsian", "Victoria Petrova"])
+    let noRoster = idx.resolve(quote: q, modelOwner: "Вика", participants: [])
+    check(!viaCalendar.isMine && viaCalendar.owner == "Вика" && !noRoster.isMine && noRoster.owner == "Вика",
+          rule: "on a \"You\" line a name the model gives for someone else is kept, listed or not",
+          meaning: "a calendar says Victoria and the speaker says Вика; with no roster at all the assignment is still not the user's",
+          saw: "\(viaCalendar) / \(noRoster)")
+    let typed = PromiseOwner.Index(text: "[00:30] 📝 NOTE: Pavel to send the invoice", myName: "Aik")
+        .resolve(quote: "Pavel to send the invoice", modelOwner: "Pavel", participants: [])
+    check(!typed.isMine && typed.owner == "Pavel",
+          rule: "a typed note that names someone else's task is not the user's",
+          meaning: "the user wrote it down; it was not them who promised it",
+          saw: "\(typed)")
+    let legacy = idx.resolve(quote: nil, modelOwner: "Вика", participants: [])
+    check(!legacy.isMine && legacy.owner == "Вика",
+          rule: "with no quote the model's own name for the owner is kept",
+          meaning: "\"Them\" in place of a name the model gave loses information that was there",
+          saw: "\(legacy)")
+    check(PromiseOwner.isMe("Айк", myName: "Aik Sargsian") && PromiseOwner.isMe("Aik", myName: "Aik Sargsian")
+          && PromiseOwner.isMe("AÏK", myName: "Aik") && !PromiseOwner.isMe("Maria", myName: "Aik Sargsian"),
+          rule: "the user's name is recognised in another script, by first name alone, and without accents",
+          meaning: "a Cyrillic \"Айк\" label for \"Aik Sargsian\" otherwise reads as a stranger and the user's promises go to someone else",
+          saw: "—")
+    let cyr = PromiseOwner.Index(text: "[00:05] **Айк:** I will send the budget today for sure.", myName: "Aik Sargsian")
+    let r = cyr.resolve(quote: "I will send the budget today for sure", modelOwner: "Aik", participants: ["Aik Sargsian", "Айк"])
+    check(r.isMine, rule: "a Cyrillic label of the user's own name is the user, and is not another participant",
+          meaning: "the speaker label decides whose promise it is", saw: "\(r)")
+    let call = PromiseOwner.Index(text: "[00:05] Them: Please send the invoice today.", myName: "Aik")
+    check(call.resolve(quote: "Please send the invoice today", modelOwner: "Aik", participants: ["Aik", "Maria"]).isMine
+          && !call.resolve(quote: "Please send the invoice today", modelOwner: "Aik", participants: ["Aik", "Maria", "Pavel"]).isMine,
+          rule: "in a call of two, a request on the other person's line that the model gives to the user is the user's",
+          meaning: "with one other person there is nobody else it can be asked of; with more, the line must name the user",
+          saw: "—")
+    let echo = PromiseOwner.Index(text: "## Action items\n\n- Aik: I will send the budget today for sure\n\n## Transcript\n\n[00:05] **Maria:** I will send the budget today for sure.", myName: "Aik")
+    let e = echo.resolve(quote: "I will send the budget today for sure", modelOwner: "Aik", participants: ["Aik", "Maria", "Pavel"])
+    check(!e.isMine && e.owner == "Maria",
+          rule: "a quote is located in the transcript line, not in a summary line that repeats it",
+          meaning: "the summary names no speaker; the transcript says who spoke",
+          saw: "\(e)")
+    let cut = "Sure: [{\"text\":\"a\"},{\"text\":\"b\"},{\"text\":\"c"
+    let salvaged = LongMeetingMap.arrayCandidates(cut).compactMap {
+        try? JSONSerialization.jsonObject(with: $0) as? [[String: String]]
+    }.first
+    check(salvaged?.count == 2,
+          rule: "a list cut off by the token limit keeps its complete elements",
+          meaning: "losing the whole list for one half-written promise loses every promise before it",
+          saw: "\(String(describing: salvaged))")
+    let d1 = PromiseDuplicate.entry(text: "Send the budget to Maria", owner: "Aik", quote: "I will send the budget")
+    check(!PromiseDuplicate.isDuplicate(text: "Send the budget to Maria", owner: "Pavel", quote: nil, of: [d1])
+          && !PromiseDuplicate.isDuplicate(text: "Book a hotel", owner: "Pavel", quote: "I will send the budget", of: [d1])
+          && PromiseDuplicate.duplicate(text: "Send budget to Maria", owner: "Aik", quote: "i will send the budget", of: [d1]) == 0,
+          rule: "the same words for another owner are another promise; a shared quote also needs similar wording",
+          meaning: "two people can each owe the same task, and one sentence can hold two promises",
+          saw: "—")
 }
 
 // MARK: the record and the request

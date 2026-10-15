@@ -42,12 +42,16 @@ enum PromiseOwner {
         }
 
         /// Speakers of the line (or two or three consecutive lines) the quote is in.
+        /// Lines with a known speaker come first: a summary or an action-item list
+        /// echoes the words of the transcript but says nothing of who spoke them.
         func locate(_ quote: String) -> [Paragraph]? {
-            for width in 1...3 where prepared.count >= width {
-                for start in 0...(prepared.count - width) {
-                    let joined = prepared[start..<(start + width)].joined(separator: " ")
-                    if QuoteMatch.contains(joined, quote: quote) {
-                        return Array(paragraphs[start..<(start + width)])
+            for knownOnly in [true, false] {
+                for width in 1...3 where prepared.count >= width {
+                    for start in 0...(prepared.count - width) {
+                        let span = paragraphs[start..<(start + width)]
+                        if knownOnly, span.contains(where: { $0.speaker == .unknown }) { continue }
+                        let joined = prepared[start..<(start + width)].joined(separator: " ")
+                        if QuoteMatch.contains(joined, quote: quote) { return Array(span) }
                     }
                 }
             }
@@ -58,15 +62,21 @@ enum PromiseOwner {
             let owner = modelOwner?.trimmingCharacters(in: .whitespaces) ?? ""
             let me = myName.isEmpty ? "You" : myName
             func isMe(_ name: String) -> Bool { PromiseOwner.isMe(name, myName: myName) }
+            let others = participants.filter { !isMe($0) }
             func other(_ name: String) -> String? {
                 let n = name.trimmingCharacters(in: .whitespaces)
-                guard !n.isEmpty, !isMe(n),
-                      participants.contains(where: { $0.caseInsensitiveCompare(n) == .orderedSame }) else { return nil }
-                return participants.first { $0.caseInsensitiveCompare(n) == .orderedSame }
+                guard !n.isEmpty, !isMe(n) else { return nil }
+                return others.first { $0.caseInsensitiveCompare(n) == .orderedSame }
             }
-            // No quote, or no line to read it from: the model's owner, and the
-            // user's only if the model said it is the user.
-            let legacy = Resolution(isMine: isMe(owner), owner: isMe(owner) ? me : (other(owner) ?? (owner.isEmpty ? "Unknown" : "Them")),
+            let generic = owner.isEmpty || ["them", "unknown", "speaker", "someone", "you"].contains(owner.lowercased())
+                && !isMe(owner)
+            let modelSaysMe = isMe(owner)
+            // A name the model gave that is not the user's: kept even when it is
+            // not on the participant list (a short name, a Cyrillic spelling).
+            let modelNamesOther: String? = (modelSaysMe || generic) ? nil : (other(owner) ?? owner)
+
+            // No quote, or no line to read it from: the model's owner.
+            let legacy = Resolution(isMine: modelSaysMe, owner: modelSaysMe ? me : (modelNamesOther ?? "Unknown"),
                                     at: nil, located: false)
             guard let quote, !quote.isEmpty, let span = locate(quote) else { return legacy }
 
@@ -76,32 +86,31 @@ enum PromiseOwner {
             let hasThem = span.contains { $0.speaker == .them } || !named.isEmpty
             let lineText = span.map(\.text).joined(separator: " ") + " " + quote
             // A participant other than the user who is addressed in the line.
-            let addressee = participants.first { !isMe($0) && PromiseOwner.mentions($0, in: lineText) }
-            let modelSaysMe = isMe(owner)
-            let modelSaysOther = other(owner)
+            let addressee = others.first { PromiseOwner.mentions($0, in: lineText) }
 
             func result(mine: Bool, owner: String) -> Resolution {
                 Resolution(isMine: mine, owner: owner, at: at, located: true)
             }
             if hasYou && !hasThem {
                 // The user speaking: their own promise, unless they are handing the task to someone.
-                if let who = modelSaysOther { return result(mine: false, owner: who) }
+                if let who = modelNamesOther { return result(mine: false, owner: who) }
                 if modelSaysMe { return result(mine: true, owner: me) }
                 if let addressee { return result(mine: false, owner: addressee) }
                 return result(mine: true, owner: me)
             }
             if hasThem && !hasYou {
-                // Someone else speaking: the user's only when they are named in the
-                // line and the model says it is theirs.
-                if modelSaysMe, PromiseOwner.mentions(me == "You" ? "" : me, in: lineText) {
+                // Someone else speaking: the user's only when the model says so and
+                // either the line names them or the call has one other person (it
+                // can only be asking the user).
+                if modelSaysMe, others.count == 1 || PromiseOwner.mentions(me == "You" ? "" : me, in: lineText) {
                     return result(mine: true, owner: me)
                 }
                 if Set(named.map { $0.lowercased() }).count == 1 { return result(mine: false, owner: named[0]) }
-                return result(mine: false, owner: modelSaysOther ?? "Them")
+                return result(mine: false, owner: other(owner) ?? "Them")
             }
             if hasYou && hasThem {
                 // Said across both: the user's only if the model says so and the user spoke in it.
-                return result(mine: modelSaysMe, owner: modelSaysMe ? me : (modelSaysOther ?? "Them"))
+                return result(mine: modelSaysMe, owner: modelSaysMe ? me : (other(owner) ?? "Them"))
             }
             var r = legacy
             r.at = at
@@ -120,10 +129,26 @@ enum PromiseOwner {
         return false
     }
 
+    /// "Айк", "Aik" and "aïk" are one name: transliterated to Latin, folded for
+    /// case and accents, with й/y read as i.
+    static func fold(_ name: String) -> String {
+        let latin = name.applyingTransform(.toLatin, reverse: false) ?? name
+        let folded = latin.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+        return folded.filter { $0.isLetter || $0.isNumber || $0 == " " }
+            .replacingOccurrences(of: "j", with: "i").replacingOccurrences(of: "y", with: "i")
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The user's name, or its first word alone ("Aik" for "Aik Sargsian"), in
+    /// any script; "you" and "me" too.
     static func isMe(_ name: String, myName: String) -> Bool {
-        let n = name.trimmingCharacters(in: .whitespaces).lowercased()
+        let n = fold(name)
         if n.isEmpty { return false }
-        return n == "you" || n == "me" || (!myName.isEmpty && n == myName.lowercased())
+        if n == "you" || n == "me" { return true }
+        let mine = fold(myName)
+        guard !mine.isEmpty else { return false }
+        let first = mine.split(separator: " ").first.map(String.init) ?? mine
+        return n == mine || n == first
     }
 
     /// Raw dialogue (`[mm:ss] You: …`) and finished notes (`**Name:** …`,

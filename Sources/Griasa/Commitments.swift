@@ -336,15 +336,14 @@ enum CommitmentExtractor {
         for request in requests {
             let owners = PromiseOwner.Index(text: request.shown, myName: myName)
             let reply = try await AIFormatter.complete(
-                system: request.system, user: request.user, tier: .fast, maxTokens: 2048,
+                system: request.system, user: request.user, tier: .fast, maxTokens: 4096,
                 timeout: request.timeout, allowCloudFallback: false, allowApple: false,
                 requireLocal: requireLocal, config: config)
             found.requests += 1
 
-            guard let start = reply.firstIndex(of: "["), let end = reply.lastIndex(of: "]"),
-                  start < end,
-                  let data = String(reply[start...end]).data(using: .utf8),
-                  let items = try? JSONDecoder().decode([ExtractedItem].self, from: data) else {
+            // A list cut off at the token limit keeps its complete elements.
+            guard let items = LongMeetingMap.arrayCandidates(reply).lazy
+                .compactMap({ try? JSONDecoder().decode([ExtractedItem].self, from: $0) }).first else {
                 found.unreadable += 1
                 continue
             }
@@ -369,23 +368,31 @@ enum CommitmentExtractor {
                     continue
                 }
                 // Whose it is comes from who spoke the quoted line, not from the model.
-                let who = owners.resolve(quote: quote, modelOwner: item.owner, participants: participants)
-                let isMine = quote == nil ? (item.mine == true && who.isMine) : who.isMine
-                let owner = who.owner
-                // The same promise in the overlap of two parts, or said twice.
-                guard !PromiseDuplicate.isDuplicate(text: text, owner: owner, quote: quote, of: seen) else { continue }
-                seen.append(PromiseDuplicate.entry(text: text, owner: owner, quote: quote))
-                found.commitments.append(Commitment(
+                var who = owners.resolve(quote: quote, modelOwner: item.owner, participants: participants)
+                if quote == nil, (item.owner ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+                    // Nothing to go on, as before: the model's own flag, the user by default.
+                    who = PromiseOwner.Resolution(isMine: item.mine ?? true, owner: (item.mine ?? true) ? mine : "Unknown",
+                                                  at: nil, located: false)
+                }
+                let commitment = Commitment(
                     text: text,
-                    owner: owner,
-                    isMine: isMine,
+                    owner: who.owner,
+                    isMine: who.isMine,
                     dueHint: item.dueHint,
                     dueDate: item.due.flatMap { dateParser.date(from: $0) },
                     sourceTitle: sourceTitle,
                     sourceEntryID: sourceEntryID,
                     date: meetingDate,
                     sourceQuote: quote,
-                    sourceAt: quote == nil ? nil : (who.at ?? QuoteMatch.visibleTimestamp(item.at, in: request.shown))))
+                    sourceAt: quote == nil ? nil : (who.at ?? QuoteMatch.visibleTimestamp(item.at, in: request.shown)))
+                // The same promise in the overlap of two parts, or said twice: one
+                // copy, and the one on the user's own line wins.
+                if let earlier = PromiseDuplicate.duplicate(text: text, owner: who.owner, quote: quote, of: seen) {
+                    if who.isMine, who.located, !found.commitments[earlier].isMine { found.commitments[earlier] = commitment }
+                    continue
+                }
+                seen.append(PromiseDuplicate.entry(text: text, owner: who.owner, quote: quote))
+                found.commitments.append(commitment)
             }
         }
         return found

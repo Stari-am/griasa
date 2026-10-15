@@ -17,6 +17,8 @@ enum LongMeetingNotes {
         var partNotes: [String] = []
     }
 
+    private struct MapDraft { let text: String; let owner: String; let quote: String? }
+
     /// Where the promises of a long meeting are saved beside its notes.
     static func actionsFile(besideNotes notes: URL) -> URL {
         notes.deletingLastPathComponent().appendingPathComponent("map-actions.json")
@@ -43,9 +45,6 @@ enum LongMeetingNotes {
         var known: [(name: String, clue: String)] = []
         var sections: [String] = []
         var dropped = 0
-        // The question "send this to the cloud instead?" is asked by the first
-        // request only: a meeting is not asked about once per part.
-        var mayAsk = allowCloudFallback
         for chunk in chunks {
             let instructions = Prompts.text(.meetingChunk).filling([
                 "part": "\(chunk.index + 1)", "parts": "\(chunks.count)",
@@ -60,9 +59,8 @@ enum LongMeetingNotes {
             for _ in 0..<2 where result == nil {
                 let reply = try await AIFormatter.complete(
                     system: system, user: user, tier: .smart, maxTokens: 4096, timeout: timeout,
-                    allowCloudFallback: mayAsk, requireLocal: requireLocal,
+                    allowCloudFallback: false, requireLocal: requireLocal,
                     config: config, jsonSchema: LongMeetingMap.schema)
-                mayAsk = false
                 result = LongMeetingMap.decode(reply)
             }
             guard let result else {
@@ -79,10 +77,16 @@ enum LongMeetingNotes {
                 var tagged = action
                 tagged.owner = who.owner
                 let task = (action.task ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !PromiseDuplicate.isDuplicate(text: task, owner: who.owner, quote: action.quote, of: seen) else {
+                let entry = MapDraft(text: task, owner: who.owner, quote: action.quote)
+                if let earlier = PromiseDuplicate.duplicate(text: task, owner: who.owner, quote: action.quote, of: seen) {
+                    // The copy on the user's own line wins.
+                    if who.isMine, who.located, !actions[earlier].isMine {
+                        actions[earlier].isMine = true
+                        actions[earlier].owner = who.owner
+                    }
                     continue
                 }
-                seen.append(PromiseDuplicate.entry(text: task, owner: who.owner, quote: action.quote))
+                seen.append(PromiseDuplicate.entry(text: entry.text, owner: entry.owner, quote: entry.quote))
                 attributed.append(tagged)
                 actions.append(.init(
                     text: task, owner: who.owner, isMine: who.isMine,
@@ -105,8 +109,7 @@ enum LongMeetingNotes {
             let reply = try await AIFormatter.complete(
                 system: system, user: parts.joined(separator: "\n\n") + "\n\n" + reduce,
                 tier: .smart, maxTokens: 6000, timeout: timeout,
-                allowCloudFallback: mayAsk, requireLocal: requireLocal, config: config)
-            mayAsk = false
+                allowCloudFallback: false, requireLocal: requireLocal, config: config)
             return LongMeetingMap.withoutTranscript(reply)
         }
         let budget = max(limit - 8_000, TranscriptChunker.chunkSize(contextCharLimit: limit))

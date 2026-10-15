@@ -252,6 +252,12 @@ enum AIFormatter {
         }
     }
 
+    /// A 400 that is about the JSON-schema field, not about the request in general.
+    private static func rejectsSchema(_ body: Data) -> Bool {
+        let text = (String(data: body, encoding: .utf8) ?? "").lowercased()
+        return ["response_format", "format", "schema", "grammar"].contains { text.contains($0) }
+    }
+
     private static func schemaObject(_ text: String?) -> Any? {
         guard let data = text?.data(using: .utf8) else { return nil }
         return try? JSONSerialization.jsonObject(with: data)
@@ -410,7 +416,7 @@ enum AIFormatter {
         }
         // An engine that does not take `response_format` answers 400: ask again
         // without it (the reply is read leniently for JSON).
-        if schema != nil, (response as? HTTPURLResponse)?.statusCode == 400 {
+        if schema != nil, (response as? HTTPURLResponse)?.statusCode == 400, Self.rejectsSchema(data) {
             return try await openAIComplete(config, system: system, user: user, model: model,
                                             maxTokens: maxTokens, timeout: timeout, schema: nil)
         }
@@ -528,7 +534,7 @@ enum AIFormatter {
                                    schema: schema))
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        if status == 400, schema != nil {
+        if status == 400, schema != nil, Self.rejectsSchema(data) {
             return try await ollamaComplete(config, system: system, user: user, model: model,
                                             maxTokens: maxTokens, timeout: timeout, schema: nil)
         }

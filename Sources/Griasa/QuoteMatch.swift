@@ -153,20 +153,29 @@ enum QuoteMatch {
 enum PromiseDuplicate {
     struct Seen { let text: String; let owner: String; let quote: String }
 
-    static func isDuplicate(text: String, owner: String, quote: String?, of seen: [Seen]) -> Bool {
+    /// Index of the earlier copy of this promise, if there is one: the same
+    /// words for the same owner; the same quoted sentence with similar wording;
+    /// or the same owner and nearly the same wording.
+    static func duplicate(text: String, owner: String, quote: String?, of seen: [Seen]) -> Int? {
         let t = QuoteMatch.normalize(text), o = owner.lowercased()
         let q = quote.map(QuoteMatch.normalize) ?? ""
         let words = Set(t.split(separator: " "))
-        for s in seen {
-            if s.text == t { return true }
-            if !q.isEmpty, s.quote == q { return true }
-            if s.owner == o {
-                let other = Set(s.text.split(separator: " "))
-                let union = words.union(other).count
-                if union > 0, Double(words.intersection(other).count) / Double(union) >= 0.8 { return true }
-            }
+        for (index, s) in seen.enumerated() {
+            let similarity = jaccard(words, Set(s.text.split(separator: " ")))
+            if s.text == t, s.owner == o { return index }
+            if !q.isEmpty, s.quote == q, similarity >= 0.5 { return index }
+            if s.owner == o, similarity >= 0.8 { return index }
         }
-        return false
+        return nil
+    }
+
+    static func isDuplicate(text: String, owner: String, quote: String?, of seen: [Seen]) -> Bool {
+        duplicate(text: text, owner: owner, quote: quote, of: seen) != nil
+    }
+
+    private static func jaccard(_ a: Set<Substring>, _ b: Set<Substring>) -> Double {
+        let union = a.union(b).count
+        return union == 0 ? 0 : Double(a.intersection(b).count) / Double(union)
     }
 
     static func entry(text: String, owner: String, quote: String?) -> Seen {

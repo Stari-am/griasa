@@ -64,6 +64,18 @@ enum LongMeetingMap {
         return try? JSONDecoder().decode(Result.self, from: data)
     }
 
+    /// The JSON array in a reply, and — when the reply was cut off by the token
+    /// limit — the same array closed after its last complete element.
+    static func arrayCandidates(_ reply: String) -> [Data] {
+        guard let start = reply.firstIndex(of: "[") else { return [] }
+        var out: [Data] = []
+        if let end = reply.lastIndex(of: "]"), start < end,
+           let data = String(reply[start...end]).data(using: .utf8) { out.append(data) }
+        if let brace = reply.lastIndex(of: "}"), start < brace,
+           let data = (String(reply[start...brace]) + "]").data(using: .utf8) { out.append(data) }
+        return out
+    }
+
     /// Keeps only the promises whose quote is really in this part of the
     /// transcript (not only in the context repeated from the part before).
     /// `dropped` counts the rest.

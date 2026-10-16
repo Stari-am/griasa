@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import NaturalLanguage
 
 /// A user-configurable modifier+letter combination, stored as e.g.
 /// "ctrl+opt+cmd+s".
@@ -169,9 +170,31 @@ enum SelectionAI {
     static func run(preset: PromptPreset, text: String) async -> String? {
         // Bound extreme selections; ~200k chars is far beyond any sane use.
         let input = text.count > 200_000 ? String(text.prefix(200_000)) : text
-        return try? await AIFormatter.complete(system: preset.systemPrompt,
+        return try? await AIFormatter.complete(system: languageAware(preset.systemPrompt, for: input),
                                                user: input,
                                                tier: .smart,
                                                maxTokens: 8192)
+    }
+
+    /// Fills `{{language}}` / `{{languageRules}}` with the selection's own
+    /// language, so a small local model neither translates the text nor
+    /// applies English editing habits to Russian.
+    private static func languageAware(_ prompt: String, for text: String) -> String {
+        guard prompt.contains(GrammarPrompt.languagePlaceholder)
+                || prompt.contains(GrammarPrompt.rulesPlaceholder) else { return prompt }
+        let sample = String(text.prefix(2000))
+        // Cyrillic and Armenian by their letters (NaturalLanguage mistakes
+        // Russian for Kazakh or Ukrainian); NaturalLanguage only for Latin text,
+        // and only when it is sure.
+        var code = LanguageGuess.byScript(sample)
+        if code == nil {
+            let recognizer = NLLanguageRecognizer()
+            recognizer.processString(sample)
+            if let top = recognizer.languageHypotheses(withMaximum: 1).first, top.value >= 0.6 {
+                code = top.key.rawValue
+            }
+        }
+        let name = code.flatMap { LanguageGuess.names[$0] ?? Locale(identifier: "en").localizedString(forLanguageCode: $0) }
+        return GrammarPrompt.fill(prompt, languageName: name, english: code == "en")
     }
 }

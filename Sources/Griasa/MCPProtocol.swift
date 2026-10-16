@@ -202,6 +202,9 @@ enum JSONRPC {
         case methodNotFound = -32601
         case invalidParams = -32602
         case internalError = -32603
+        /// 2026-07-28 allocates -32020 and up to the specification itself.
+        case headerMismatch = -32020
+        case unsupportedProtocolVersion = -32022
     }
 
     static func decode(_ data: Data) -> Result<Request, Failure> {
@@ -225,9 +228,11 @@ enum JSONRPC {
         encode(["jsonrpc": "2.0", "id": id?.raw ?? NSNull(), "result": payload])
     }
 
-    static func failure(id: JSONValue?, _ code: ErrorCode, _ message: String) -> Data {
-        encode(["jsonrpc": "2.0", "id": id?.raw ?? NSNull(),
-                "error": ["code": code.rawValue, "message": message]])
+    static func failure(id: JSONValue?, _ code: ErrorCode, _ message: String,
+                        data: [String: Any]? = nil) -> Data {
+        var error: [String: Any] = ["code": code.rawValue, "message": message]
+        if let data { error["data"] = data }
+        return encode(["jsonrpc": "2.0", "id": id?.raw ?? NSNull(), "error": error])
     }
 
     private static func encode(_ object: [String: Any]) -> Data {

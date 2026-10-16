@@ -12,6 +12,17 @@ promise's owner is decided by who spoke the line it was taken from, and every
 promise keeps those words (with the time, when known) and shows them under it in
 Commitments; a promise the meeting does not actually contain is dropped.
 
+**Claude Desktop in one click.** *Settings → System → AI assistants (MCP)* has an
+*Add to Claude Desktop* button: Griasa builds a small extension and opens it in
+Claude Desktop, which asks you to confirm. The extension reads Griasa's port and
+token each time it runs, so changing the token never needs a reinstall, and if
+Griasa is closed, Claude says so and tells you to open it from the menu bar.
+The copy-a-configuration route for Claude Code, Codex and Cursor is unchanged.
+Behind it, the MCP endpoint now speaks the 2026-07-28 revision of the protocol
+and still answers older clients, rejects mismatched requests with the errors the
+specification names, and describes each tool (a title, that it only reads, what
+it returns) so assistants pick the right one more often.
+
 **Fix grammar & spelling actually fixes.** On the local model it used to hand
 back the text nearly untouched: told to change as little as possible, it left
 mistakes like "as soon as it will be available" alone. It now sees which

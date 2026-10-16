@@ -999,6 +999,9 @@ private struct SystemSettings: View {
                         LabeledContent("Endpoint", value: mcp.endpoint)
                             .font(.caption)
                         HStack {
+                            Button("Add to Claude Desktop") { mcp.installInClaudeDesktop() }
+                                .disabled(mcp.isInstalling)
+                                .help("Builds a Griasa extension and opens it in Claude Desktop, which asks you to confirm")
                             Button("Copy client configuration") {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(mcp.clientConfiguration, forType: .string)
@@ -1006,14 +1009,18 @@ private struct SystemSettings: View {
                             Button("New token") { mcp.rotateToken() }
                                 .help("Invalidates any configuration already handed out")
                         }
+                        if let message = mcp.lastInstallMessage {
+                            Text(message).font(.caption).foregroundStyle(.red)
+                        }
                     } else if let error = mcp.lastError {
                         Text(error).font(.caption).foregroundStyle(.red)
                     } else {
                         Text("Starting…").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Text("Claude Code, Codex and anything else speaking MCP can then ask what was "
-                   + "promised, by whom, and what the next meeting is about. Reachable only from "
+                Text("Claude Desktop installs in one click with Add to Claude Desktop; Claude Code, "
+                   + "Codex and anything else speaking MCP use the copied configuration. Either "
+                   + "can then ask what was promised, by whom, and what the next meeting is about. Reachable only from "
                    + "this Mac, and only with the token.\n\nWorth knowing: audio still never "
                    + "leaves your machine, but whatever an assistant reads goes wherever that "
                    + "assistant sends its context. Summaries and promises are separate from "

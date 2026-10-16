@@ -36,6 +36,13 @@ enum Prompts {
         case commitments
         /// Deciding which already-open commitments this conversation says are done.
         case commitmentsDone
+        /// One part of a long meeting (local model): the part first, the task last.
+        case meetingChunk
+        /// Merging the notes of every part into one set of meeting notes.
+        case meetingReduce
+        /// The short shared system message of the long-meeting requests, so the
+        /// model's cached prefix is the same for every question about a part.
+        case longMeetingSystem
         /// Working dossier about one colleague.
         case personDossier
         /// Filing a note into one of the user's projects.
@@ -106,6 +113,47 @@ enum Prompts {
     }
 
     // MARK: - Shipped wording
+
+    /// Appended to `.commitments` in code, outside the text a person can edit: the
+    /// quote is what lets a promise be checked, so an edited prompts file cannot
+    /// lose it.
+    static let commitmentQuoteRules = """
+
+    Every element must also carry these two keys:
+      "quote": the exact words from the input where the promise was made, copied word for \
+    word exactly as they stand — never translated, corrected or tidied up,
+      "at": "mm:ss" of the nearest [mm:ss] timestamp before the quote if the input shows one, else null
+    A promise you cannot quote is dropped. Text marked "context only" is already covered: \
+    do not extract from it.
+    """
+
+    /// Added when the input is one part of a longer transcript, where "You" and "Them" are tracks.
+    static let commitmentPartRules = """
+
+    The input is one part of a longer meeting transcript, not finished notes. "You" is the \
+    user's microphone ({{me}}); "Them" is everything the computer played — the other \
+    participants ({{participants}}). Attribute each promise to the person who made it; set \
+    "mine" to true only when the speaker is "You". When you cannot tell who a "Them" speaker \
+    is, use "Them" as the owner and set "mine" to false.
+    """
+
+    /// An explicit line naming the language of the meeting; a model left to guess
+    /// answers in English for a Russian meeting. When it is not known the line says "the language the speakers use".
+    static func languageLine(_ language: String?) -> String {
+        let name = (language?.isEmpty == false) ? language! : "the language the speakers use"
+        return "\nThe meeting is in \(name). Write everything in \(name); keep English tech terms as spoken."
+    }
+
+    /// The language rules of `.meetingNotes`, shared by the long-meeting prompts.
+    private static let languageRules = """
+    Language rules:
+    - The meeting may be in any language and may switch languages. Never translate the \
+    content into another language.
+    - Speakers often mix in English technology and crypto terms (GitHub, deploy, staking, \
+    jetton, seed phrase, mainnet…). Keep those terms in English exactly as spoken — do not \
+    translate or transliterate them — and fix ones the recognizer mangled or transliterated \
+    phonetically (e.g. "гит хаб" → "GitHub").
+    """
 
     // swiftlint:disable function_body_length
     private static func shipped(_ key: Key) -> String {
@@ -212,6 +260,67 @@ enum Prompts {
               group decisions with no owner, and things already done.
             - Keep each text self-contained (a week later it must still make sense on its own).
             - 0 items is a valid answer: return [].
+            """
+
+        case .longMeetingSystem:
+            return """
+            You work on one meeting transcript. The text comes first; what to do with it comes \
+            after it, at the end. Do only what the final instructions ask.
+            """
+
+        case .meetingChunk:
+            return """
+            =====
+            The text above is part {{part}} of {{parts}} of a meeting transcript{{range}}. {{speakerRules}}{{noteRules}} \
+            Speech recognition errors are common — read obvious mis-transcriptions from context. \
+            A part marked "context only" at the start repeats the end of the previous part so that \
+            a sentence is not cut in half: use it to understand, but do not report anything from it.
+            {{known}}
+            \(languageRules)
+
+            Write down what happened in THIS part, in the language that dominates it. Return ONLY \
+            a JSON object with these keys (empty lists are fine):
+            - "points": the substantive things discussed, one short sentence each.
+            - "decisions": what was decided or agreed.
+            - "actions": tasks someone is to do AFTER this call that produce or change something \
+            outside it (send, prepare, fix, check, schedule, pay, decide) — promised, taken on, \
+            assigned, or agreed as a next step. List each such task separately. Each: {"owner": who \
+            is to do it, "task": what, "due": the deadline as spoken or "", "date": that deadline as \
+            YYYY-MM-DD counted from the meeting date {{today}}, or "", "quote": the exact words from \
+            the transcript where it was said, copied exactly as it stands in the transcript — do not \
+            correct, translate or tidy it, even if a word looks mis-recognised}. Do NOT list: requests \
+            answered inside the meeting itself ("tell me more", "repeat that", "explain", "share your \
+            screen", "go on"), questions, conversational moves, anything already done during the call, \
+            or wishes nobody took on. Test: would it still make sense on a to-do list a week later, and \
+            was it not finished before the call ended? If unsure whether a real deliverable was \
+            promised, include it.
+            - "questions": questions left open.
+            - "speakers": clues about who the "Them" speakers are, e.g. someone addressed by name \
+            or introducing themselves. Each: {"name": the person, "clue": the words that tell}.
+
+            Never invent anything that is not in this part of the transcript.
+            """
+
+        case .meetingReduce:
+            return """
+            =====
+            Above are notes taken part by part from one meeting, in order, each with its time \
+            range. {{speakerRules}}
+
+            Merge them into one set of meeting notes, in the language that dominates them. \
+            Produce a Markdown document with exactly these sections and no others:
+            # Meeting notes — <infer a short title>
+            ## Summary            (3-6 sentences covering the whole meeting, beginning to end)
+            ## Key points         (bulleted, merged, in the order they came up)
+            ## Action items       (bulleted, with owner when clear; write "None" if there are none)
+
+            Rules:
+            - Merge duplicates: the same point or promise reported by two parts appears once.
+            - Action items: every item listed under "Actions" in the parts must be in Action items. \
+            Drop one only when another entry is the same task; never drop one to make the list shorter.
+            - When a later part changes an earlier decision, keep the later one and say it changed.
+            - Do not add the transcript. Never add anything that is not in the notes above.
+            \(languageRules)
             """
 
         case .personDossier:

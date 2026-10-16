@@ -43,8 +43,15 @@ swiftc -O \
   Sources/Griasa/MCPEndpoint.swift \
   Sources/Griasa/MCPBundle.swift \
   Sources/Griasa/DownloadResume.swift \
-  Sources/Griasa/GrammarPrompt.swift \
+  Sources/Griasa/TranscriptChunker.swift \
+  Sources/Griasa/TranscriptAssembler.swift \
+  Sources/Griasa/QuoteMatch.swift \
+  Sources/Griasa/LongMeetingMap.swift \
+  Sources/Griasa/PromiseOwner.swift \
   Sources/Griasa/LanguageGuess.swift \
+  Sources/Griasa/MeetingLanguage.swift \
+  Sources/Griasa/Prompts.swift \
+  Sources/Griasa/GrammarPrompt.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
@@ -73,6 +80,7 @@ swiftc -O \
   Tests/LlamaStreamChecks.swift \
   Tests/LlamaServerChecks.swift \
   Tests/ResumeChecks.swift \
+  Tests/LongMeetingChecks.swift \
   Tests/GrammarChecks.swift \
   Tests/main.swift \
   -o "$BIN"

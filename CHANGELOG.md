@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+**Long meetings complete on the local model, and every promise keeps the words it
+came from.** Meetings longer than about 20,000 characters are now read in parts on
+the model on this Mac; ones over about 38,000 used to lose their start. Griasa
+reads each part, merges what it found into one set of notes, and builds the
+transcript itself, so nothing is cut. Promises are collected from the whole of a
+long meeting too, not just its first part. For everyone, on any provider: a
+promise's owner is decided by who spoke the line it was taken from, and every
+promise keeps those words (with the time, when known) and shows them under it in
+Commitments; a promise the meeting does not actually contain is dropped.
+
 **Claude Desktop in one click.** *Settings → System → AI assistants (MCP)* has an
 *Add to Claude Desktop* button: Griasa builds a small extension and opens it in
 Claude Desktop, which asks you to confirm. The extension reads Griasa's port and

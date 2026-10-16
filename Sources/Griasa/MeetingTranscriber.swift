@@ -56,7 +56,8 @@ enum MeetingTranscriber {
         if AIFormatter.isConfigured {
             do {
                 let formatted = try await aiFormat(raw: raw, participants: participants,
-                                                   myName: myName, hasNotes: !notes.isEmpty)
+                                                   myName: myName, hasNotes: !notes.isEmpty,
+                                                   actionsFile: LongMeetingNotes.actionsFile(besideNotes: output))
                 try formatted.write(to: output, atomically: true, encoding: .utf8)
                 return output
             } catch {
@@ -77,7 +78,7 @@ enum MeetingTranscriber {
     /// if the raw file is gone or the provider errors.
     static func reformat(transcriptFile: URL, participants: [String],
                          myName: String, allowCloudFallback: Bool = true,
-                         requireLocal: Bool = false) async throws -> String {
+                         requireLocal: Bool = false, meetingDate: Date = Date()) async throws -> String {
         let rawURL = transcriptFile.deletingLastPathComponent()
             .appendingPathComponent("transcript-raw.txt")
         guard let raw = try? String(contentsOf: rawURL, encoding: .utf8),
@@ -89,9 +90,20 @@ enum MeetingTranscriber {
         let formatted = try await aiFormat(raw: raw, participants: participants,
                                            myName: myName, hasNotes: raw.contains("📝 NOTE:"),
                                            allowCloudFallback: allowCloudFallback,
-                                           requireLocal: requireLocal)
+                                           requireLocal: requireLocal,
+                                           actionsFile: LongMeetingNotes.actionsFile(besideNotes: transcriptFile),
+                                           meetingDate: meetingDate)
         try formatted.write(to: transcriptFile, atomically: true, encoding: .utf8)
         return formatted
+    }
+
+    /// The raw dialogue saved beside a meeting's notes file, if it is still there.
+    static func rawTranscript(besideNotes path: String) -> String? {
+        let url = URL(fileURLWithPath: path).deletingLastPathComponent()
+            .appendingPathComponent("transcript-raw.txt")
+        guard let raw = try? String(contentsOf: url, encoding: .utf8),
+              !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return raw
     }
 
     /// Extracts the "# Meeting notes — Title" line for history labeling.
@@ -106,15 +118,52 @@ enum MeetingTranscriber {
         return "Meeting"
     }
 
-    private static func aiFormat(raw: String, participants: [String], myName: String,
-                                 hasNotes: Bool, allowCloudFallback: Bool = true,
-                                 requireLocal: Bool = false) async throws -> String {
-        // Very long meetings: keep the request under the provider's context
-        // limit rather than failing. Cloud models have 1M-token windows
-        // (~400k chars barely dents them); local models get the much smaller
-        // configurable budget.
+    /// How the notes are produced. `automatic` is what the app does; the
+    /// others force a path so the evaluation probe can compare them.
+    enum NotesMode { case automatic, singlePass, chunked }
+
+    static func aiFormat(raw: String, participants: [String], myName: String,
+                         hasNotes: Bool, allowCloudFallback: Bool = true,
+                         requireLocal: Bool = false, config configOverride: LLMConfig? = nil,
+                         mode: NotesMode = .automatic, actionsFile: URL? = nil,
+                         meetingDate: Date = Date(), timeout: TimeInterval = 300) async throws -> String {
+        // The promises of a previous summary of this meeting are not these notes'.
+        if let actionsFile { try? FileManager.default.removeItem(at: actionsFile) }
+        let config = configOverride ?? LLMConfig.current()
+        // A long meeting on a local model is read in parts rather than cut: the
+        // single pass kept only the end and lost the agenda and the early decisions.
+        let inParts = mode == .chunked
+            || (mode == .automatic && TranscriptChunker.shouldChunk(
+                    isLocal: config.runsOnThisMac, characters: raw.count,
+                    maxChars: TranscriptChunker.chunkSize(contextCharLimit: config.contextCharLimit)))
+        if inParts {
+            do {
+                let output = try await LongMeetingNotes.make(
+                    raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
+                    allowCloudFallback: allowCloudFallback, requireLocal: requireLocal,
+                    config: configOverride, meetingDate: meetingDate, timeout: timeout)
+                if let actionsFile, let data = try? JSONEncoder().encode(output.actions) {
+                    try? data.write(to: actionsFile, options: .atomic)
+                }
+                return output.markdown
+            } catch {
+                // A summary is worth more than the better way of making it: fall
+                // back to today's single pass, which keeps the end of the meeting.
+                // Not when the catch-up is waiting for a model that is slow or
+                // away — that meeting stays queued and is tried again whole.
+                let kind = LocalFailure.kind(of: error)
+                if error is CancellationError || mode == .chunked || kind == .slow
+                    || (requireLocal && kind == .unreachable) { throw error }
+                NSLog("Griasa: notes in parts failed (%@), using the single pass", error.localizedDescription)
+            }
+        }
+
+        // Keep the request under the provider's context limit rather than
+        // failing. Cloud models have 1M-token windows (~400k chars barely
+        // dents them); a local model's budget is the one the meeting just
+        // exceeded only when `singlePass` is forced.
         var transcript = raw
-        let limit = LLMConfig.current().contextCharLimit
+        let limit = config.contextCharLimit
         if transcript.count > limit {
             transcript = String(transcript.suffix(limit))
             transcript = "[…earlier part of the meeting truncated to fit the model's context…]\n" + transcript
@@ -158,9 +207,11 @@ enum MeetingTranscriber {
             .filling(["speakerRules": speakerRules, "noteRules": noteRules])
 
         return try await AIFormatter.complete(system: system, user: transcript,
-                                              tier: .smart, maxTokens: 16000, timeout: 300,
+                                              tier: .smart, maxTokens: 16000, timeout: timeout,
+                                              // The one place a meeting asks about the cloud:
+                                              // the parts never do.
                                               allowCloudFallback: allowCloudFallback,
-                                              requireLocal: requireLocal)
+                                              requireLocal: requireLocal, config: configOverride)
     }
 
     private static func timestamp(_ seconds: TimeInterval) -> String {

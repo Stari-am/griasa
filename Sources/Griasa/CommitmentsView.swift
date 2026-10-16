@@ -286,6 +286,14 @@ private struct CommitmentRow: View {
                     }
                 }
                 caption
+                if let quote = item.sourceQuote, !quote.isEmpty {
+                    Text("“\(quote)”" + (item.sourceAt.map { " · \($0)" } ?? ""))
+                        .font(.caption2)
+                        .italic()
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                        .help("The words this promise was taken from")
+                }
             }
 
             Spacer(minLength: 0)

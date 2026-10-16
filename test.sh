@@ -43,6 +43,8 @@ swiftc -O \
   Sources/Griasa/MCPEndpoint.swift \
   Sources/Griasa/MCPBundle.swift \
   Sources/Griasa/DownloadResume.swift \
+  Sources/Griasa/GrammarPrompt.swift \
+  Sources/Griasa/LanguageGuess.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
@@ -71,6 +73,7 @@ swiftc -O \
   Tests/LlamaStreamChecks.swift \
   Tests/LlamaServerChecks.swift \
   Tests/ResumeChecks.swift \
+  Tests/GrammarChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

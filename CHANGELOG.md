@@ -12,6 +12,14 @@ promise's owner is decided by who spoke the line it was taken from, and every
 promise keeps those words (with the time, when known) and shows them under it in
 Commitments; a promise the meeting does not actually contain is dropped.
 
+**Fix grammar & spelling actually fixes.** On the local model it used to hand
+back the text nearly untouched: told to change as little as possible, it left
+mistakes like "as soon as it will be available" alone. It now sees which
+language the text is in. English gets a proper copy edit; Russian and other
+languages get their spelling, endings and commas fixed while every correct
+word, the "ты"/"вы" register and the language itself stay as written. If you
+never edited this preset it updates itself; an edited one is left as it is.
+
 ## 1.0.18 — 2026-10-14
 
 **Testing the local model works.** *Test* in Settings → AI & Actions said the

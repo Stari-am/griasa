@@ -26,13 +26,7 @@ struct PromptPreset: Identifiable, Codable, Equatable {
             """,
             replacesSelection: false, hotkey: "ctrl+opt+cmd+s"),
         PromptPreset(
-            name: "Fix grammar & spelling", emoji: "✅", systemPrompt: """
-            Fix grammar, spelling, and punctuation in the user's text. Rules:
-            - Keep the original language, meaning, tone, and formatting (line breaks, lists).
-            - Keep English tech/crypto terms as-is.
-            - Change as little as possible — do not rephrase beyond what corrections require.
-            Output ONLY the corrected text, no commentary.
-            """,
+            name: "Fix grammar & spelling", emoji: "✅", systemPrompt: GrammarPrompt.defaultPrompt,
             replacesSelection: true, hotkey: "ctrl+opt+cmd+g"),
         PromptPreset(
             name: "Translate to English", emoji: "🌐", systemPrompt: """
@@ -80,7 +74,11 @@ final class PresetStore: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: Self.defaultsKey),
            let decoded = try? JSONDecoder().decode([PromptPreset].self, from: data),
            !decoded.isEmpty {
-            presets = decoded
+            presets = decoded.map { preset in
+                var preset = preset
+                preset.systemPrompt = GrammarPrompt.migrated(preset.systemPrompt)
+                return preset
+            }
         } else {
             presets = PromptPreset.defaults
         }

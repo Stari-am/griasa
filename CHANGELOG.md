@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.19 — 2026-10-19
 
 **Long meetings complete on the local model, and every promise keeps the words it
 came from.** Meetings longer than about 20,000 characters are now read in parts on

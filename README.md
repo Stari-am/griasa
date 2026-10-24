@@ -82,6 +82,12 @@ The short version is below; the full policy is at [stari-am.github.io/griasa/pri
 
 **[Download the latest release — signed, notarized, universal](https://github.com/Stari-am/griasa/releases/latest)**, or `./build.sh` to compile it yourself.
 
+With Homebrew, one command installs the app and both engines it uses (whisper.cpp for speech, llama.cpp for the on-device AI):
+
+```sh
+brew install --cask stari-am/tap/griasa
+```
+
 Free, and nothing is held back: there is no license check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
 
 Think of it the way you think of WinRAR: the trial never ends and it keeps working whether or not you pay. WinRAR apparently makes real money like that, which leaves the mystery nobody has solved in thirty years — *somebody* pays. Feel free to be one of the somebodies.

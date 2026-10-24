@@ -60,6 +60,8 @@ enum BenchmarkScore {
         var matched: Int
         /// Matched pairs where "mine" and "theirs" agree with the gold.
         var mineCorrect: Int
+        /// Matched pairs where the owner is the same person (`sameOwner`).
+        var ownerCorrect: Int
         /// Unmatched predictions that quote a trap.
         var trapsHit: Int
         /// (gold index, prediction index) of every match.
@@ -70,11 +72,13 @@ enum BenchmarkScore {
         var recall: Double? { gold == 0 ? nil : Double(matched) / Double(gold) }
         var precision: Double? { predicted == 0 ? nil : Double(matched) / Double(predicted) }
         var mineAccuracy: Double? { matched == 0 ? nil : Double(mineCorrect) / Double(matched) }
+        var ownerAccuracy: Double? { matched == 0 ? nil : Double(ownerCorrect) / Double(matched) }
 
         /// Several meetings as one: counts add, so a long meeting weighs more.
         static func total(_ results: [Result]) -> Result {
             Result(gold: results.reduce(0) { $0 + $1.gold }, predicted: results.reduce(0) { $0 + $1.predicted },
                    matched: results.reduce(0) { $0 + $1.matched }, mineCorrect: results.reduce(0) { $0 + $1.mineCorrect },
+                   ownerCorrect: results.reduce(0) { $0 + $1.ownerCorrect },
                    trapsHit: results.reduce(0) { $0 + $1.trapsHit }, pairs: [])
         }
     }
@@ -109,13 +113,14 @@ enum BenchmarkScore {
         pairs.sort { $0.gold < $1.gold }
 
         let mineCorrect = pairs.filter { predicted[$0.prediction].isMine == gold[$0.gold].isMine }.count
+        let ownerCorrect = pairs.filter { sameOwner(predicted[$0.prediction].owner, gold[$0.gold].owner, meta: meta) }.count
         let trapsHit = predicted.indices.filter { p in
             !usedPrediction.contains(p) && traps.contains { trap in
                 predicted[p].quote.map { sameQuote($0, trap.quote) } == true
             }
         }.count
         return Result(gold: gold.count, predicted: predicted.count, matched: pairs.count,
-                      mineCorrect: mineCorrect, trapsHit: trapsHit, pairs: pairs)
+                      mineCorrect: mineCorrect, ownerCorrect: ownerCorrect, trapsHit: trapsHit, pairs: pairs)
     }
 
     /// The same words: one quote found in the other, or five words in a row in common.

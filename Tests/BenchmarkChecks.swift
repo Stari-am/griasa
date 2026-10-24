@@ -105,10 +105,16 @@ do {
 do {
     let predicted = [Prediction(owner: "Maya", isMine: true, task: "x", quote: "I'll book the room for the offsite")]
     let r = BenchmarkScore.score(gold: gold, predicted: predicted, meta: meta)
-    check(r.matched == 1 && r.mineCorrect == 0 && r.mineAccuracy == 0,
-          rule: "a match with the wrong mine/theirs flag counts against mine/theirs accuracy",
-          meaning: "the user's own list is what this flag decides",
-          saw: "matched \(r.matched), mine correct \(r.mineCorrect)")
+    check(r.matched == 1 && r.mineCorrect == 0 && r.mineAccuracy == 0 && r.ownerAccuracy == 1,
+          rule: "a match with the wrong mine/theirs flag counts against mine/theirs accuracy, not owner accuracy",
+          meaning: "the user's own list is what this flag decides; the owner name is scored on its own",
+          saw: "matched \(r.matched), mine correct \(r.mineCorrect), owner correct \(r.ownerCorrect)")
+    let wrongOwner = BenchmarkScore.score(gold: gold, predicted: [Prediction(owner: "Alex", isMine: true, task: "x",
+                                          quote: "I'll book the room for the offsite")], meta: meta)
+    check(wrongOwner.matched == 1 && wrongOwner.ownerAccuracy == 0,
+          rule: "a quote match with the wrong owner still matches, and counts against owner accuracy",
+          meaning: "finding the promise and naming its owner are two different skills",
+          saw: "matched \(wrongOwner.matched), owner correct \(wrongOwner.ownerCorrect)")
 }
 
 // A prediction on a trap is counted.

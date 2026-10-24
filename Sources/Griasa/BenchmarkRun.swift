@@ -88,9 +88,9 @@ enum BenchmarkRun {
         let matchedGold = Set(r.pairs.map(\.gold)), matchedPredicted = Set(r.pairs.map(\.prediction))
         return [
             "gold": r.gold, "predicted": r.predicted, "matched": r.matched,
-            "mineCorrect": r.mineCorrect, "trapsHit": r.trapsHit,
+            "mineCorrect": r.mineCorrect, "ownerCorrect": r.ownerCorrect, "trapsHit": r.trapsHit,
             "matches": r.pairs.map { ["gold": gold[$0.gold].task, "predicted": predicted[$0.prediction].task,
-                                      "byQuote": $0.byQuote,
+                                      "byQuote": $0.byQuote, "predictedOwner": predicted[$0.prediction].owner,
                                       "mineRight": predicted[$0.prediction].isMine == gold[$0.gold].isMine] },
             "missed": gold.indices.filter { !matchedGold.contains($0) }.map { "\(gold[$0].owner): \(gold[$0].task)" },
             "extra": predicted.indices.filter { !matchedPredicted.contains($0) }
@@ -105,9 +105,9 @@ enum BenchmarkRun {
             return String(format: "%.0f+%.0f", notes, v.promisesSeconds ?? 0)
         }
         func cells(_ r: BenchmarkScore.Result?) -> String {
-            guard let r else { return "failed | – | – | – | –" }
+            guard let r else { return "failed | – | – | – | – | –" }
             return "\(r.matched)/\(r.gold) (\(r.predicted) found) | \(percent(r.recall)) | \(percent(r.precision))"
-                + " | \(percent(r.mineAccuracy)) | \(r.trapsHit)"
+                + " | \(percent(r.mineAccuracy)) | \(percent(r.ownerAccuracy)) | \(r.trapsHit)"
         }
         let names = ["single", "chunked"] + (cloud == nil ? [] : ["cloud"])
         var lines = [
@@ -120,8 +120,8 @@ enum BenchmarkRun {
             "- Variants: **single** — today's local single pass, truncated as today; **chunked** — the local path in parts;"
                 + " **cloud** — a cloud model reading the whole transcript.",
             "",
-            "| Meeting | Language | Chars | Variant | Matched | Recall | Precision | Mine/theirs | Traps hit | Notes+promises s |",
-            "|---|---|---:|---|---|---:|---:|---:|---:|---:|",
+            "| Meeting | Language | Chars | Variant | Matched | Recall | Precision | Mine/theirs | Owner | Traps hit | Notes+promises s |",
+            "|---|---|---:|---|---|---:|---:|---:|---:|---:|---:|",
         ]
         for row in rows {
             let outcome = variants(row.outcome, cloud: true)
@@ -131,8 +131,8 @@ enum BenchmarkRun {
             }
         }
         lines += ["", "**Totals** (counts summed over the meetings, so a long meeting weighs more):", "",
-                  "| Variant | Matched | Recall | Precision | Mine/theirs | Traps hit | Notes+promises s |",
-                  "|---|---|---:|---:|---:|---:|---:|"]
+                  "| Variant | Matched | Recall | Precision | Mine/theirs | Owner | Traps hit | Notes+promises s |",
+                  "|---|---|---:|---:|---:|---:|---:|---:|"]
         for name in names {
             let scored = rows.compactMap { $0.scores[name] }
             let total = BenchmarkScore.Result.total(scored)

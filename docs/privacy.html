@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Griasa — Privacy Policy</title>
+<!-- The formal version of the "What leaves your Mac" list on the project page.
+     Extension directories and the MCP Registry link here from the Claude
+     Desktop extension's manifest (MCPBundle.privacyPolicyURL). -->
+<link rel="canonical" href="https://stari-am.github.io/griasa/privacy.html">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --bg: #fdfcfa; --fg: #1c1a17; --muted: #6a635a; --accent: #9a4a1e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161513; --fg: #ece8e1; --muted: #9b938a; --accent: #e59b6a; }
+  }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    max-width: 40rem; margin: 8vh auto; padding: 0 1.4rem;
+  }
+  a { color: var(--accent); }
+  h1 { font-size: 1.8rem; margin-bottom: .2rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; }
+  .quiet { color: var(--muted); font-size: .92rem; }
+</style>
+</head>
+<body>
+<p class="quiet"><a href="./">Griasa</a></p>
+<h1>Privacy Policy</h1>
+<p class="quiet">Applies to the Griasa app for macOS and its Claude Desktop extension. Last updated 23 October 2026.</p>
+
+<p>Griasa is open-source software that runs on your Mac. There is no Griasa server and no account. The developer receives none of your recordings, transcripts, notes or usage data. This page describes what the software itself does with your data.</p>
+
+<h2>What is collected</h2>
+<p>Griasa records only what you ask it to: meeting audio (your microphone and the Mac's system audio) and dictation. From those it makes transcripts, notes, a list of promises and pages for the people you meet. It reads your calendar to know when a meeting starts and who was invited. There is no analytics, no telemetry and no crash reporting.</p>
+
+<h2>How it is used and where it is stored</h2>
+<p>Everything is stored in files on your Mac, in <code>~/Library/Application Support/Griasa</code> and the recording folder you choose. Speech is transcribed on the Mac. Notes and promises are made by a local model on the Mac unless you select a cloud provider in Settings. API keys you enter are stored in the macOS keychain.</p>
+
+<h2>Sharing with third parties</h2>
+<ul>
+  <li><b>Cloud AI providers, only if you choose one.</b> If you select Anthropic, OpenAI, Google Gemini or a command-line tool such as Claude Code or Codex, the text of a transcript or note is sent to that provider when it is processed, under that provider's own terms. Audio is never sent.</li>
+  <li><b>AI assistants you connect.</b> The MCP endpoint and the Claude Desktop extension are off until you switch them on. They are local and read-only, and need a token stored on your Mac. Whatever an assistant reads, it may send to its own model provider under that provider's terms.</li>
+  <li><b>Downloads.</b> Griasa downloads speech and language models from Hugging Face and checks GitHub for new releases. These requests carry no personal data.</li>
+</ul>
+<p>Nothing is sold, and nothing is shared with the developer.</p>
+
+<h2>Retention and deletion</h2>
+<p>Data stays until you delete it. Old audio can be deleted automatically after a period you choose (Settings → Meetings → Recordings on disk); transcripts and notes are kept. Deleting a meeting in the app removes it from the history and its project files; its recording folder can be deleted in Finder. Removing the folder above, the recording folder and the app removes everything.</p>
+
+<h2>Organizations</h2>
+<p>Administrators can restrict Griasa with configuration profiles, for example to on-device AI only or with MCP switched off. See the <a href="https://github.com/Stari-am/griasa/blob/main/Support/mdm/README.md">MDM guide</a>.</p>
+
+<h2>Contact</h2>
+<p>Questions or concerns: open an issue at <a href="https://github.com/Stari-am/griasa/issues">github.com/Stari-am/griasa/issues</a>.</p>
+</body>
+</html>

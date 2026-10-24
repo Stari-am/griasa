@@ -14,6 +14,7 @@ import Foundation
 enum MCPBundle {
     static let extensionName = "griasa"
     static let fileName = "Griasa.mcpb"
+    static let privacyPolicyURL = "https://stari-am.github.io/griasa/privacy.html"
 
     /// MCPB manifest 0.3. `version` must look like semver; a development build's
     /// "dev" does not, so it becomes 0.0.0 rather than an extension Claude
@@ -32,6 +33,8 @@ enum MCPBundle {
                 + "Settings \u{2192} System.",
             "author": ["name": "Stari", "url": "https://github.com/Stari-am/griasa"],
             "homepage": "https://github.com/Stari-am/griasa",
+            // Directories and the MCP Registry reject a local server without one.
+            "privacy_policies": [privacyPolicyURL],
             "icon": "icon.png",
             "server": [
                 "type": "node",

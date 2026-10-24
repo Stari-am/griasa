@@ -326,6 +326,10 @@ check(manifest["manifest_version"] as? String == "0.3" && manifest["name"] as? S
       rule: "the manifest has the fields MCPB 0.3 requires and a node entry point",
       meaning: "a manifest Claude Desktop cannot read is an install that fails with no explanation",
       saw: "\(manifest.keys.sorted())")
+check((manifest["privacy_policies"] as? [String])?.allSatisfy { $0.hasPrefix("https://") } == true,
+      rule: "the manifest links a privacy policy over https",
+      meaning: "extension directories and the MCP Registry reject a local server without one",
+      saw: "\(String(describing: manifest["privacy_policies"]))")
 check(!MCPBundle.bridgeSource.contains("child_process") && MCPBundle.bridgeSource.contains("mcp.json"),
       rule: "the bridge reads the token from mcp.json and spawns nothing",
       meaning: "a token baked into the bundle would outlive a token change, and a bridge that runs "

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Stari-am/griasa",
+  "title": "Griasa",
+  "description": "Local-first Mac meeting memory: open promises, people, next-meeting briefs. Read-only.",
+  "repository": {
+    "url": "https://github.com/Stari-am/griasa",
+    "source": "github"
+  },
+  "websiteUrl": "https://stari-am.github.io/griasa/",
+  "version": "@VERSION@",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/Stari-am/griasa/releases/download/v@VERSION@/Griasa.mcpb",
+      "fileSha256": "@MCPB_SHA256@",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}

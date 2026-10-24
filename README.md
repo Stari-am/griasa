@@ -21,6 +21,8 @@ A menu-bar app, not a service.
 
 </div>
 
+![A 19-second loop: a transcript line turns into a promise with its date and the exact words it came from, the brief appears before the next call, and Claude Desktop answers "What did I promise Maya last week?" from Griasa](docs/demo.gif)
+
 ![The pre-meeting brief: who is on the call with each person's open-promise count, what the last meeting was about, and promises grouped as Overdue, From this meeting before, One to one, and With these people elsewhere](docs/screenshot-prep.png)
 
 <div align="center"><sub>Five minutes before a call, without taking keyboard focus. Everybody in these screenshots is invented — the app is pointed at a made-up team to photograph it, with <code>Support/shoot-docs.sh</code>.</sub></div>
@@ -62,7 +64,9 @@ the joins, because a join is not a feature any one of them owns.
 screenshots, what leaves your Mac and what doesn't, the engineering that turned
 out harder than it looked, and the questions people actually ask.**
 
-## Privacy, in four lines
+## Privacy Policy
+
+The short version is below; the full policy is at [stari-am.github.io/griasa/privacy.html](https://stari-am.github.io/griasa/privacy.html).
 
 - **Audio never leaves your Mac.** Transcription is local — Apple's recognizer or `whisper.cpp`. There is no Griasa server and no account.
 - **Text stays on the Mac by default.** A new install uses a local model that Griasa sets up after one question; Anthropic, OpenAI or Gemini are used only if you choose one.

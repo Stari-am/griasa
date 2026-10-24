@@ -39,6 +39,16 @@ enum GriasaMain {
             let cloud = args.firstIndex(of: "--cloud").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
             await LongMeetingEval.run(count: count, cloudRaw: cloud)
         }
+        if let flag = args.firstIndex(of: "--build-mcpb"), args.count > flag + 1 {
+            let destination = URL(fileURLWithPath: args[flag + 1])
+            do {
+                try await MainActor.run { try MCPServer.writeBundle(to: destination) }
+                exit(0)
+            } catch {
+                FileHandle.standardError.write(Data("build-mcpb: \(error.localizedDescription)\n".utf8))
+                exit(1)
+            }
+        }
         if args.contains("--closure-selftest") { await ClosureScan.selfTest() }
         if let flag = args.firstIndex(of: "--closure-scan") {
             let limit = args.count > flag + 1 ? Int(args[flag + 1]) ?? 8 : 8

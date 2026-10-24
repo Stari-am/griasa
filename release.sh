@@ -281,6 +281,21 @@ if (( ${#FAILED[@]} )); then
     die "verification failed (${FAILED[*]}) — this build is not fit to sell."
 fi
 
+# ── The Claude Desktop extension, the MCP Registry entry and the Homebrew cask ──
+#
+# The MCP Registry lists an .mcpb only from a release asset, by URL and hash, so
+# the extension is built once here from the signed app and attached next to the
+# disk image. server.json and the cask are filled from Support/ templates with
+# this release's version and hashes; publishing them is printed below.
+MCPB="$DIST/Griasa.mcpb"
+"$APP/Contents/MacOS/Griasa" --build-mcpb "$MCPB" || die "could not build $MCPB."
+MCPB_SHA=$(shasum -a 256 "$MCPB" | cut -d' ' -f1)
+DMG_SHA=$(shasum -a 256 "$DMG" | cut -d' ' -f1)
+sed -e "s/@VERSION@/$VERSION/g" -e "s/@MCPB_SHA256@/$MCPB_SHA/" \
+    Support/mcp-registry/server.json > "$DIST/server.json"
+sed -e "s/@VERSION@/$VERSION/" -e "s/@DMG_SHA256@/$DMG_SHA/" \
+    Support/homebrew/griasa.rb > "$DIST/griasa.rb"
+
 # The staged .app has done its job — it exists to be signed, notarized and
 # verified, and the disk image is the artifact. Leaving it behind puts a second
 # "Griasa" in Spotlight and in Launch Services with the same name and icon as the
@@ -306,5 +321,8 @@ print
 print "The staged app bundle was removed; the disk image above is the artifact."
 print
 print "Publish with:"
-print "  gh release create v$VERSION $DMG \\"
+print "  gh release create v$VERSION $DMG $MCPB \\"
 print "    --title \"Griasa $VERSION\" --notes-file $NOTES"
+print "Then, once the release exists:"
+print "  cp $DIST/server.json server.json && mcp-publisher publish && rm server.json"
+print "  cp $DIST/griasa.rb <homebrew-tap checkout>/Casks/griasa.rb   # commit and push the tap"

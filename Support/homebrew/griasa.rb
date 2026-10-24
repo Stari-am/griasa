@@ -13,6 +13,8 @@ cask "griasa" do
   end
 
   depends_on macos: ">= :sonoma"
+  # The speech and AI engines Griasa would otherwise install with brew on first launch.
+  depends_on formula: ["whisper.cpp", "llama.cpp"]
 
   app "Griasa.app"
 

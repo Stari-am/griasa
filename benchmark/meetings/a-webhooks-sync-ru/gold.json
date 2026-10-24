@@ -1,0 +1,29 @@
+{
+  "promises": [
+    {"owner": "Иван", "isMine": false, "task": "Выкатить фикс webhook handler с очередью и exponential backoff на staging", "due": "сегодня вечером", "quote": "Ок, я тогда сегодня вечером выкачу фикс с exponential backoff на staging"},
+    {"owner": "Alex", "isMine": true, "task": "Дописать идемпотентность для webhook handler (таблица обработанных event id)", "due": "до пятницы", "quote": "Я до пятницы допишу идемпотентность для webhook handler"},
+    {"owner": "Иван", "isMine": false, "task": "Выложить PR с миграцией для таблицы event id и скриптом replay потерянных событий", "due": "завтра утром", "quote": "PR с миграцией я выложу завтра утром"},
+    {"owner": "Иван", "isMine": false, "task": "Переслать в канал переписку с саппортом Stripe", "due": "сразу после звонка", "quote": "Ага, перешлю переписку в канал сразу после звонка."},
+    {"owner": "Alex", "isMine": true, "task": "Завести тикет на алерт по dead letter queue", "due": null, "quote": "Я заведу тикет на алерт по dead letter queue"},
+    {"owner": "Иван", "isMine": false, "task": "Снизить порог алерта по пятисоткам на webhook endpoint до пяти процентов", "due": "после звонка", "quote": "Это две минуты, я сделаю прямо после звонка"},
+    {"owner": "Анна", "isMine": false, "task": "Проверить логи за выходные на другие потерянные типы событий и скинуть в канал", "due": "до обеда", "quote": "Хорошо, я гляну логи за выходные и скину в канал до обеда."},
+    {"owner": "Анна", "isMine": false, "task": "Прогнать регресс по платежам", "due": "в среду", "quote": "регресс по платежам я прогоню в среду"},
+    {"owner": "Alex", "isMine": true, "task": "Записать нагрузочное тестирование в бэклог следующего спринта", "due": null, "quote": "Тогда в этом спринте не делаем, я запишу в бэклог на следующий."},
+    {"owner": "Майя", "isMine": false, "task": "Написать клиенту Brightmoor о том, что произошло и когда будет фикс", "due": null, "quote": "Я напишу клиенту из Brightmoor, что фикс будет на следующей неделе"},
+    {"owner": "Майя", "isMine": false, "task": "Обновить release notes (пункт про надёжность webhook'ов)", "due": "к четвергу", "quote": "Я обновлю release notes к четвергу"},
+    {"owner": "Alex", "isMine": true, "task": "Поговорить с Даниилом про доступ к Grafana на проде для Ивана", "due": "когда Даниил вернётся", "quote": "Ок, я поговорю с Даниилом про доступы к Grafana, когда он вернётся."},
+    {"owner": "Alex", "isMine": true, "task": "Скинуть Майе короткое описание инцидента для отчёта руководству", "due": "сегодня до конца дня", "quote": "Я тебе в личку скину короткое описание инцидента сегодня до конца дня."},
+    {"owner": "Анна", "isMine": false, "task": "Собрать таймлайн инцидента из тикетов саппорта в документ постмортема", "due": "до конца недели", "quote": "Я могу собрать таймлайн из тикетов саппорта и положить в общий документ."},
+    {"owner": "Иван", "isMine": false, "task": "Добавить в постмортем таймлайн по логам", "due": "до конца недели", "quote": "Со стороны логов я тоже добавлю, у меня в заметках всё по минутам записано"},
+    {"owner": "Alex", "isMine": true, "task": "Создать документ постмортема", "due": null, "quote": "тогда документ я создам, а вы туда допишете каждый свою часть"},
+    {"owner": "Alex", "isMine": true, "task": "Написать выводы и action items постмортема", "due": null, "quote": "А выводы и action items в постмортеме я напишу сам"},
+    {"owner": "Майя", "isMine": false, "task": "Переслать команде ответ Brightmoor", "due": null, "quote": "я ещё перешлю вам ответ Brightmoor, когда они ответят"}
+  ],
+  "traps": [
+    {"quote": "Нет, нагрузочное в этом спринте я точно не возьму.", "note": "Declined: Anna refuses the load test this sprint. Not a promise; the backlog item is Alex's."},
+    {"quote": "Я тогда напишу в саппорт Stripe и спрошу про retry policy.", "note": "Cancelled a minute later: Ivan already wrote to Stripe, Alex says he won't."},
+    {"quote": "Можешь глянуть логи за выходные, нет ли там ещё каких-то типов событий", "note": "Alex's request to Anna. The promise is Anna's reply, not Alex's."},
+    {"quote": "когда-нибудь надо будет вообще переписать этот модуль на нормальную очередь событий", "note": "A wish, said as 'dreams'. Nobody takes it."},
+    {"quote": "давайте это обсудим на планировании, когда будет roadmap на следующий квартал", "note": "Deferred to planning, no owner."}
+  ]
+}

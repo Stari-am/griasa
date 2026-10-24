@@ -1,0 +1,31 @@
+{
+  "promises": [
+    {"owner": "Tom", "isMine": false, "task": "Spike a determinate progress bar component and check whether the upload API gives progress events", "due": "tomorrow", "quote": "I'll spike the progress bar component tomorrow"},
+    {"owner": "Alex", "isMine": true, "task": "Ask Daniel whether the import service accepts files over 10 MB after the rewrite", "due": null, "quote": "I'll ask Daniel whether the import service can take files over ten megabytes now"},
+    {"owner": "Olena", "isMine": false, "task": "Add an \"Ignore all unmatched\" link to the import preview", "due": null, "quote": "Okay, I'll add that. Small change."},
+    {"owner": "Alex", "isMine": true, "task": "Write the API contract for the parse-preview endpoint", "due": "by end of day Wednesday", "quote": "I'll write up the API contract for the preview endpoint by end of day Wednesday"},
+    {"owner": "Priya", "isMine": false, "task": "Add onboarding step events (viewed, completed, skipped) to the tracking plan", "due": "early next week", "quote": "Yes, I'll add the onboarding events to the tracking plan"},
+    {"owner": "Tom", "isMine": false, "task": "Wire up the onboarding tracking events once they are in the plan", "due": null, "quote": "And I'll wire them once they're in the plan"},
+    {"owner": "Priya", "isMine": false, "task": "Pull baseline funnel numbers per step for the current flow", "due": "before Monday", "quote": "I'll pull the funnel numbers for the current flow before Monday"},
+    {"owner": "Maya", "isMine": false, "task": "Send Olena the compliance doc with required invoice fields per country", "due": "today", "quote": "I'll send Olena the compliance doc with the required invoice fields today."},
+    {"owner": "Maya", "isMine": false, "task": "Get legal to confirm the marketing consent checkbox wording", "due": null, "quote": "I'll talk to legal about the consent checkbox wording and get back to you."},
+    {"owner": "Olena", "isMine": false, "task": "Update the spec with per-workspace vs per-user checklist rules and the other changes", "due": "by Thursday", "quote": "I'll update the spec with the per-workspace versus per-user rules by Thursday"},
+    {"owner": "Olena", "isMine": false, "task": "Run five unmoderated user tests on the new copy", "due": "next week", "quote": "I'll run five quick user tests with the new copy next week"},
+    {"owner": "Olena", "isMine": false, "task": "Add Priya to the user test results doc", "due": null, "quote": "Of course, I'll add you to the doc."},
+    {"owner": "Tom", "isMine": false, "task": "Fix the keyboard covering the email field on small iPhones", "due": "this week", "quote": "I can fix that this week, it's a scroll inset thing."},
+    {"owner": "Maya", "isMine": false, "task": "Send Olena the structure for the three onboarding emails", "due": "by Friday", "quote": "Then I'll send you the structure for the three onboarding emails by Friday"},
+    {"owner": "Alex", "isMine": true, "task": "Add the day-three email trigger to the message for Daniel", "due": null, "quote": "Okay, then it goes with my question to Daniel, I'll just add it to the same message."},
+    {"owner": "Tom", "isMine": false, "task": "Check every PR in the new flow for hardcoded strings", "due": null, "quote": "Yep, I'll check every PR for hardcoded strings"},
+    {"owner": "Alex", "isMine": true, "task": "Add CSV encoding detection to the list for Daniel", "due": null, "quote": "I'll put it on the list for Daniel too."},
+    {"owner": "Maya", "isMine": false, "task": "Raise the pricing page problems with the web team", "due": null, "quote": "Fair, I'll raise it with them."},
+    {"owner": "Maya", "isMine": false, "task": "Book a follow-up design review", "due": "the 20th", "quote": "I'll book a follow-up review for the 20th, same time, same people."},
+    {"owner": "Alex", "isMine": true, "task": "Post the meeting summary in the onboarding channel", "due": "right after this call", "quote": "I'll post the summary of this meeting in the onboarding channel right after this call."}
+  ],
+  "traps": [
+    {"quote": "I'll redo the illustrations for all five steps so it feels consistent.", "note": "Cancelled a few lines later: the team ships with plain icons and Olena says she won't redo them now."},
+    {"quote": "No, sorry, I can't take that on this sprint", "note": "Declined: Maya asks Alex to fix the pricing page; Alex refuses and it goes to the web team."},
+    {"quote": "Priya, can you add the onboarding step events to the tracking plan?", "note": "Alex's request to Priya. The promise is Priya's reply, not Alex's."},
+    {"quote": "We should really do a proper design system audit at some point", "note": "Someday talk, explicitly not this quarter."},
+    {"quote": "Translations after the user tests.", "note": "A decision with no owner, not a promise."}
+  ]
+}

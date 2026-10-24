@@ -24,7 +24,8 @@ enum BenchmarkRun {
     static func run(directory: String, cloudRaw: String?, only: Set<String>?) async -> Never {
         let source = URL(fileURLWithPath: directory, isDirectory: true)
         let ids = ((try? FileManager.default.contentsOfDirectory(atPath: source.path)) ?? [])
-            .filter { !$0.hasPrefix(".") && (only?.contains($0) ?? true) }
+            // `--only a,b` takes a whole folder name or its letter ("a" is "a-webhooks-sync-ru").
+            .filter { id in !id.hasPrefix(".") && (only?.contains { id == $0 || id.hasPrefix($0 + "-") } ?? true) }
             .sorted()
         guard !ids.isEmpty else {
             print("No meeting folders in \(source.path)\(only.map { " matching --only \($0.sorted().joined(separator: ","))" } ?? "").")

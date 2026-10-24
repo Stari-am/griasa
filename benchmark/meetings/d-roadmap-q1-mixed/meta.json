@@ -1,0 +1,14 @@
+{
+  "title": "Q1 roadmap session",
+  "language": "ru+en",
+  "myName": "Alex",
+  "participants": ["Maya", "Priya", "Tom", "Иван", "Даниил"],
+  "aliases": {
+    "Alex": ["Алекс", "Саша", "Саш"],
+    "Иван": ["Ваня", "Ivan"],
+    "Даниил": ["Даня", "Daniel", "Danya"],
+    "Maya": ["Майя"],
+    "Priya": ["Прия"],
+    "Tom": ["Том"]
+  }
+}

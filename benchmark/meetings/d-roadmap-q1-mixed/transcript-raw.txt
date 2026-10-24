@@ -1,0 +1,630 @@
+[00:03] You: Okay, hi everyone, let's start. This is the Q1 roadmap session, we have two hours blocked, and I'd like to actually use them, not finish in forty minutes and then argue in Slack for a week. Maya, Priya, Tom, Ваня, Даня, вы все тут?
+[00:19] Them: Maya here, hi.
+[00:21] Them: Hi, it's Priya. I'm here.
+[00:23] Them: Tom here. Morning, or afternoon for you guys.
+[00:26] Them: Ваня тут, привет.
+[00:30] Them: Даня, привет, слышу всех.
+[00:33] You: Great. Quick note on language: Priya and Tom don't speak Russian, so anything that matters for them, we say in English. Если мы с Ваней и Даней уходим в детали по бэкенду, можем по-русски, но потом коротко пересказываем на английском. Okay?
+[00:49] Them: Tom. Works for me. Honestly I'm used to it by now, I just wait for the English summary.
+[00:55] Them: Priya. Same. And if I hear "Postgres" and "ClickHouse" in a Russian sentence, I usually get the gist.
+[01:03] Them: Даня. Ха, это правда, у нас половина слов английские.
+[01:09] You: Okay. Agenda. One: quick look back at Q4, what we shipped, what we didn't. Two: the Android tablet question that Tom raised last week. Three: sunsetting API v1. Four: the seller analytics dashboard, which is Priya's big proposal. Five: the Shopnest marketplace integration. Six: pricing, Maya. Seven: capacity and the Q1 timeline. That's a lot, so I'll be strict with time.
+[01:36] Them: Maya. Can I swap pricing and Shopnest? Pricing depends a bit on what we decide about Shopnest.
+[01:44] You: Sure. Pricing after Shopnest it is.
+[01:47] 📝 NOTE: Agenda: Q4 recap, tablets, API v1, seller analytics, Shopnest, pricing, capacity/timeline.
+[01:48] You: Q4 recap. Maya, you have the slide?
+[01:51] Them: Maya. Yes, sharing now. So, in Q4 we committed to five things. We shipped three fully: the new checkout, bulk edit for products, and the grouped push notifications. One partially: the PDF export is out for web but not for mobile. And one we didn't start at all: the public API v2, which is part of why API v1 is still around and on today's agenda.
+[02:15] Them: Tom. The grouped pushes numbers are really nice by the way. Push opt-in went from forty percent back to fifty-two in six weeks.
+[02:25] Them: Priya. Yes, I can confirm that, I double-checked it last week because it looked too good. It's real. It's mostly new users not turning them off in the first week, existing users who turned them off mostly stayed off.
+[02:40] You: That's a good nuance. So the effect on existing users is small, the effect on new ones is big.
+[02:47] Them: Priya. Exactly. If we want existing users back, we'd need some kind of re-permission prompt, but that's a separate thing.
+[02:56] Them: Maya. Bulk edit adoption is also good. About thirty percent of sellers with more than five hundred products used it at least once in the first month. The complaints are mostly about undo, which we knew would come.
+[03:11] Them: Ваня. Undo, да. Мы же специально историю изменений сохраняем, чтобы его потом добавить. Так что это не переделка, это доделка.
+[03:20] You: Ваня says the undo was planned for, the history is already stored, so adding it is an increment, not a rewrite.
+[03:27] Them: Maya. Good, that's going into the candidates list then.
+[03:33] Them: Даня. А checkout — там как с ошибками? Я помню, первую неделю после релиза было много пятисоток.
+[03:41] Them: Maya. The checkout error rate is back to normal, Даня is asking. The first week was rough because of the payment provider timeout issue, but since the fix it's below the old checkout.
+[03:55] Them: Даня. Отлично, спасибо.
+[03:58] You: And the PDF export on mobile?
+[04:00] Them: Tom. That's on me. We hit a problem with rendering fonts for Cyrillic and Greek on Android, the library we picked just doesn't embed them properly. We have a workaround, rendering on the server and downloading the PDF, but it needed backend changes that didn't fit in December.
+[04:20] Them: Ваня. Серверный рендеринг уже есть, кстати, для веба же. Там просто нужен эндпоинт, который отдаёт файл, а не открывает страницу.
+[04:29] Them: Tom. Sorry, what did he say?
+[04:31] You: Ivan says the server-side rendering already exists for web, so it's just an endpoint that returns the file instead of a page. Small.
+[04:42] Them: Tom. Oh, that's much better than I thought. Then it's a small item, we can probably do it in January.
+[04:51] You: Okay, that's Q4. Three and a half out of five, roughly. Not bad for a team this size.
+[04:57] Them: Priya. Before we move on, can I add one thing from the support data? Because it connects to a few items on today's agenda.
+[05:06] You: Sure, briefly.
+[05:08] Them: Priya. I categorised all the support tickets from Q4 with a simple keyword model, it's rough but it gives the shape. The biggest category, about a quarter, is still "how do I", which is documentation. The second is payments, about fifteen percent. And the third, which grew the most, is integrations: people asking why their external tool stopped syncing, or how to connect something. That went from six percent in Q3 to eleven percent in Q4.
+[05:37] Them: Maya. Integrations meaning what, exactly? Our API?
+[05:42] Them: Priya. Mostly the API, yes, and a good part of that is v1. People using old plugins that return weird data, because v1 fills in fields we don't have anymore with defaults. And then some are about marketplaces, people asking if we connect to Shopnest or to the bigger marketplaces.
+[06:02] Them: Ваня. Это те самые фейковые поля в v1. Например, поле «вес» мы не храним с позапрошлого года, а v1 отдаёт ноль. И какой-то плагин доставки считает стоимость по весу ноль.
+[06:13] You: Ivan's example: v1 returns zero for the weight field because we stopped storing weight, and some shipping plugin calculates shipping cost from that zero.
+[06:23] Them: Tom. Oh wow, that's a fun bug for someone.
+[06:26] Them: Maya. That's a real money bug for sellers. That alone is a reason to sunset v1.
+[06:31] Them: Priya. So, my point is just: the integration tickets are growing, and two of today's topics, v1 and Shopnest, are both about that.
+[06:42] You: Good framing, thanks. Keep that in mind for the next items.
+[06:46] Them: Даня. А саппорт отвечает на вопросы про API сам, или пересылает Ване?
+[06:52] Them: Priya. Даня asked if support handles the API questions themselves. Mostly they forward them to Ivan, from what I see in the ticket history.
+[07:02] Them: Ваня. Да. Примерно три-четыре в неделю. Немного, но каждый раз это полчаса, потому что надо разобраться, какая версия, какой плагин.
+[07:11] You: So that's another hidden cost of v1: two hours a week of Ivan's time on support questions.
+[07:17] Them: Tom. Can I add a process thing about Q4, while we're looking back? It's short.
+[07:24] You: Sure.
+[07:28] Them: Tom. The thing that went worst for us in Q4 was handoffs between backend and mobile. Three times we built a screen against an API that changed shape in the last week. Not because anyone did something wrong, but because the API was being designed while we were building against it.
+[07:49] Them: Ваня. Это правда. С push-уведомлениями так было. Я поменял формат payload'а, когда понял, что группировка требует другой структуры, и Том узнал об этом из сломанной сборки.
+[08:02] You: Ivan confirms, with the push notifications he changed the payload format late, and Tom found out from a broken build.
+[08:12] Them: Tom. No hard feelings, it made sense technically. But I'd like us to agree the API shape first, in a short written contract, before both sides start building.
+[08:25] Them: Priya. Same for events, by the way. If the event schema is agreed first, I can prepare the analysis while you build.
+[08:35] Them: Даня. Контракт API заранее — это хорошо, но он всё равно будет меняться. Важно, чтобы изменения были видны. Может, генерировать клиентский код из схемы? Тогда изменение сразу ломает сборку в момент изменения, а не через неделю.
+[08:50] You: Даня suggests generating client code from the API schema, so a change breaks the build when it's made, not a week later.
+[08:59] Them: Tom. That would be great for Android. iOS has decent generators too.
+[09:06] Them: Maya. I like the "agree first" rule. It's also easier for me to review: I can read a contract, I can't read a pull request.
+[09:15] You: Okay. Let's make "API contract first" a working rule for Q1 projects that cross backend and mobile. Not a big process, a page in the project doc. And generated clients we look at as part of the analytics project, since that's new API anyway.
+[09:31] Them: Tom. Thank you. That's all I wanted.
+[09:35] Them: Maya. And one more process thing from my side. In Q4, I think I was too slow to say no to sales. Twice they promised a feature to a customer, and we ended up squeezing it in. Bulk edit for the furniture chain was one.
+[09:50] Them: Ваня. Это было тяжело, да. Две недели переработок.
+[09:53] Them: Maya. Right. So in Q1, anything sales want that's not on this roadmap goes through me, and the default answer is "Q2 candidate". I want you to hear that from me, so you can point people to me.
+[10:07] You: That's really helpful, Maya. The roadmap is only real if it can say no.
+[10:13] Them: Priya. Can I steal that sentence for my slides?
+[10:18] You: It's yours.
+[10:21] Them: Maya. That number belongs in the business case too.
+[10:26] Them: Maya. And honestly the API v2 not starting was a deliberate choice, we moved people to bulk edit when the big sellers started complaining. So I don't count that as a failure.
+[10:39] You: Agreed. Okay, item two. Tablets. Tom, you raised it, go ahead.
+[10:44] Them: Tom. Right. So, context. We have phone layouts and tablet layouts in the Android app. The tablet layouts are basically a second app. Every new screen we build, we build twice. And the tablet layouts are in pretty bad shape, there are layout bugs nobody has time to fix, the crash rate on tablets is three times the phone crash rate. And according to the store console, tablets are about four percent of our Android installs.
+[11:12] Them: Maya. Four percent of installs, and how much of the work?
+[11:17] Them: Tom. I'd say twenty to twenty-five percent of Android UI time goes into tablet variants. Every screen, every review, every QA pass.
+[11:26] Them: Ваня. Это много. Четверть времени на четыре процента пользователей.
+[11:31] You: Ivan says that's a lot. A quarter of the time for four percent of users.
+[11:36] Them: Tom. So my proposal is: we drop the dedicated tablet layouts. Tablets get the phone layout, stretched, with max width so it doesn't look ridiculous. That's what a lot of apps do. We save a quarter of Android UI time.
+[11:52] Them: Maya. And iOS? iPads?
+[11:55] Them: Tom. iPad is different. We never did a separate iPad layout, the app runs in compatibility mode. So nothing changes there.
+[12:03] Them: Даня. А что с планшетными сборками в CI? У нас же отдельные эмуляторы для планшетов, это прилично времени в пайплайне.
+[12:12] You: Даня asks about the tablet emulators in CI, those take quite some pipeline time.
+[12:17] Them: Tom. Right, those would go too. That's another win, the Android pipeline would get maybe five minutes faster.
+[12:25] You: Okay. Does anyone see a reason not to do it?
+[12:29] Them: Maya. Honestly, four percent and a quarter of the time, it's an easy call for me. Unless Priya has numbers that say otherwise.
+[12:38] Them: Priya. I haven't looked at tablets specifically. I'd assume the numbers in the store console are right.
+[12:47] You: Okay. Then let's decide: we drop the dedicated Android tablet layouts in Q1. Tablets get the phone layout with max width.
+[12:57] Them: Tom. Great. I'll write the deprecation plan for the tablet layouts by next Friday, with which screens change, what the stretched layout looks like, and how we communicate it.
+[13:10] Them: Даня. Тогда, когда Том напишет план, я уберу планшетные эмуляторы из CI. Скажи мне, Том, когда будет готово.
+[13:19] You: Даня will remove the tablet emulators from CI once Tom's plan is ready.
+[13:26] Them: Tom. Perfect, I'll ping him.
+[13:28] 📝 NOTE: Решение: Android-планшеты — без отдельных layout'ов. Том — план к след. пятнице. Даня — убрать эмуляторы из CI после плана.
+[13:29] You: Item three. API v1. Ваня, давай ты расскажешь, а я переведу, или ты сразу по-английски?
+[13:37] Them: Ваня. Давай я попробую по-английски, а если застряну, перейду на русский. So. API v1 is the old public API, it was written five years ago, before I joined. It has no rate limits per client, it uses API keys that never expire, and it returns some fields that we don't even have in the database anymore, we fake them with default values. We have v1.5, which is the same but with OAuth and rate limits, and most new integrators use that. But v1 is still used.
+[14:08] Them: Priya. How much is it used?
+[14:12] Them: Ваня. Это как раз вопрос. Я знаю, что запросов в v1 около двух миллионов в месяц, but I don't know how many distinct clients. The logs have the API key, but mapping keys to companies is… сложно, ключи в старой таблице, там половина без привязки к аккаунту.
+[14:30] You: So we know the volume, two million requests a month, but not how many integrators that is, because the old key table is a mess.
+[14:39] Them: Maya. My guess from the partner list is about forty integrators. But that's a guess.
+[14:46] You: Priya, can you pull the list of API v1 clients with traffic in the last ninety days? Joined with whatever account data we have for those keys?
+[14:56] Them: Priya. Yes, I'll pull the list of v1 clients with traffic in the last ninety days, and I'll try to match keys to accounts through the billing data, that usually works better than the old key table. Give me until Thursday.
+[15:11] Them: Ваня. Thank you, это очень поможет.
+[15:15] Them: Даня. Ваня, пока мы тут, вопрос по OAuth. В v1.5 токены живут сколько? Если интеграторы переходят, у них не начнётся ад с обновлением токенов?
+[15:25] Them: Ваня. Access token час, refresh token тридцать дней, но обновляется при каждом использовании. То есть если интеграция работает хотя бы раз в месяц, она живёт вечно. Если не работает месяц — надо переподключаться.
+[15:40] Them: Даня. А для маленьких агентств, которые написали плагин и забыли, это нормально? Они же не будут обрабатывать refresh.
+[15:50] Them: Ваня. Вот это проблема, да. Многие старые плагины написаны на коленке. Им проще с постоянным ключом. Может, для v1.5 сделать ещё вариант с персональными токенами, как в GitHub? Постоянный, но с ограниченными правами и с возможностью отозвать.
+[16:07] Them: Даня. Мне нравится. Это безопаснее, чем ключи v1, и проще, чем OAuth.
+[16:12] You: Let me summarise for Priya and Tom. Даня asked whether OAuth tokens in v1.5 would be a pain for small agencies with old plugins. Ivan explained the refresh logic, and they agree that the old plugins won't handle refresh well. Ivan's idea is personal access tokens, like GitHub: long-lived, scoped, revocable. Safer than v1 keys, simpler than OAuth.
+[16:37] Them: Priya. Makes sense to me. Is that a lot of work?
+[16:42] Them: Ваня. Not a lot. We have most of it, scopes already exist for OAuth. It's a new token type, a page in settings to create and revoke them. Maybe three or four days.
+[16:53] Them: Maya. And it makes the migration much easier for the small ones. I'd want that before we send the emails, so the guide can say "the easiest path is a personal token".
+[17:04] You: Agreed. It fits naturally into the guide work. Ivan, it's your call how to slice it.
+[17:10] Them: Ваня. Логично, без таких токенов гайд будет сложным.
+[17:15] Them: Tom. Do personal tokens have expiry?
+[17:18] Them: Ваня. Optional. The seller chooses: thirty days, ninety days, or no expiry. And we show the last-used date, so they can clean up.
+[17:27] Them: Tom. Nice, like the good tools do it.
+[17:31] You: Okay. Now the actual decision. Do we sunset v1, and when?
+[17:37] Them: Ваня. I'd say yes, sunset. The security problem alone is a reason: keys that never expire, no rate limits. If one key leaks, someone can download the whole catalog of a seller, and we wouldn't even notice.
+[17:53] Them: Даня. Плюс нагрузка. Без rate limits один кривой клиент может положить нам базу. В ноябре такое почти случилось, помнишь, когда какой-то интегратор зациклился и делал по триста запросов в секунду.
+[18:08] You: Даня reminds us that in November one integrator got stuck in a loop and hit us with three hundred requests per second through v1, and we had no way to throttle it.
+[18:19] Them: Tom. That's a pretty strong argument.
+[18:22] Them: Maya. I'm in favour, but I want a long notice period. Some of these integrators are small agencies, they built a plugin for a client three years ago and nobody has touched it since. If we turn it off with a month's notice, their client's shop just breaks, and the client will blame us, not the agency.
+[18:43] You: How long would you want?
+[18:46] Them: Maya. Six months minimum. Announce in January, turn off at the end of June.
+[18:51] Them: Ваня. Шесть месяцев — нормально. But during those six months, I want to add the deprecation header to every v1 response, and rate limits, at least generous ones, so nobody can do three hundred per second.
+[19:06] You: Ivan wants two things during the notice period: a deprecation header on every v1 response, and generous rate limits so nobody can hammer us.
+[19:16] Them: Priya. The deprecation header is a good idea, some API clients log warnings on that automatically.
+[19:24] Them: Ваня. Yes. I'll add the Deprecation and Sunset headers to all v1 responses, this sprint, that's small. Rate limits I need to think about, because if I set them too low, we break someone tomorrow, not in June.
+[19:38] Them: Даня. Для лимитов давай сначала посчитаем, какой максимум у нормальных клиентов. Это видно по логам за месяц, там всё есть.
+[19:48] Them: Ваня. Да, это несложный запрос.
+[19:51] You: Даня says the logs for a month will show what normal clients actually do, so the limit can be based on that.
+[19:58] Them: Maya. And the integrators need a migration guide, not just "please move to v1.5". Something that says: this endpoint becomes that endpoint, this field is now called that, here's how you get an OAuth token.
+[20:13] Them: Ваня. Да, я напишу. I'll write the migration guide from v1 to v1.5 by the end of the month. Most of it is a table of endpoints, there are only around thirty of them.
+[20:24] Them: Maya. And then I'll email the integrators. Once Priya has the list and Ivan has the guide, I'll email all the v1 integrators about the sunset date, with the guide attached. Personally, not a newsletter, so they actually read it.
+[20:39] You: Good. So: sunset date end of June, announcement in January. Priya, the list by Thursday. Ivan, headers this sprint and the guide by end of month. Maya, the emails once both are ready.
+[20:51] Them: Tom. Does this affect the mobile apps? Do we still use v1 anywhere?
+[20:56] Them: Ваня. No, the apps use the internal API, not the public one. Мобилка вообще не трогается.
+[21:02] Them: Tom. Great.
+[21:06] Them: Priya. One question about the June date. Is there anyone large on v1? Because if it turns out one of our top ten sellers runs their whole warehouse on a v1 integration, the June date might be a problem.
+[21:21] You: Good question, and that's exactly what your list will tell us. If someone big is on it, we talk to them directly, before the email goes out.
+[21:31] Them: Maya. Agreed. Big ones get a call, not an email.
+[21:36] Them: Tom. How do agencies usually react to this kind of thing? I've been on the other side once, at an agency, and honestly we hated deprecation emails. They always came at the worst time.
+[21:48] Them: Maya. That's exactly why I want six months, and why I want the email to be personal. In my experience, the agencies that complain the loudest are the ones that find out late. If they find out early and the guide is good, most just schedule it.
+[22:06] Them: Ваня. А можно сделать так, чтобы в личном кабинете продавца было видно, что его интеграция использует v1? Тогда продавец сам пнёт своё агентство.
+[22:18] You: Ivan's idea: show sellers in their own settings that one of their integrations is on v1. Then the seller pushes their agency, not us.
+[22:27] Them: Priya. That's clever. The seller is the one paying the agency, so they have the leverage.
+[22:35] Them: Maya. I love it. A banner, "one of your connected apps uses an old API that stops working on June thirtieth, contact the developer".
+[22:46] Them: Даня. Только аккуратно с формулировкой, чтобы продавцы не подумали, что это мы что-то ломаем.
+[22:54] Them: Maya. Right, Даня says careful with the wording, so sellers don't think we're breaking something. Yes. Something like "will need an update", not "will stop working". Well, it will stop working, but we lead with the update.
+[23:10] Them: Tom. Is the banner on mobile too?
+[23:13] Them: Maya. Web only, I think. It's a settings thing, sellers manage integrations on web.
+[23:21] Them: Ваня. Привязать ключ к продавцу мы можем только для тех ключей, которые Прия сопоставит. Для остальных баннер не покажем.
+[23:31] You: Ivan notes the banner only works for keys that Priya manages to map to a seller. For unmapped keys, we can't show anything.
+[23:40] Them: Priya. Then the mapping quality matters even more. I'll be careful with it. I'd rather show no banner than a banner to the wrong seller.
+[23:51] Them: Maya. Agreed, wrong banners would be worse than none.
+[23:56] You: Okay, the banner is a nice idea, let's consider it as part of the sunset plan once the list exists. It's small. Not deciding now.
+[24:05] Them: Даня. Ещё одна мысль. Можно сделать «тёмный запуск» выключения. За месяц до конца июня на один час отключить v1 в рабочее время, с предупреждением. Кто не мигрировал — заметит и прибежит. Многие так делают, называется brownout.
+[24:20] You: Даня suggests a brownout: a month before the shutdown, turn v1 off for an hour, announced, so anyone who hasn't migrated notices while there's still time.
+[24:32] Them: Tom. That's brutal but effective. We did that with an old login endpoint at my last job.
+[24:39] Them: Maya. As long as it's announced, I'm fine with it. Better they panic in May than in July.
+[24:47] Them: Priya. And it gives us a final list of who's still on v1, from the errors during that hour.
+[24:53] You: Okay, brownout goes into the sunset plan as an option. Good.
+[24:57] Them: Даня. И ещё. Когда мы v1 выключим, надо будет почистить старую таблицу ключей. Там, кажется, тысячи ключей, которые никто не использует. Это тоже потенциальная утечка.
+[25:10] You: Даня says after shutdown we should clean up the old keys table, there are thousands of unused keys sitting there. That's June though, not now. It goes into the shutdown checklist when we get there. Let's move on. Any last thing on API v1?
+[25:27] Them: Priya. Just a thought. One day we should really have proper API analytics, per client dashboards, usage trends. Every time we need to know who uses what, it's a one-off query.
+[25:40] Them: Ваня. Это было бы здорово, но это когда-нибудь. Not this quarter.
+[25:45] Them: Priya. Yeah, I know, I'm just saying it out loud so it's on record.
+[25:49] 📝 NOTE: API v1: закат в конце июня. Прия — список клиентов к четвергу. Ваня — заголовки в этом спринте, гайд к концу месяца. Майя — письма интеграторам.
+[25:50] You: Item four, the seller analytics dashboard. Priya, this is yours.
+[25:56] Them: Priya. Thanks. So, I'll try to be quick, I have a doc but I'll just talk through it. Right now sellers see almost nothing about their own business in our product. They see a list of orders, and a total revenue number for the month. That's it. Anything more, they export a CSV and do it in Excel, and we know from the interviews Maya did that big sellers spend hours on that every week.
+[26:23] Them: Maya. Hours, literally. One of them has a person whose half-time job is building a weekly report from our exports.
+[26:31] Them: Priya. Right. So the proposal is a seller analytics section. Version one: revenue over time, orders over time, average order value, top products, and, the one they ask for most, which products are viewed a lot but rarely bought. That last one needs product view events, which we have, but they're not connected to anything sellers can see.
+[26:56] Them: Tom. Would that be in the app too, or web only?
+[27:01] Them: Priya. Web first. The mobile app gets a small summary card, maybe, in a later version.
+[27:08] You: Okay. The question I have is mostly technical. Where does this data come from? Because if every seller opens a dashboard that runs aggregates on our main Postgres, we're going to have a bad time.
+[27:22] Them: Даня. Вот именно. Агрегаты по заказам на основной базе — это смерть. У нас и так отчёты в админке медленные.
+[27:29] You: Даня agrees, aggregates on the main database would hurt. The admin reports are already slow.
+[27:35] Them: Priya. Yes, I assumed we'd need a separate analytical store. In my last job we used ClickHouse for exactly this, per-tenant dashboards over event data. It's very fast for this kind of query, and cheap.
+[27:49] Them: Даня. ClickHouse я знаю, работал с ним. Он хороший, но его надо уметь готовить. Репликация, бэкапы, обновления — это всё на нас, если мы его хостим сами. Или managed, но это дороже.
+[28:01] You: Даня has worked with ClickHouse, says it's good but operationally it's on us if we self-host. Managed is more expensive.
+[28:11] Them: Priya. How much more expensive?
+[28:15] Them: Даня. Зависит от объёма. Если у нас сто миллионов событий в месяц, managed будет, наверное, несколько сотен долларов. Self-hosted — меньше, но плюс моё время.
+[28:27] Them: Priya. A few hundred dollars a month is nothing compared to what this is worth to sellers, honestly.
+[28:35] Them: Maya. Agreed, I'd rather pay than have Даня babysit a database.
+[28:41] Them: Даня. Ха, спасибо. Но прежде чем решать, я бы хотел его попробовать на наших данных. Я подниму ClickHouse на стейдже и залью туда события за месяц, чтобы посмотреть на реальные запросы и объёмы. Это неделя примерно.
+[28:56] You: Даня will set up ClickHouse on staging with a month of our events, so we see real query times and volumes before deciding managed versus self-hosted. About a week.
+[29:07] Them: Priya. That's perfect. The queries behind each chart are already in my proposal doc, in the appendix, so you can run exactly those.
+[29:17] Them: Даня. Отлично, это как раз то, что нужно.
+[29:21] You: Then the pipeline. How do events get from our services into ClickHouse? Right now we have events in three places: the product view events go to the analytics tool directly from the frontend, the orders are in Postgres, and some things are in the logs.
+[29:40] Them: Ваня. Можно через outbox. Сервисы пишут событие в таблицу outbox в той же транзакции, а отдельный процесс читает и отправляет в ClickHouse. Тогда ничего не теряется.
+[29:52] You: Ivan suggests an outbox pattern, events written in the same transaction, a separate process ships them. That way nothing is lost.
+[30:02] Them: Priya. And the product views from the frontend? Those don't go through our backend at all right now.
+[30:10] Them: Ваня. Тогда нужен маленький эндпоинт для сбора событий с фронта. Или брать их из аналитического инструмента через их экспорт, но это раз в сутки.
+[30:20] Them: Priya. Once a day is fine for version one, honestly. Sellers won't notice if views are a day behind. Orders should be fresher though.
+[30:30] Them: Ваня. Саш, можно мы с Даней пару минут по-русски про outbox? Там есть детали, которые проще обсудить на родном.
+[30:37] You: Давайте, только коротко, потом я перескажу. Priya, Tom, two minutes of Russian backend detail, then a summary.
+[30:46] Them: Priya. Go ahead, I'll enjoy the music of it.
+[30:49] Them: Ваня. Даня, смотри. Outbox — это таблица в основной базе. Каждый сервис, когда меняет заказ, в той же транзакции пишет строчку в outbox: тип события, идентификатор, полезная нагрузка в JSON. Потом отдельный процесс, релей, читает новые строчки и отправляет. Вопрос — куда отправляет. Напрямую в ClickHouse, или через очередь?
+[31:13] Them: Даня. Через очередь лучше. Если ClickHouse лежит или мы его обновляем, релей не должен копить всё в Postgres. Пусть кладёт в очередь, а из очереди уже отдельный консьюмер пишет в ClickHouse батчами.
+[31:27] Them: Ваня. Но у нас очередь — это Redis Streams. Он не для долговременного хранения. Если ClickHouse лежит час, в Redis накопится, ну, сколько? Миллион событий?
+[31:38] Them: Даня. Час — это несколько сотен тысяч, не страшно, память есть. Если сутки — тогда да, проблема. Но сутки ClickHouse лежать не будет, а если будет, у нас проблемы посерьёзнее.
+[31:51] Them: Ваня. Хорошо. А чистка outbox? Таблица будет расти.
+[31:55] Them: Даня. Удаляем всё, что старше трёх дней и уже отправлено. Партиционирование по дням, и просто дропаем старые партиции. Это дёшево, не надо DELETE на миллионы строк.
+[32:06] Them: Ваня. Партиции, да, правильно. А порядок событий? Если заказ создан, потом оплачен, потом отменён, и события придут в ClickHouse не по порядку?
+[32:18] Them: Даня. В ClickHouse для этого есть ReplacingMergeTree с версией. Последняя версия побеждает. Порядок прихода не важен, важна версия строки.
+[32:27] Them: Ваня. Это для состояния заказа. А для событий, которые надо считать, например, «сколько заказов отменили за день», важен сам факт события, а не последнее состояние.
+[32:40] Them: Даня. Тогда две таблицы. Одна — события как есть, append-only, для подсчётов. Вторая — текущее состояние заказа, для фильтров. Это стандартная схема.
+[32:52] Them: Ваня. Логично. И ещё вопрос с историческими данными. Новые события пойдут через outbox, а старые заказы за год? Их надо залить один раз.
+[33:01] Them: Даня. Один раз скриптом, напрямую из реплики Postgres, ночью. Ты это видишь как часть пайплайна или отдельно?
+[33:09] Them: Ваня. Отдельно. Это одноразовая штука. Но её надо будет сделать так, чтобы она не задублировала то, что уже пришло через outbox.
+[33:18] Them: Даня. Граница по времени. Всё, что до момента включения outbox, — из бэкфилла, всё, что после, — из outbox. И проверка на дубли по идентификатору события.
+[33:29] Them: Ваня. Ок, мне всё понятно. Саш, можешь пересказывать.
+[33:34] You: Okay, summary. Ivan and Даня went through the outbox design. Services write events into an outbox table in the same transaction. A relay process moves them into our Redis stream, and a separate consumer writes them into ClickHouse in batches, so if ClickHouse is down, nothing piles up in Postgres. The outbox table is partitioned by day and old partitions are dropped. In ClickHouse, two tables: raw events, append-only, for counting things, and current order state with versioning, so out-of-order arrival doesn't matter. Historical data is a one-time backfill from the Postgres replica, with a time boundary and de-duplication by event id.
+[34:18] Them: Priya. That was a very efficient two minutes. And it all sounds right to me, it's close to what we had at my last job. The two-table thing especially, I've been bitten by mixing state and events.
+[34:31] Them: Tom. I understood "ReplacingMergeTree" and nothing else, but I trust you.
+[34:36] Them: Даня. Ха. It's a table type in ClickHouse, the latest version of a row wins.
+[34:41] You: This is good input for the design doc, it saves me half the work.
+[34:45] You: Okay. This needs an actual design, not a discussion. I'll write up the architecture for the event pipeline, outbox plus the view events, by the next roadmap call, so we can review it properly. I'll keep it short, two pages.
+[35:02] Them: Priya. Great. And on my side, I'll write the metric definitions doc for the dashboard, so we agree on what "revenue" and "conversion" mean before anyone builds a chart. You'd be amazed how many ways there are to count revenue.
+[35:18] Them: Maya. Oh, I know. Returns, cancellations, taxes, shipping. We've argued about it in every company I've been in.
+[35:26] Them: Priya. Exactly. Gross versus net, before or after refunds, what timezone the day is in. I'd like that settled in writing. I can have it ready in two weeks.
+[35:38] Them: Tom. Will sellers see the same numbers as in their payout reports? Because if the dashboard says one thing and the payout says another, support is going to get a lot of tickets.
+[35:52] Them: Priya. Good point. The definitions doc will have a section on reconciling with payouts. They should match, or the difference should be explained right in the UI.
+[36:04] Them: Maya. Priya, while you're on it, could you also build a churn prediction model for sellers? We keep losing mid-size sellers and we only find out when they've already left. Even a simple score would help account managers.
+[36:19] Them: Priya. Honestly, no, not this quarter. I'm one person, the dashboard is already the biggest thing I've ever done here, and a churn model done badly is worse than no model, account managers would chase the wrong sellers. Let's talk about it in Q2, maybe once the event data is in ClickHouse, because the model would need it anyway.
+[36:43] Them: Maya. That's fair. Q2 then.
+[36:47] You: Yes, Q2 at the earliest. Okay, timeline for the dashboard. Assuming the ClickHouse test goes well, what's realistic?
+[36:56] Them: Priya. If the pipeline design is done in two weeks, and Даня has the test in a week, then building it is maybe six weeks for a first version. So end of Q1, beta for ten sellers.
+[37:08] Them: Даня. Шесть недель — это если ClickHouse не принесёт сюрпризов. Я бы сказал, конец квартала — это оптимистично, но возможно.
+[37:18] You: Даня says end of quarter is optimistic but possible. Let's put it as "beta for ten sellers by end of Q1, stretch goal". Not a promise to sales.
+[37:30] Them: Maya. Agreed, I won't promise it to sales. I'll say "early access in spring".
+[37:36] Them: Ваня. А кто фронтенд будет делать? Графики — это не такая простая вещь.
+[37:42] You: Good question, Ivan's asking who builds the frontend. Charts aren't trivial. Tom, does your team have anyone who's done charting?
+[37:52] Them: Tom. On mobile, sort of. For web I'd ask the web team, they used a charting library for the admin dashboard last year. But that's a capacity question for the last item.
+[38:03] You: Okay, let's park it for the capacity discussion. One more thing on analytics: privacy. Sellers seeing their own data is fine. But product views include anonymous visitors. We shouldn't expose anything that could identify a buyer.
+[38:18] Them: Priya. Agreed, everything aggregated, no individual sessions, and a minimum count, so a seller can't see "one person from this small town looked at this product". I'll put that in the definitions doc too.
+[38:33] Them: Maya. Legal might want to look at it.
+[38:35] Them: Ваня. Кстати, про юристов. Если продавцы видят просмотры товаров, а у нас в политике конфиденциальности для покупателей написано, что мы используем данные о просмотрах для улучшения сервиса, это покрывает показ агрегатов продавцу?
+[38:52] You: Ivan raises a legal question: does our buyer privacy policy, which says we use view data to improve the service, cover showing aggregates to sellers?
+[39:04] Them: Priya. Aggregated and anonymous, it usually does. But I'm not a lawyer.
+[39:10] Them: Maya. Nobody here is. It goes on the list for legal, together with the minimum count rule. I'd rather ask now than after launch.
+[39:19] Them: Даня. И хранение. Сколько мы храним сырые события просмотров? Если вечно, это может быть проблемой.
+[39:26] Them: Priya. For the dashboard we need raw events maybe ninety days, then only daily aggregates. We could drop raw views after ninety days. That's also cheaper.
+[39:38] Them: Даня. Отлично. ClickHouse умеет TTL на таблицах, это настраивается одной строчкой.
+[39:43] You: Даня says ClickHouse supports a time-to-live on tables, so dropping raw views after ninety days is one line of config.
+[39:51] Them: Tom. Do buyers ever see anything from this? Like "fifty people looked at this today"?
+[39:59] Them: Priya. Not in this project. That's a marketing feature some marketplaces do, but it's a different discussion, and honestly a bit manipulative.
+[40:10] Them: Maya. Agreed, not doing that.
+[40:14] Them: Ваня. Ещё вопрос: продавцы с несколькими магазинами. У нас есть такие, у которых два-три магазина на одном аккаунте. Дашборд по каждому магазину отдельно или общий?
+[40:25] You: Ivan asks about sellers with several shops on one account. One dashboard per shop, or combined?
+[40:31] Them: Priya. Per shop, with a switcher, and later a combined view. Combined is harder because of currencies again.
+[40:39] Them: Maya. Per shop is fine for the beta. I don't think any of the ten beta sellers have more than one shop. Actually, I'm not sure.
+[40:49] Them: Priya. That's an easy query. We'll know when we pick the beta sellers.
+[40:56] Them: Priya. Sure, once the doc exists.
+[40:59] Them: Maya. Can we talk about what the dashboard looks like for a moment? Not the design, Olena's not here, but the main choices. Because sellers will judge it in the first ten seconds.
+[41:11] Them: Priya. Sure. The main choice is the default view. What do they see when they open it? My proposal: last thirty days, compared to the thirty days before, four numbers at the top, revenue, orders, average order value, conversion. And below, a chart of revenue per day.
+[41:31] Them: Tom. Compared to the previous period, or to the same period last year? For seasonal businesses, the previous thirty days is misleading. A garden shop in April always looks amazing compared to March.
+[41:44] Them: Priya. That's a good point. Both, maybe, with a toggle. Default to the previous period, because many sellers don't have a year of history with us.
+[41:54] Them: Ваня. А валюта? У нас продавцы, которые продают в нескольких валютах. Как считать выручку — в какой валюте?
+[42:01] You: Ivan's asking about currency. Some sellers sell in several currencies, which one does the revenue use?
+[42:10] Them: Priya. In the seller's base currency, converted at the rate on the day of the order. That's the only sane way. And we say so in a little info tooltip.
+[42:20] Them: Даня. Курс на день заказа — это значит, нам нужна таблица курсов за каждый день. У нас она есть?
+[42:28] Them: Ваня. Есть, для счетов. Но только с прошлого года. Для старых заказов курсов нет.
+[42:34] Them: Priya. That's fine, the dashboard only needs to go back about a year for version one.
+[42:40] Them: Maya. And timezones. Sellers in Poland, in Germany, in Ukraine. When is "today"?
+[42:46] Them: Priya. The seller's timezone, from their settings. That one is in the definitions doc already, it's the classic trap.
+[42:56] Them: Tom. On mobile, the summary card, what would it show? Just today's revenue?
+[43:01] Them: Priya. Today's revenue and orders, compared to the same weekday last week. Sellers love that comparison, it's the one they look at on their phone in the evening.
+[43:12] Them: Tom. That's simple enough, and it can come from the same API.
+[43:18] You: I'm hearing a lot of good detail. Let's make sure it ends up in Priya's definitions doc, not in our memories of this call.
+[43:27] Them: Priya. It's all in my notes already.
+[43:30] Them: Maya. And one more. Export. Sellers who look at charts will immediately want to download the data behind them.
+[43:39] Them: Priya. A CSV of whatever is on screen. It's cheap, and it stops the "I'll just export orders and do it in Excel" habit, because they get the aggregated data directly.
+[43:50] Them: Ваня. CSV у нас уже есть для заказов, можно переиспользовать.
+[43:56] Them: Ваня. Кстати, мечта: когда-нибудь у нас будет своя BI-система для всех внутренних отчётов, а не десять разных инструментов. Но это не сейчас.
+[44:06] Them: Даня. Это мечта, да. Каждый год.
+[44:10] You: Ivan's dreaming of one internal BI system instead of ten tools. Every year. Not now.
+[44:18] 📝 NOTE: Аналитика продавцов: Даня — ClickHouse на стейдже (~неделя), я — архитектура пайплайна к след. созвону, Прия — документ с определениями метрик (2 нед.). Churn-модель — Q2, Прия отказалась сейчас.
+[44:19] You: Okay, we're at about fifty minutes, good pace. Item five, Shopnest. Maya?
+[44:25] Them: Maya. Right. For those who missed it: Shopnest is the marketplace that's growing really fast in Central Europe, especially Poland and the Czech Republic. A lot of our sellers also sell there, and today they manage their Shopnest listings by hand, or with some third-party sync tool that costs them money and breaks regularly. Shopnest reached out to us two weeks ago, they have a partner program for shop platforms, and they'd like us to build a native integration.
+[44:58] Them: Tom. What does native mean here? Like, sellers connect their Shopnest account and products sync automatically?
+[45:07] Them: Maya. Yes. Products and stock go from us to Shopnest, orders come from Shopnest to us. So the seller manages everything in one place.
+[45:17] Them: Ваня. Это большая интеграция. Двусторонняя синхронизация — это всегда больно. Конфликты, когда остаток поменялся в двух местах одновременно, разные форматы категорий, разные правила для описаний.
+[45:31] You: Ivan says two-way sync is always painful: conflicts when stock changes in both places, different category trees, different content rules.
+[45:41] Them: Maya. I know. That's why I don't want to commit to anything big yet. I want us to understand their API and their partner terms first.
+[45:50] Them: Priya. Do we know how many of our sellers are on Shopnest?
+[45:54] Them: Maya. From the interviews, roughly a third of the big sellers mentioned it. But we don't have hard data. I asked Shopnest, they said they can tell us how many of their sellers have a website on our platform, if we sign an NDA.
+[46:09] Them: Priya. That's actually a good number to have. If it's two hundred sellers, it's a different conversation than if it's twenty.
+[46:18] You: Agreed. Okay, what do we need to decide today? I'd say nothing final, just next steps.
+[46:24] Them: Maya. Right. Next steps: a technical call with their partner team, so our engineers can ask the hard questions. I'll set up a call with the Shopnest partner team next week, and I'll ask for the NDA and the seller numbers at the same time.
+[46:41] Them: Ваня. Мне нужно посмотреть их API до этого звонка, иначе я не буду знать, какие вопросы задавать. У них есть публичная документация?
+[46:51] Them: Maya. Yes, they sent a link to their partner docs and a sandbox account. I already forwarded both to you yesterday.
+[46:59] Them: Ваня. Хорошо. Тогда я посмотрю их API в эту пятницу, у меня пятница как раз свободнее, и составлю список вопросов к звонку.
+[47:08] You: Ivan will go through their API docs and sandbox on Friday and make a list of questions for the call.
+[47:16] Them: Даня. А что у них с вебхуками? Если заказы приходят только через polling, это одна нагрузка, если через вебхуки — совсем другая архитектура.
+[47:27] Them: Ваня. Вот это как раз первый вопрос в списке будет.
+[47:31] Them: Даня. И ещё про синхронизацию остатков. Ваня, как ты видишь конфликты? Например, товар последний на складе, и его одновременно купили у нас на сайте и на Shopnest.
+[47:44] Them: Ваня. Это классическая проблема. Варианта три. Первый — мы мастер остатков, и Shopnest только отражает наши данные с задержкой. Тогда возможна продажа того, чего нет, и продавец отменяет заказ. Второй — резервирование: Shopnest перед продажей спрашивает нас, есть ли товар. Но это значит, что наш API в их критическом пути, и если мы лежим, у них не продаётся. Третий — буфер: на Shopnest показываем остаток минус один или минус два, чтобы снизить шанс перепродажи.
+[48:16] Them: Даня. Буфер — это хак, но рабочий. Многие так делают.
+[48:22] Them: Ваня. Да, и продавец сам выбирает размер буфера. Для дорогих товаров — ноль и риск, для дешёвых — буфер.
+[48:29] Them: Даня. А как часто синхронизировать? Если раз в пятнадцать минут, то в распродажу точно будут перепродажи.
+[48:36] Them: Ваня. Если у них есть вебхуки на заказы — почти мгновенно. Если нет, то polling раз в минуту, но это нагрузка на наш API лимит у них. Это вопрос к звонку.
+[48:47] You: Let me translate the last few minutes. Даня and Ivan discussed stock conflicts: the last item sold on both channels at once. Three options: we are the source of truth and Shopnest lags, which means occasional overselling; Shopnest asks us before each sale, which puts our uptime in their checkout; or a stock buffer, showing one or two fewer on Shopnest, set by the seller. They lean towards the buffer, with near-real-time sync if Shopnest has order webhooks. Whether they do is the first question for the call.
+[49:23] Them: Maya. That's really helpful. The buffer thing, I've heard sellers talk about it with the third-party sync tools. They know the concept.
+[49:33] Them: Tom. And overselling, how bad is it in practice? A cancelled order on a marketplace usually hurts the seller's rating there.
+[49:43] Them: Maya. That's the real issue. On Shopnest, cancellations hit your seller score, and a low score pushes you down in search. So sellers care a lot.
+[49:53] Them: Priya. Then I'd want to measure it from day one, if we build this. Oversell rate per seller.
+[50:00] Them: Ваня. И категории. Категории Shopnest — это их дерево, у нас своё. Маппинг категорий — это то, на чём ломаются все такие интеграции. Продавцу придётся один раз сопоставить свои категории с их.
+[50:13] You: Ivan adds category mapping, which is where all these integrations usually break. Sellers would have to map their categories to Shopnest's tree once.
+[50:25] Them: Maya. Could we suggest the mapping automatically?
+[50:28] Them: Priya. By product titles, you could get a decent guess. Not perfect, but a good starting point that the seller corrects.
+[50:38] Them: Ваня. Это уже вторая версия. В первой — ручной маппинг, но удобный.
+[50:42] Them: Maya. They also sent a technical questionnaire. It's for partners, about our platform: how we handle security, data retention, uptime, incident response. It's about thirty questions. They want it before they put us in the partner program.
+[50:58] You: That's mine then, it's mostly platform and security questions, and I have most of the answers from the enterprise security reviews we did last year. I'll fill in the Shopnest technical questionnaire before the call, so they have it in advance.
+[51:14] Them: Maya. Perfect, it's already in your inbox, it came with the same email as the docs.
+[51:20] Them: Даня. Если там будет про бэкапы и восстановление — у нас есть документ с прошлого аудита, он лежит в общей папке, там всё актуально, кроме части про поиск.
+[51:31] You: Thanks, Даня, I'll use that.
+[51:35] Them: Tom. What about mobile? Do sellers need to see Shopnest orders in the app?
+[51:41] Them: Maya. Eventually, sure, but if they come into our system as normal orders, they'd show up in the app automatically, with a little badge maybe.
+[51:51] Them: Tom. Okay, so nothing special for us at first. Good.
+[51:56] Them: Priya. And analytics. If we do this, I'd want orders tagged with the channel from day one, so the seller dashboard can show "revenue by channel". That's exactly the kind of thing sellers would pay for.
+[52:09] Them: Maya. Ooh, that's a nice connection. Channel breakdown in the dashboard, Shopnest as the first external channel.
+[52:16] You: Let's keep that in mind, but not commit to it yet. First the call, then we see.
+[52:23] Them: Priya. Maya, do we know anything about the partner terms besides the revenue share? Like exclusivity, or requirements on uptime?
+[52:33] Them: Maya. They mentioned an SLA for the integration itself: if our sync is down for more than four hours, they can suspend the integration. And they want a technical contact who answers within one business day.
+[52:47] Them: Даня. Четыре часа — это нормально, если у нас мониторинг синхронизации. А технический контакт — это кто? Дежурный?
+[52:56] You: Даня asks who the technical contact would be. On-call?
+[53:00] Them: Maya. Probably a shared email that goes to on-call, with a named backup. That's for later.
+[53:07] Them: Ваня. И ещё — тестовая среда. У них есть sandbox, но насколько он похож на прод? В прошлой интеграции со службой доставки песочница работала через раз и вообще не так, как прод.
+[53:19] You: Ivan's had bad experiences with sandboxes, the delivery service one last year behaved nothing like production. So the question is how realistic the Shopnest sandbox is.
+[53:31] Them: Maya. Good, that's a great question for the call too.
+[53:36] Them: Ваня. Да, он в моём списке вопросов. Список будет длинный.
+[53:42] Them: Tom. Do they have a certification step? Some marketplaces review your integration before it goes live.
+[53:49] Them: Maya. Yes, they mentioned a review, about two weeks, where they test the integration with test listings. That's another reason it's probably Q2: build, then two weeks of their review.
+[54:01] Them: Priya. And sellers, how would they find out about it? In our app or in theirs?
+[54:08] Them: Maya. Both, ideally. Shopnest has an app directory for partners, we'd be listed there. And we'd announce it to our sellers. If they also list us in their directory, that's a sales channel for us, sellers on Shopnest who don't have a web shop yet.
+[54:24] Them: Даня. О, это интересно. То есть это не только для наших продавцов, но и способ получить новых.
+[54:32] Them: Maya. Exactly, that's the part leadership will like. It might bring sellers to us, not just keep the ones we have.
+[54:42] You: That's a good argument to include in the business case. But again, after the call.
+[54:47] Them: Ваня. Ещё одна вещь, про деньги. Shopnest берёт комиссию с продаж. Если заказы идут через нас, мы как-то участвуем в этом? Или это только между продавцом и Shopnest?
+[54:59] Them: Maya. Good question, Ivan's asking whether we get anything from the commission. In the partner program, they pay partners a small revenue share, I think one percent of the order value, for orders that come through a partner integration. I have to check the exact terms.
+[55:18] Them: Priya. One percent of the order value across a few hundred big sellers could be real money.
+[55:24] Them: Maya. Could be. That's why I want the seller numbers before we decide. If it's real money, this becomes a Q1 or Q2 priority. If it's small, it's a "nice to have" for later.
+[55:35] You: Okay. So for Shopnest: Maya sets up the call and asks for the NDA and numbers. Ivan reviews the API on Friday. I do the questionnaire. Decision on whether to build comes after the call. Agreed?
+[55:50] Them: Maya. Agreed.
+[55:54] Them: Ваня. Да.
+[55:58] Them: Tom. Yep.
+[56:01] 📝 NOTE: Shopnest: Майя — звонок с партнёрами на след. неделе + NDA; Ваня — их API в пятницу; я — техническая анкета до звонка.
+[56:02] You: Item six, pricing. Maya.
+[56:05] Them: Maya. Okay. This one is more of a heads-up than a decision for this group, because pricing is decided with the leadership team. But it affects what we build, so I want you to know where it's going.
+[56:18] Them: Maya. Right now we have three plans: Starter, Business and Pro. The difference between Business and Pro is basically the number of products and the number of staff accounts. And what we see is that big sellers stay on Business forever, because they don't need more staff accounts, and they just pay for extra product slots. Pro has very few customers. About forty.
+[56:42] Them: Priya. Forty out of how many paying?
+[56:46] Them: Maya. Out of about three thousand two hundred.
+[56:51] Them: Ваня. Это очень мало. Получается, Pro никому не нужен.
+[56:56] You: Ivan says Pro is basically not needed by anyone.
+[57:01] Them: Maya. Exactly. So the idea is to rebuild Pro around features that big sellers actually want, instead of limits. Things like: the analytics dashboard Priya just presented, bulk edit with undo, marketplace integrations like Shopnest, and priority support. And Business stays roughly as it is.
+[57:21] Them: Tom. So the analytics dashboard would be Pro only?
+[57:24] Them: Maya. The full version, yes. Business would get a basic version, revenue and orders over time, because we don't want small sellers to feel like they get nothing.
+[57:36] Them: Priya. That's actually fine from my side. The basic charts are cheap, the expensive part is product views and channel breakdowns, and that's what big sellers want.
+[57:48] Them: Даня. А с точки зрения нагрузки — если только Pro-продавцы получают тяжёлые запросы, это даже хорошо. Их мало, и они платят.
+[57:58] You: Даня says from a load point of view it's good if the heavy queries are only for Pro sellers, there are few of them and they pay.
+[58:07] Them: Maya. Right. And bulk edit — today it's on all plans. I'm not going to take it away from anyone. But undo, and scheduled changes, like "apply these prices on Friday at midnight", would be Pro.
+[58:22] Them: Ваня. Scheduled changes — это интересно. Это почти бесплатно, если у нас уже есть очередь и история изменений.
+[58:31] Them: Maya. Really? That's great to hear. That's the one sellers asked about most after undo.
+[58:38] You: Okay, so what does this mean for the roadmap? I think it means the Q1 priorities line up nicely: analytics, bulk edit undo, maybe Shopnest. Those are all Pro features. That's a good story.
+[58:51] Them: Maya. That's exactly the point. The roadmap and the pricing support each other. And I need to show that to leadership with a proper deck: the plans, what's in each, the expected revenue impact. I'll share the pricing proposal deck with you all by Monday, before it goes to leadership on Wednesday, so you can tell me if I promised something we can't build.
+[59:15] Them: Tom. Please do, I'd love to check the mobile parts.
+[59:20] Them: Priya. And I can sanity check the revenue estimates, if you want.
+[59:25] Them: Maya. Yes please, Priya, that would be really helpful, the numbers are the part I'm least confident about.
+[59:32] Them: Priya. Okay, send it over when it's ready and I'll take a look before Wednesday.
+[59:38] You: One concern. Existing Pro customers, all forty of them. If Pro changes, do they get a worse deal?
+[59:46] Them: Maya. No, they'd keep their price for a year and get all the new features. They're our best customers, we're not going to annoy them.
+[59:57] Them: Даня. А Starter? Его кто-то трогает?
+[60:00] Them: Maya. Starter stays the same. Maybe we lower the price a little, but that's not decided.
+[60:07] Them: Priya. How do our prices compare to competitors, roughly? Because if new Pro is more expensive, sellers will compare.
+[60:15] Them: Maya. Our Business is roughly in the middle of the market. Pro, today, is cheaper than the competitors' top plans, which is part of the problem: it's cheap and nobody wants it, which tells you it's not about price.
+[60:31] Them: Tom. What do the competitors put in their top plans?
+[60:35] Them: Maya. Mostly the same things: analytics, multichannel, priority support, sometimes a dedicated account manager. And they charge two to three times what we charge for Pro.
+[60:48] Them: Ваня. То есть мы можем поднять цену на Pro, если там будут реальные фичи.
+[60:55] You: Ivan's point: if Pro has real features, we can raise its price.
+[61:01] Them: Maya. That's the plan, yes. Not three times, but noticeably. Leadership will decide the exact number.
+[61:10] Them: Даня. А приоритетная поддержка — это кто? У нас саппорт три человека.
+[61:17] Them: Maya. Good question. Priority means a faster first response, a separate queue. Not a different team. The support lead said they can do it if the volume is small, and forty or even a hundred Pro customers is small.
+[61:33] Them: Priya. I'd want to see the support data per plan before we promise anything about response times. Big sellers write to support much more than small ones, from what I've seen.
+[61:47] Them: Maya. How much more?
+[61:50] Them: Priya. I'd guess five to ten times per seller. But I'd want to check, not guess. It's the same lesson as with the tablets.
+[61:58] You: Ha, yes, we're learning today.
+[62:02] Them: Tom. One thing that I've seen work at my previous company: a trial of the top plan. Fourteen days of Pro for any Business seller, one click. People get used to the analytics and don't want to give it up.
+[62:18] Them: Maya. Yes, that's in the deck. A trial for existing Business sellers when new Pro launches.
+[62:25] Them: Ваня. Триал — это опять entitlements. С временным доступом. Хорошо, что мы его делаем нормально.
+[62:32] You: Ivan notes that a trial needs entitlements with an expiry date. Another reason to do them properly.
+[62:41] Them: Ваня. Можно я скажу одну вещь, которая меня беспокоит? Каждый раз, когда мы меняем тарифы, мы два месяца чиним биллинг. Проверки лимитов разбросаны по всему коду. Если мы добавляем фичи по тарифам, нам нужен нормальный механизм feature flags по тарифу, а не if plan == pro в двадцати местах.
+[63:02] You: Ivan is worried that every pricing change means two months of fixing billing, because plan checks are scattered across the code. He wants a proper entitlements mechanism, not "if plan equals Pro" in twenty places.
+[63:18] Them: Maya. That's a fair concern. How big is that?
+[63:22] Them: Ваня. Если сделать по-нормальному — недели две. Таблица entitlements, один сервис, который отвечает на вопрос «может ли этот аккаунт использовать эту фичу», и замена всех проверок.
+[63:36] Them: Даня. И кэш, чтобы на каждый запрос не ходить в базу.
+[63:40] Them: Ваня. Да, и кэш.
+[63:42] You: Two weeks for proper entitlements. I think that should go into the capacity discussion as a prerequisite. If we change pricing without it, we pay more later.
+[63:53] Them: Maya. Agreed. It belongs in the deck as a dependency anyway, so leadership understands why the new Pro can't launch the day after they approve it.
+[64:04] Them: Tom. Do mobile apps need to know about plans?
+[64:07] Them: Ваня. Мобилка получает список доступных фич с бэкенда. Если мы сделаем entitlements, мобилке нужно будет только этот список читать.
+[64:16] Them: Tom. That's what we already do for the feature flags, so that would be easy for us.
+[64:22] Them: Даня. Ваня, а entitlements ты где видишь? Отдельный сервис или модуль в монолите?
+[64:28] Them: Ваня. Модуль в монолите. Отдельный сервис — это ещё один деплой, ещё одна точка отказа, а проверка прав нужна на каждый запрос. Пусть будет функция в том же процессе с кэшем в памяти.
+[64:42] Them: Даня. А инвалидация кэша? Если продавец купил Pro, он ожидает, что фичи появятся сразу, а не через пять минут.
+[64:49] Them: Ваня. Событие о смене тарифа сбрасывает кэш для этого аккаунта. У нас уже есть такой механизм для настроек магазина, я его переиспользую.
+[65:00] Them: Даня. А мобилка? Она же кэширует список фич у себя.
+[65:04] Them: Ваня. Мобилка обновляет список при каждом старте и при пуше «тариф изменён». Том говорил, что у них это уже есть для фича-флагов.
+[65:13] Them: Даня. Хорошо. И ещё: триал. Права с датой окончания. Кто их снимает, когда триал закончился?
+[65:21] Them: Ваня. Никто не снимает. Проверка смотрит на дату. Если дата прошла — права нет. Не нужен никакой фоновый процесс, который может упасть.
+[65:32] Them: Даня. Красиво. А аудит? Кто когда выдал права вручную? Саппорт же будет выдавать фичи в виде исключения, например, крупному клиенту на время переговоров.
+[65:42] Them: Ваня. Таблица с историей, как у bulk edit. Кто, когда, что, причина. Это бесплатно, раз мы так уже делаем.
+[65:51] Them: Даня. И это, кстати, плюс для SOC 2, про который я потом хочу сказать.
+[65:58] You: Summary again: Ivan sees entitlements as a module inside the main application, not a separate service, with an in-memory cache that's reset by a plan-change event. Mobile refreshes the list on start and on a "plan changed" push. Trials are just entitlements with an end date, checked at read time, no background job. Manual grants by support are logged with who, when and why, which Даня says also helps with SOC 2, his topic for later.
+[66:27] Them: Maya. The manual grants are a big one for me, actually. Account managers do that all the time today, in a spreadsheet.
+[66:35] Them: Priya. And the logged history means I can finally report on who has what, without asking billing.
+[66:43] You: Okay, good. Anything else on pricing?
+[66:46] Them: Maya. No, that's it. Thanks for the input, it's genuinely useful.
+[66:50] You: Let's take a five-minute break. We've been going for over an hour. Back at quarter past.
+[66:56] Them: Tom. Great, coffee.
+[66:58] Them: Priya. Yes please. Back in five.
+[67:01] Them: Maya. I'll stay on but mute.
+[67:05] Them: Ваня. Саш, ты тут? Пока перерыв.
+[67:08] You: Тут. Что такое?
+[67:12] Them: Ваня. Да ничего, просто. Как тебе вообще встреча? Мне кажется, мы много на себя берём. Я смотрю на список и немного пугаюсь.
+[67:20] You: Честно — да, много. Но мы ещё не дошли до capacity, там и будем резать. Я не хочу, чтобы мы вышли отсюда с планом, который заведомо не выполним.
+[67:32] Them: Даня. Я тоже про это думал. ClickHouse, SOC 2 скоро, дежурства, Loki ещё не до конца доделан. У меня ощущение, что инфраструктура в каждом проекте сбоку, и её никто не считает.
+[67:46] You: Это правда. Инфраструктурная работа часто невидима в роадмапе. Давай, когда дойдём до capacity, ты прямо назовёшь это. Не стесняйся.
+[67:57] Them: Даня. Ладно. Просто не хочу выглядеть, как будто я жалуюсь.
+[68:03] You: Это не жалоба, это информация. Без неё план будет враньём.
+[68:08] Them: Ваня. Кстати, Даня, ты с ClickHouse где работал? Я так и не понял.
+[68:13] Them: Даня. На прошлой работе, в рекламной компании. Там было по миллиарду событий в день. У нас будет в сотни раз меньше, так что я спокоен по производительности. Меня больше беспокоят обновления версий: они там выходят часто, и иногда ломают совместимость.
+[68:31] Them: Ваня. Managed это решает, нет?
+[68:35] Them: Даня. Частично. Managed обновляет сам, но иногда в неудобный момент. Плюс-минус то же самое, что с Postgres было.
+[68:45] You: Если managed стоит несколько сотен долларов, я бы взял managed без раздумий. Твоё время дороже.
+[68:51] Them: Даня. Посмотрим на тесте. Если там будут какие-то ограничения, которые нам мешают, тогда подумаем.
+[68:59] Them: Ваня. А новый человек, который в феврале выходит, — он вообще с аналитическими базами работал?
+[69:07] You: Немного. В основном с Postgres и Kafka. Но outbox он знает, мы это обсуждали на собеседовании, он сам предложил этот паттерн, когда я спросил про надёжную доставку событий.
+[69:19] Them: Ваня. О, отлично. Это хороший знак.
+[69:21] Them: Даня. Слушайте, а Том правда серьёзно про Kotlin Multiplatform? Мне кажется, это для нас рано.
+[69:28] You: Он предлагает эксперимент в Q2, не переход. Мне кажется, это разумно. Если не пойдёт — остановятся.
+[69:35] Them: Даня. Ну, эксперимент — ладно. Главное, чтобы мне потом CI для этого не пришлось с нуля собирать в разгар SOC 2.
+[69:43] You: Это ты как раз и скажешь, когда будем это обсуждать. Не сегодня.
+[69:47] Them: Ваня. Саш, ещё вопрос не по работе. Ты в феврале на конференцию едешь? Я видел, там программа вышла.
+[69:54] You: Думаю да, если по срокам ничего не будет гореть. Там пара докладов про миграции больших баз, интересно.
+[70:02] Them: Даня. Если поедешь, запиши доклад про zero-downtime миграции, пожалуйста. Мне бы пригодился для следующего раза.
+[70:11] You: Если будет запись, скину ссылку. Если нет — посмотрим.
+[70:15] Them: Ваня. А я в феврале в отпуск хотел, на неделю. Но, судя по плану, это будет сложно.
+[70:22] You: Ваня, отпуск — это не обсуждается. Бери. Если план не выдерживает недели твоего отпуска, значит, план плохой. Просто скажи даты заранее, чтобы мы их учли.
+[70:34] Them: Ваня. Спасибо. Тогда это будет конец февраля, когда пайплайн уже пойдёт.
+[70:41] Them: Даня. Кофе закончился, пока вы болтали. Ладно, вода.
+[70:46] Them: Maya. I'm back, by the way. I heard Russian and the word "отпуск", which I know means vacation. Is someone escaping?
+[70:56] You: Ivan's thinking of a week of vacation in February. Which he should take.
+[71:02] Them: Maya. Absolutely, take it, Ivan. We'll plan around it.
+[71:07] Them: Ваня. Thank you, Maya.
+[71:10] Them: Tom. I'm back too. Did I miss anything?
+[71:15] You: Just vacation plans. Priya?
+[71:17] Them: Priya. Here, sorry, the coffee machine had a queue. Let's go.
+[71:21] Them: Priya. Sorry, before we go to capacity, can I go back to tablets for a moment? I did something during the pricing discussion and I think it matters.
+[71:32] You: Sure, go ahead.
+[71:35] Them: Priya. When Maya said the Pro plan is for big sellers, it made me curious who actually uses the Android tablet app, because the store console only tells us about installs, not about who. So I ran a quick query on our own events, the app sends the device type with every session. And it's not what we assumed.
+[71:56] Them: Tom. Uh oh.
+[71:59] Them: Priya. Tablets are about four percent of installs, that's true. But they are almost all sellers, not buyers. And they're big sellers. Sixty-one of our top two hundred sellers have at least one Android tablet session in the last month. And the orders that were processed, like marked as packed or shipped, from a tablet, are about eighteen percent of all orders processed in the app.
+[72:26] Them: Maya. Eighteen percent? From four percent of installs?
+[72:32] Them: Priya. Yes. My guess is that big sellers have a tablet in the warehouse. Someone stands at the packing table with a tablet and goes through the orders. One install, thousands of orders.
+[72:46] Them: Ваня. Ого. Это меняет всё.
+[72:49] Them: Даня. Ну да, четыре процента установок — это одно, а восемнадцать процентов обработанных заказов — совсем другое.
+[72:59] You: Ivan and Даня are saying the same thing I'm thinking: this changes the picture completely. Four percent of installs, but eighteen percent of the order processing in the app, and from our biggest sellers.
+[73:13] Them: Tom. Yeah. Okay. That's, wow. I really didn't expect that. And if we give those people a stretched phone layout on a ten-inch tablet in a warehouse, with tiny buttons, that's going to hurt exactly the people Maya wants to sell Pro to.
+[73:30] Them: Maya. Exactly the people. I'm honestly glad Priya checked.
+[73:34] Them: Priya. I'd want to double check it properly, it was a ten-minute query. But the order of magnitude won't change. Even if it's twelve percent instead of eighteen, it's not four.
+[73:48] You: Okay. Then I think we need to reverse the decision we made an hour ago. We keep the dedicated Android tablet layouts. Does anyone disagree?
+[73:57] Them: Tom. No. I mean, it hurts, because the work is real, but no, I don't disagree.
+[74:02] Them: Maya. Agreed, we keep them.
+[74:04] Them: Ваня. Согласен.
+[74:06] Them: Даня. Да.
+[74:09] You: Okay. So, decision reversed: we keep the tablet layouts. Tom, that means the deprecation plan is off.
+[74:17] Them: Tom. Right, so I won't write the deprecation plan. That's cancelled. Даня, you can keep the tablet emulators too, sorry for the noise.
+[74:28] Them: Даня. Ничего страшного, я их ещё не трогал. Эмуляторы остаются.
+[74:33] You: But I think we can't just go back to how it was either. The tablet layouts are in bad shape, crash rate three times the phones. If those are warehouse workers processing thousands of orders, every crash is a real problem.
+[74:49] Them: Tom. Totally. So instead of the plan, I'll fix the two worst tablet bugs next sprint. The crash on the order details screen when you rotate, that's the biggest one, and the packing list that cuts off the last item. Those two are most of the crashes and most of the complaints.
+[75:07] Them: Priya. Tom, can I get the crash numbers broken down by tablet model? I'd like to see if it's specific devices, because warehouse tablets are often cheap rugged ones with weird screen sizes.
+[75:20] Them: Tom. Sure. I'll send you the tablet crash breakdown by device model tomorrow, it's an export from the crash reporting tool.
+[75:29] Them: Priya. Thanks. And I'll add the tablet share of processed orders to the monthly product report from now on, so we never make this kind of decision on install numbers again.
+[75:40] Them: Maya. Yes please. That's the real lesson here, honestly. We almost made a decision on the wrong metric.
+[75:49] You: Agreed. And since Tom's proposal was already discussed in the product channel last week, people might be planning around it. Я напишу в общий продуктовый канал, что решение по планшетам отменили и почему. In English, so everyone reads it. I'll do it today, right after this meeting.
+[76:10] Them: Tom. Thank you. Some of my team already started grumbling happily about not having to do tablet layouts anymore, so the official message should really come from you.
+[76:23] Them: Ваня. Можно мысль? Может быть, это вообще повод подумать о отдельном режиме «склад» для планшета? Если там реально стоят люди и пакуют заказы, им нужна не копия телефонного приложения, а специальный экран: большой список, сканер штрихкодов, крупные кнопки.
+[76:41] You: Ivan has an interesting idea: maybe tablets deserve a dedicated warehouse mode. Big list, barcode scanning, large buttons. Not a copy of the phone app.
+[76:53] Them: Tom. Oh, that's actually a great idea. A packing mode. That's a feature, not a burden.
+[77:00] Them: Maya. And it's a Pro feature, by the way. Warehouse mode for big sellers.
+[77:06] Them: Priya. Ha, everything's a Pro feature today.
+[77:09] Them: Maya. Well, the big sellers are the ones with warehouses.
+[77:14] You: I like it, but let's not put it into Q1 right now. First let's fix the crashes and understand how these sellers actually use the tablets. Maya, maybe that's a topic for your next round of interviews?
+[77:28] Them: Maya. Yes, definitely. I'll keep it on my list, it's a good interview topic.
+[77:35] Them: Tom. Can I say, for the record, that I'm glad I was wrong? A warehouse mode sounds like way more fun than deleting layouts.
+[77:45] Them: Priya. Out of curiosity, Tom, do warehouse tablets usually have barcode scanners built in?
+[77:53] Them: Tom. The rugged ones do, yes, a lot of them have a hardware scanner that just types the barcode like a keyboard. The cheap consumer tablets don't, but the camera can scan barcodes reasonably well.
+[78:08] Them: Ваня. У нас штрихкоды вообще хранятся? Я не уверен, что у товаров есть поле для штрихкода.
+[78:16] Them: Maya. There's a field, EAN, it's optional. About half of big sellers fill it in, I think.
+[78:22] Them: Priya. Another number I'd want to check rather than guess.
+[78:28] Them: Maya. Ha, fair. Everything today ends with "Priya will check".
+[78:32] Them: Priya. Not everything. Just the things that decide what we build.
+[78:38] Them: Даня. А принтеры этикеток? Если склад, то там обычно и печать этикеток для доставки.
+[78:44] Them: Tom. That's a whole other can of worms. Bluetooth label printers on Android are, let's say, an adventure.
+[78:52] You: Okay, this is a great discussion for the warehouse mode interviews, but let's not design it now. It's not in Q1.
+[79:00] You: Before capacity, two smaller things that came in after I sent the agenda. Даня asked for five minutes on a security questionnaire, and Tom wanted to raise Kotlin Multiplatform. Даня first.
+[79:13] Them: Даня. Да. Можно я по-английски попробую? So. One of our enterprise customers, the furniture chain, sent us a security questionnaire as part of their annual vendor review. It's a big one, two hundred questions. And at the end they ask whether we have SOC 2, or plan to get it.
+[79:33] Them: Maya. They asked me about it too, in the renewal call. It's not a blocker for them this year, but their procurement said it will be next year.
+[79:42] Them: Priya. What does SOC 2 involve, practically? I only know it's an audit.
+[79:48] Them: Даня. It's an audit of our processes. Access control, change management, incident response, backups, vendor management. Not the code, the processes. And you need to show evidence over a period, usually six to twelve months. So if we want it by the end of next year, we need to start the process in spring.
+[80:09] Them: Ваня. Это много бумажной работы. В прошлой компании мы на это потратили почти год, и половина команды ненавидела политики, которые пришлось писать.
+[80:19] You: Ivan's experience from his previous company: almost a year, a lot of paperwork, and people hated the policies.
+[80:28] Them: Tom. At my last job we used one of those compliance automation tools. It connects to the cloud account and GitHub and collects most of the evidence automatically. It made it much less painful.
+[80:41] Them: Даня. Yes, I looked at two of them. They're not cheap, but cheaper than a person doing it by hand.
+[80:48] Them: Maya. Is it worth it for us? One customer asking.
+[80:53] Them: Даня. Not one. I checked our enterprise deals from last year, three of them asked about SOC 2 in procurement. One we lost partly because of it, I think, the logistics company.
+[81:07] Them: Maya. Oh, I didn't know that was a factor.
+[81:10] Them: Даня. Their security person told me on the call. Not officially.
+[81:15] You: Okay. I don't think we decide on SOC 2 today, it's a company-level decision with a budget. But I'd like to know how far we are from it. Даня, do you have a sense?
+[81:27] Them: Даня. Partly. Some things we have: backups, encryption, the incident process after the search incident, access reviews for production. Some things we don't: formal change approval, vendor reviews, security training, written policies for most of it. I'll make a list of the gaps for SOC 2, what we have and what's missing, so leadership can decide with real information. Two weeks, because I want to do it properly.
+[81:55] Them: Maya. That would be really useful for the renewal conversation too.
+[82:00] Them: Priya. Does it affect the analytics project? New database, new data flows.
+[82:07] Them: Даня. A bit. ClickHouse would need to be in the scope, with access control and backups. It's better to design it that way from the start than to fix later.
+[82:19] You: Good point. Let's make sure the pipeline design mentions it. Okay, Tom, Kotlin Multiplatform.
+[82:25] Them: Tom. Right. Short version: we maintain two native apps, Android in Kotlin, iOS in Swift. A lot of the logic is duplicated: networking, the models, validation rules, the offline cache for orders. Every bug in that logic we fix twice, sometimes differently. Kotlin Multiplatform lets us share that layer and keep native UI on both.
+[82:47] Them: Ваня. Звучит разумно. А iOS-разработчики не будут против писать на Kotlin?
+[82:53] Them: Tom. That's the main risk, honestly. Ivan's asking about the iOS devs. They'd mostly consume the shared module, not write it, but someone has to debug it from Xcode, and the tooling there is still rough.
+[83:09] Them: Maya. What would it cost us in Q1?
+[83:13] Them: Tom. That's the thing, I'm not proposing Q1. I'm proposing a small experiment in Q2: share one module, the order models and validation, and see how it feels. If it's painful, we stop.
+[83:25] Them: Priya. From the data side, I'd be happy if the event names and properties came from one place. Right now the iOS and Android apps send slightly different events for the same action, and I clean it up in SQL every time.
+[83:41] Them: Tom. Exactly the kind of thing it would fix.
+[83:44] Them: Даня. А сборка? CI для мультиплатформы — это отдельная история, сборки становятся медленнее.
+[83:51] Them: Tom. Даня's right, builds get slower. That's part of what the experiment should measure.
+[83:59] You: I like that it's framed as an experiment with a clear stop condition. Let's put it on the Q2 candidate list, not Q1. Tom, when we do the Q2 session, bring a one-page proposal: which module, how long, how we decide whether to continue.
+[84:17] Them: Tom. Sounds good. It was always meant as a Q2 thing, I just wanted it on the radar early.
+[84:24] Them: Ваня. Мне кажется, когда-нибудь мы и бэкенд на Kotlin перепишем, раз уж мобилка туда идёт.
+[84:31] Them: Даня. Ваня, не надо. Пожалуйста.
+[84:34] Them: Ваня. Шучу, шучу.
+[84:38] You: Ivan joked about rewriting the backend in Kotlin someday. Даня begged him not to. Noted as a joke.
+[84:45] Them: Tom. Ha, I'd vote for that, but I'm biased.
+[84:49] You: Okay. One more thing before capacity, and it's quick. The new backend engineer starts on February third. I want their first two weeks to be good, not "here's the repo, good luck", which is how most of us started.
+[85:05] Them: Ваня. Как я, да. Мне дали ноутбук и доступ к репозиторию, и всё.
+[85:11] Them: Даня. И я.
+[85:13] You: So, Ivan, since you'll work with them most: could you prepare a set of starter tasks? Small, real things, that touch different parts of the system.
+[85:25] Them: Ваня. Да, конечно. Я подготовлю пять-шесть стартовых задач для нового бэкендера к концу января, от простых к посложнее, с описанием, куда смотреть в коде. И буду их ревьюить сам.
+[85:38] Them: Priya. Could one of them be in the analytics area? So they meet the pipeline before they build it.
+[85:45] Them: Ваня. Хорошая идея, да. Например, добавить одно событие в outbox, когда он будет.
+[85:50] Them: Maya. And they get the usual product intro in the first week, the one every new hire gets. Who our sellers are, what they complain about.
+[86:01] You: Good, that's exactly the kind of onboarding I mean.
+[86:06] You: Okay. Now, capacity. And this is where it gets uncomfortable.
+[86:12] 📝 NOTE: РЕШЕНИЕ ОТМЕНЕНО: планшетные layout'ы остаются (Прия: 18% обработанных заказов с планшетов, крупные продавцы). План Тома отменён. Том — два худших бага в след. спринте. Я — сообщение в продуктовый канал сегодня.
+[86:13] You: So. Let me list what's on the table for Q1 after today, and then we look at who we have. Analytics dashboard: Priya, Даня on ClickHouse, someone on the pipeline, someone on frontend. API v1 sunset: Ivan, small but steady. Entitlements: two weeks, Ivan or someone else on backend. Bulk edit undo and scheduled changes: backend, mostly Ivan again. Shopnest: unknown until the call, potentially big. Tablet bug fixes: Tom's team. Mobile PDF export: small, Tom plus an endpoint from Ivan. And Postgres is done, thankfully, that was last quarter.
+[86:50] Them: Ваня. Я вижу своё имя в каждой строчке.
+[86:53] You: Yes. That's the problem. Ivan is in almost every line.
+[86:58] Them: Maya. How many backend people do we have now? Ivan, Даня part-time on backend, and the new person who starts in February?
+[87:07] You: Right. The new backend engineer, the one we hired in November, starts on February third. So for January it's Ivan plus half of Даня, and from February, plus one, but a new person is maybe at half speed for the first month.
+[87:24] Them: Даня. И у меня ClickHouse, это не бэкенд, это инфраструктура, но времени съест прилично.
+[87:30] Them: Ваня. Давайте честно: entitlements, undo, v1, Shopnest и пайплайн для аналитики — это не влезает в квартал. Даже с новым человеком.
+[87:40] You: Ivan says, honestly, entitlements, undo, v1, Shopnest and the analytics pipeline don't fit in a quarter, even with the new hire. I agree.
+[87:49] Them: Maya. Then what goes? From the business side, my order would be: analytics, because it's the core of new Pro. Then entitlements, because without it Pro can't launch. Then undo. Shopnest depends on the call. v1 sunset is small but it has a deadline, so it can't slip.
+[88:07] Them: Priya. Can I suggest something? The pipeline for analytics, the outbox part, is a good first project for the new backend person. It's well-defined, it's new code, not legacy, and Alex will have written the design.
+[88:23] You: That's a really good idea. A new person on a greenfield, well-specified piece, with the design ready when they arrive. Ivan, what do you think?
+[88:34] Them: Ваня. Да, отлично. Я бы с радостью отдал пайплайн. Тогда я в январе делаю entitlements и v1, в феврале — undo и scheduled changes, и помогаю новому человеку.
+[88:46] Them: Даня. А Shopnest?
+[88:50] Them: Maya. If the call shows it's big, it's probably Q2 anyway. The partner program onboarding takes them a couple of months, from what they told me.
+[89:00] You: Okay. So Shopnest is Q2 unless the call changes our mind.
+[89:06] Them: Tom. What about the frontend for analytics? Charts on web.
+[89:11] You: Right, the open question. Tom, you said the web team did charts for the admin?
+[89:17] Them: Tom. They did. But they're stretched too. Honestly, my iOS contractor, Marek, has done a lot of web charting before he moved to mobile. His contract ends at the end of January. If we extend him through March, he could do the analytics frontend, and we'd still have the tablet fixes covered by my own team.
+[89:37] Them: Maya. How much would that cost?
+[89:41] Them: Tom. I'd need to ask him, but probably the same rate as now. And it's much faster than hiring someone for three months.
+[89:49] You: I like it. Tom, can you ask him?
+[89:52] Them: Tom. Yes, I'll ask Marek this week whether he can extend through March and do the analytics frontend, and what it would cost. Then you and Maya decide on the budget.
+[90:05] Them: Maya. If the number is reasonable, I'll fight for it, it's directly tied to Pro.
+[90:11] Them: Priya. And if Marek is doing the frontend, I'd love to work with him directly on the chart designs, rather than through a spec. Charts are easier to get right by iterating.
+[90:24] Them: Tom. He'd like that, he hates specs.
+[90:28] You: Okay. Let me try to put all of this into a timeline. January: entitlements, v1 headers and guide, tablet bugs, mobile PDF, ClickHouse test, pipeline design, metric definitions. February: new backend person on the pipeline, Marek on the analytics frontend if approved, Ivan on undo. March: analytics beta for ten sellers, undo and scheduled changes, v1 announcement already out. Something like that.
+[90:56] Them: Maya. That looks realistic, actually. Tight, but realistic.
+[91:01] Them: Priya. Can I play devil's advocate for a second? What are the biggest risks in this timeline? Because a timeline without risks is a wish.
+[91:12] You: Fair. Let's name them. Risk one: ClickHouse doesn't perform on our data, or managed is much more expensive than Даня thinks. Then the analytics backend gets more complicated.
+[91:24] Them: Даня. Я бы сказал, риск средний. ClickHouse обычно справляется. Больше боюсь, что выгрузка исторических данных из Postgres займёт дольше, чем думаем.
+[91:34] Them: Priya. What did he say?
+[91:37] You: Даня thinks ClickHouse itself is a medium risk, he's more worried about the historical backfill from Postgres taking longer than expected.
+[91:46] Them: Priya. That's a fair worry. We could limit the backfill to ninety days for the beta. Ten sellers don't need two years of history.
+[91:55] Them: Даня. Девяносто дней — это гораздо проще, да.
+[91:59] You: Risk two: the new backend hire. If they start late, or need more ramp-up, the pipeline slips.
+[92:05] Them: Ваня. Я буду рядом, у меня с февраля время есть. Не сильно рискованно, мне кажется, если дизайн будет хороший.
+[92:13] You: Risk three: Marek. If he doesn't extend, we have no one for the analytics frontend.
+[92:19] Them: Tom. Then the fallback is the web team, but later. Maybe April.
+[92:24] Them: Maya. Which would push the beta into Q2.
+[92:27] You: Yes. That's the honest version. Risk four: entitlements being harder than two weeks, which pushes undo, which pushes the new Pro launch.
+[92:38] Them: Ваня. Две недели — честная оценка. Но там двадцать мест в коде, и в каком-нибудь из них будет сюрприз. Я бы сказал, две-три недели.
+[92:48] You: Let's write two to three, then. And risk five, which nobody wants to say out loud: a big incident. Last quarter the search incident cost us almost a week of focus.
+[92:59] Them: Даня. Тьфу-тьфу.
+[93:03] Them: Tom. I don't know what that means but I'm sure it's appropriate.
+[93:07] Them: Даня. It means "knock on wood". Ha.
+[93:10] Them: Priya. I like this list. Can it go into the timeline doc too?
+[93:15] You: Yes, that's the idea, the risks section next to the "what slips first" section.
+[93:22] Them: Даня. Если ClickHouse не подведёт.
+[93:24] You: If ClickHouse behaves, yes. I'll put together the Q1 timeline draft with all of this by Wednesday, with owners and dependencies, so Maya can attach it to the pricing deck for leadership.
+[93:38] Them: Maya. Oh, that would be perfect. Leadership always asks "and when", and I never have a good answer.
+[93:47] Them: Ваня. А что мы делаем, если что-то поедет? Например, если entitlements окажутся сложнее.
+[93:55] You: Then the first thing to slip is scheduled changes, then undo. Analytics and entitlements are the core, v1 has a deadline. Let's write that into the timeline too, so nobody is surprised.
+[94:09] Them: Tom. That's a nice touch. A pre-agreed list of what slips.
+[94:14] Them: Priya. I've never seen that in a roadmap, honestly. Usually we just find out.
+[94:20] You: Well, let's try it once. Okay, any other capacity issue?
+[94:26] Them: Даня. Одна вещь. Дежурства. Если новый человек выходит в феврале, его можно ставить в ротацию не раньше апреля. А у нас сейчас в ротации три человека, и один из них — Ваня, который и так в каждой строчке.
+[94:42] You: Даня's point is on-call. The new person can't join the rotation before April, and Ivan is on call every third week on top of everything.
+[94:51] Them: Ваня. Ну, я привык. Но да, было бы неплохо.
+[94:55] Them: Tom. Could someone from my team join? We've been talking about mobile engineers learning more backend.
+[95:04] You: Let's talk about that separately, it's not a Q1 roadmap item. But thanks, Tom, that's a generous offer.
+[95:12] Them: Tom. Sure.
+[95:14] You: Okay, we have ten minutes left. Let me read back the decisions and the action items, in English, and then a short Russian line for the backend part if needed.
+[95:26] You: Decisions. One: the Android tablet layouts stay. We decided to drop them and reversed that after Priya's data, so the earlier decision is void. Two: API v1 is sunset at the end of June, announced in January, with deprecation headers and generous rate limits in the meantime. Three: the seller analytics dashboard is the main Q1 project, beta for ten sellers by end of March as a stretch goal. Four: Shopnest is Q2 unless the call changes our mind. Five: entitlements before any pricing launch.
+[96:01] Them: Maya. Yes.
+[96:03] You: Action items. Priya: the list of v1 clients by Thursday, the metric definitions doc in two weeks, the tablet share in the monthly report, and a look at Maya's revenue numbers before Wednesday. Ivan: deprecation headers this sprint, the migration guide by end of month, the Shopnest API review on Friday. Даня: ClickHouse on staging with a month of events, about a week. Maya: the Shopnest call next week, the v1 integrator emails once the list and the guide are ready, the pricing deck by Monday. Tom: the two tablet bugs next sprint, the crash breakdown for Priya tomorrow, and asking Marek about March. Me: the pipeline design by the next roadmap call, the Shopnest questionnaire before the call, the message about tablets today, and the Q1 timeline by Wednesday.
+[96:56] Them: Tom. And my deprecation plan is officially dead, right? I don't want someone to ask me about it on Friday.
+[97:03] You: Officially dead. Nobody will ask.
+[97:05] Them: Даня. Эмуляторы остаются, ничего не убираю.
+[97:09] You: Yes, Даня keeps the emulators.
+[97:12] Them: Ваня. Саш, по-русски коротко для меня: гайд по v1 к концу месяца, заголовки в этом спринте, Shopnest в пятницу, entitlements в январе. Правильно?
+[97:22] You: Да, всё так. И с февраля undo, и помогаешь новому человеку с пайплайном.
+[97:27] Them: Ваня. Ок, понял.
+[97:31] Them: Priya. One thing from me. Can we do these roadmap sessions with a data check before every big decision? Today we got lucky that I was curious.
+[97:42] Them: Maya. I'd support that. A "what does the data say" step before we decide anything that affects users.
+[97:51] You: Agreed. Let's make it part of the template for the next session. Okay, anything else? No? Then thank you all, this was a really good session. Especially the part where we changed our minds.
+[98:05] Them: Tom. Ha. Thanks all, bye.
+[98:08] Them: Priya. Bye, thanks.
+[98:10] Them: Maya. Thank you, bye!
+[98:12] Them: Ваня. Всем пока.
+[98:16] Them: Даня. Пока, спасибо.

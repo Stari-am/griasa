@@ -492,6 +492,13 @@ do {
           rule: "with no quote the model's own name for the owner is kept",
           meaning: "\"Them\" in place of a name the model gave loses information that was there",
           saw: "\(legacy)")
+    check(PromiseOwner.isMe("You", myName: "Aik") && PromiseOwner.isMe("me", myName: "Aik")
+          && PromiseOwner.isMe("Алекс", myName: "Alex") && PromiseOwner.sameName("Max", "Макс")
+          && !PromiseOwner.isMe("Yuri", myName: "Aik"),
+          rule: "\"You\" is the user, and a Cyrillic spelling with кс is the same name as one with x",
+          meaning: "fold reads y as i, so a literal \"you\" never matched; and \"Алекс\" folded to \"aleks\", "
+                 + "so the user's own promises in a Russian meeting were filed as someone else's",
+          saw: "\(PromiseOwner.fold("You")) \(PromiseOwner.fold("Алекс")) \(PromiseOwner.fold("Alex"))")
     check(PromiseOwner.isMe("Айк", myName: "Aik Sargsian") && PromiseOwner.isMe("Aik", myName: "Aik Sargsian")
           && PromiseOwner.isMe("AÏK", myName: "Aik") && !PromiseOwner.isMe("Maria", myName: "Aik Sargsian"),
           rule: "the user's name is recognised in another script, by first name alone, and without accents",

@@ -1,0 +1,424 @@
+[00:03] You: Hi everyone, thanks for making time on short notice. I can see Rachel and Marcus from Harbor Lane, and from our side Maya, Daniel and Priya. Rachel, Marcus, can you hear us okay?
+[00:16] Them: Rachel here. Yes, we can hear you. Thanks for setting this up so quickly.
+[00:22] Them: Marcus, hi. Yes, all good on my end.
+[00:24] You: Marcus, you're in the office today? I can see a lot of people walking behind you.
+[00:31] Them: Marcus. Yes, we're in the head office, it's the IT floor. It's a bit busy this week, everyone is still cleaning up after Saturday. Rachel's in the meeting room next door, actually.
+[00:45] Them: Rachel. I'm hiding in the small room, it's the only quiet place in the building this week.
+[00:51] Them: Maya. I know the feeling. We had a pretty intense weekend here too.
+[00:56] Them: Rachel. I can imagine. Shall we wait for anyone else?
+[01:02] You: No, I think everyone's here. Priya just joined.
+[01:06] You: Great. Let me quickly say who's who on our side, since you may not have met everyone. Maya is our product lead and your main contact on the business side. Daniel leads infrastructure, he's the one who was looking at the platform on Saturday. Priya is our data lead, she's been pulling the numbers on what happened. I'm Alex, I run engineering.
+[01:29] Them: Maya. Hi Rachel, hi Marcus. We've emailed a lot, nice to finally talk.
+[01:34] Them: Daniel. Hello.
+[01:38] Them: Priya. Hi both.
+[01:41] You: Rachel, before we go through what we know, I'd like to hear it from your side first. What happened on Saturday, and what's the impact for you? We have our logs, but we don't have your phones ringing.
+[01:56] Them: Rachel. Okay. I'll be direct, because I think you deserve to know how bad this was for us. Saturday was the first day of our autumn promo. It's our biggest promo of the year after Christmas. We sent the email to about three hundred thousand customers at eight in the morning. By nine, the site was slow. By ten, customers were calling us saying they'd been charged twice. By eleven, we had orders for products we didn't have in stock, because the stock numbers on the site were wrong. And the call center was completely overwhelmed. We had people waiting forty minutes on the phone.
+[02:35] You: I'm really sorry. That's a terrible day for a promo.
+[02:38] Them: Rachel. It was. And the worst part for me is that on Saturday nobody from your side reached out to us. We found your status page at noon, and it said "minor degradation". It was not minor for us.
+[02:53] Them: Maya. Rachel, that's fair, and I want to say clearly: we got the communication wrong on Saturday. The status page was updated late and it understated the impact. I'm sorry.
+[03:04] Them: Rachel. Thank you. I appreciate that. But I need to tell you that my CEO asked me on Monday whether we should start looking at other platforms. We've been with you for five years. I don't want to switch. But I need to go back to him with something concrete.
+[03:21] You: Understood. And that's exactly what this call is for. Let me suggest an agenda. First, Daniel and Priya walk through what happened technically, in plain terms. Second, the immediate stuff: the double charges, the oversold orders, the customers who are waiting for answers. Third, what we change so this doesn't happen at your next promo, which I understand is soon. And fourth, how we stay in touch through the rest of your promo season. Does that work?
+[03:53] Them: Rachel. Yes. Our next promo is next Thursday, so the third point is urgent.
+[04:00] Them: Marcus. Can I add one thing to the agenda? Our ERP integration. I think part of the stock problem was on our side, or at least in how our sync talks to your API. I want to understand that too.
+[04:14] You: Absolutely, that fits into the technical part. Daniel, do you want to start?
+[04:19] Them: Daniel. Sure. So, I'll try to keep it simple. On Saturday morning, between about eight fifteen and nine, traffic to your store went up about twelve times compared to a normal Saturday. That's expected with a big email, and the platform is supposed to handle it. The web servers did handle it. The problem was further back.
+[04:42] Them: Daniel. Your store, like all big stores, has an integration that syncs stock levels from your ERP into our system. Marcus's team runs that. That sync calls our API every few minutes and updates stock for every product. On Saturday, the sync started getting slow responses from our API, because the database was busy with all the promo traffic. The sync has a timeout, and when it timed out, it retried. And it retried the whole batch, not just the failed part.
+[05:14] Them: Marcus. Yes. That's our connector. It retries the whole batch on a timeout. We wrote it that way years ago, when batches were small.
+[05:24] Them: Daniel. Right. And each retry made the database busier, so more timeouts, so more retries. By nine thirty, about sixty percent of the requests to our database for your store were stock updates from retries. And that slowed down checkout for everyone, because checkout also needs to read and lock stock.
+[05:44] Them: Rachel. So the site was slow because of our own integration?
+[05:50] Them: Daniel. Partly, but I don't want to put it on Marcus. Our API should have protected itself. We have rate limits per client, but for integrations on the old API version, which your connector uses, the limits are very high, basically unlimited. So nothing stopped the retry storm. That's our problem.
+[06:12] Them: Marcus. I appreciate you saying that. But I also know the connector is old. It's on my list to rewrite.
+[06:20] You: Let's come back to who fixes what. Daniel, the double charges?
+[06:26] Them: Daniel. Yes. The double charges are a different problem, but connected. When checkout got slow, some customers clicked "pay" and nothing happened for twenty or thirty seconds. Many clicked again. Normally, the second click is caught: we have a protection so the same order can't be paid twice. But that protection has a time window, and under that load, the first payment hadn't been recorded yet when the second click arrived. So both went through to the payment provider.
+[06:58] Them: Rachel. How many?
+[07:02] Them: Priya. I can answer that. We counted orders where the same customer paid the same amount twice within five minutes. On Saturday it's three hundred and twelve orders. All of them on your store, between nine and eleven thirty. Some of those might be genuine second orders, but from the patterns, almost all are duplicates.
+[07:25] Them: Rachel. Three hundred and twelve. And those customers have been charged twice since Saturday.
+[07:32] Them: Priya. Yes. Most of them, the second charge is still there, unless they contacted you and you refunded manually. I can see that you refunded about forty already.
+[07:45] Them: Rachel. Our call center did that by hand. It took them all of Sunday.
+[07:51] You: We need to fix that today. The remaining ones should be refunded proactively, not when the customer calls. Priya, can you get a final list of the duplicate payments, with the ones already refunded removed?
+[08:07] Them: Priya. Yes. I'll send you a list of all duplicate charges with order numbers and amounts by tomorrow noon, with the ones that were already refunded marked, so nobody refunds twice.
+[08:20] Them: Rachel. Who does the refunds? Us or you?
+[08:25] You: Good question. The refunds go back through the payment provider. Technically, you can do them in your admin panel, but three hundred by hand is a day of work.
+[08:38] Them: Daniel. We can do them in bulk from our side, through the provider's API, once Rachel's team confirms the list. It takes a script, about an hour to write and check.
+[08:50] Them: Rachel. Please, yes. My team is exhausted.
+[08:53] Them: Daniel. Then once Priya's list is confirmed by you, I'll run the bulk refund for the duplicates the same day, and send you a confirmation file with every refund ID.
+[09:04] Them: Rachel. Thank you. That's the first good news today.
+[09:08] 📝 NOTE: Duplicates: 312 orders. Priya list tomorrow noon -> Rachel confirms -> Daniel bulk refund same day.
+[09:09] Them: Marcus. And the oversold stock? We have about two hundred orders for products we don't have. Our warehouse can't ship them.
+[09:18] Them: Daniel. That's the sync again. When the retries piled up, some stock updates were applied out of order. So for a while, the site showed stock from an older update, which was higher than reality. People bought what wasn't there.
+[09:35] Them: Rachel. So what do we do with those two hundred orders?
+[09:41] Them: Maya. That's more of a business decision on your side, Rachel. Some stores offer a substitute, some cancel with an apology and a voucher. We can help with the mechanics, like bulk-cancelling with a custom message, but the offer is yours.
+[09:57] Them: Rachel. We'll cancel them with a voucher. I'll decide the amount with marketing today.
+[10:03] Them: Marcus. And how do customers with an oversold order find out? Right now, they're still waiting for a delivery that won't come.
+[10:12] Them: Rachel. That's the most urgent part, honestly. Some of them have been waiting since Saturday and have no idea. Every day we wait, the complaint gets angrier.
+[10:23] Them: Maya. With the bulk cancellation, the message goes out to each customer as an email at the moment of cancelling. So if your team does it today, they know today.
+[10:34] Them: Rachel. Then we do it today. The vouchers can be sent separately, once marketing decides the amount, that's a second email.
+[10:42] Them: Priya. Rachel, one detail. Some of the oversold orders are partially oversold. A customer ordered five products, and only one of them wasn't in stock. Cancelling the whole order would be a shame.
+[10:56] Them: Rachel. Oh, good point. How many like that?
+[11:00] Them: Priya. About a third of the two hundred. For those, it's better to remove the missing item and ship the rest.
+[11:08] Them: Daniel. You can do that per order in the admin, "edit order", remove the item, it refunds that item automatically. There's no bulk version for that, unfortunately.
+[11:21] Them: Rachel. Seventy orders by hand. That's manageable, my team can do that in an afternoon. It's the three hundred refunds that would have killed them.
+[11:33] Them: Maya. For the cancellations, there's a bulk action in the orders list, it lets you cancel many orders at once and attach a message. It's a bit hidden. I'll send you a short guide with screenshots this afternoon, so your team doesn't have to cancel two hundred orders one by one.
+[11:53] Them: Rachel. Yes please. Honestly, my team didn't know that existed.
+[11:59] Them: Marcus. Can the cancellation trigger the stock to be corrected too? Because if we cancel and the stock goes back up by one, we're showing stock we don't have again.
+[12:10] Them: Daniel. Good point. A cancellation returns stock by default. There's a setting per cancellation, "do not restock". In the bulk action, it's a checkbox. You'd want to tick it for these.
+[12:24] Them: Maya. That goes in the guide, with a big red arrow.
+[12:28] Them: Marcus. Thanks. That would have been a second disaster.
+[12:32] You: Okay. Let's also talk about the customers themselves. Rachel, what are you telling customers who call?
+[12:41] Them: Rachel. Right now, "we're sorry, it was a technical problem with our platform provider, you'll be refunded". That's it. But we're getting complaints on social media, and some customers are asking whether their card data is safe, because they were charged twice and they think it was fraud.
+[13:00] Them: Priya. That's an important one. No card data was exposed. The double charge was a duplicate request, not anyone getting the card details.
+[13:09] Them: Rachel. I know that, but I need it in writing. Something my customer service can read out or send, in plain language, that says what happened and that their data is safe. Can you give me that?
+[13:23] You: Yes. That should come from us, because it's our platform. I'll write a customer-facing statement about the double charges and data safety today, and send it to you for approval before anything goes out. Plain language, no jargon.
+[13:38] Them: Rachel. Thank you. Today would be really good, the social media team is asking every hour.
+[13:45] Them: Maya. And if it helps, Rachel, we can mention in the statement that refunds are automatic and that customers don't need to call. That should reduce the call volume.
+[13:57] Them: Rachel. Yes, that's important. Our call center can't take another weekend like that.
+[14:03] Them: Rachel. Can we talk for a minute about what the statement should actually say? My customer service lead gave me a list of the questions customers ask most. If the statement answers those, it's useful. If it's a generic apology, it's not.
+[14:19] You: Yes, please, that's much better than me guessing.
+[14:23] Them: Rachel. Okay. Number one: "Was I charged twice?" They want to know how to check. Number two: "When do I get my money back?" Number three: "Is my card safe, should I block it?" Number four, from the oversold orders: "Where is my order?" And number five, which surprised me: "Will this happen again on Black Friday?"
+[14:45] Them: Maya. Number five is interesting. People are planning to shop on Black Friday and they're worried.
+[14:53] Them: Rachel. Exactly. Which is good news in a way, they still want to shop with us.
+[15:00] You: Okay. For one, how to check: they'll see two identical charges on their statement, same amount, same day, same merchant name. For two: refunds go out tomorrow, and banks usually show them within three to five business days. For three: no card data was exposed, there's no need to block the card.
+[15:20] Them: Priya. And it's worth saying that some banks show the second charge as "pending" and it disappears on its own. A few customers might see it vanish before the refund. That's normal.
+[15:32] Them: Rachel. Oh, that's useful, because some customers will ask "my second charge disappeared, did you refund it twice?"
+[15:42] Them: Daniel. For those, the refund will simply fail on our side, because there's nothing to refund. Nobody gets refunded twice.
+[15:50] Them: Rachel. Good, that's what my finance team will ask.
+[15:53] You: Four, where is my order: that's your vouchers and cancellations, so that part is yours, Rachel. We can leave a placeholder in the statement.
+[16:02] Them: Rachel. Yes, leave a line for us to fill in.
+[16:05] You: And five, Black Friday. I'd say something honest but not technical: "We've identified the cause and made changes to make sure our systems handle high demand."
+[16:17] Them: Maya. I'd avoid "make sure". We can't guarantee anything. Something like "we've made changes to handle high demand better, and we'll be monitoring closely on every promo day".
+[16:31] Them: Rachel. I like Maya's version. "Make sure" is a promise my CEO would hold us to, and you to.
+[16:39] You: Fair. "Better", not "sure". Good.
+[16:42] Them: Marcus. Should the statement mention the integration? That part of the cause was on our side?
+[16:50] Them: Rachel. No. Customers don't care whose system it was. For them, it's Harbor Lane's website. We take the responsibility towards customers, and we sort out the details between us.
+[17:03] Them: Marcus. Okay, that's fair.
+[17:05] You: Then I have what I need for the statement. Short, five questions, plain language, a placeholder for your part.
+[17:14] Them: Rachel. Thank you. And keep it under two hundred words, if you can. Nobody reads more on a phone.
+[17:20] You: Okay. That's the immediate stuff. Now, the next promo is next Thursday. What do we change before then? Let me propose, and you tell me if I'm missing something. One: the retry storm. Two: the double payments. Three: the stock accuracy. Four: communication when something does go wrong. Daniel, start with one.
+[17:42] Them: Daniel. For the retry storm, there are two sides. On our side, I can put a proper rate limit on your connector's API key. Not low, but enough that a retry storm can't take over the database. If the connector goes over it, it gets a "slow down" response instead of hammering us. I'll set the rate limit on your connector's key today, at a level that's well above your normal traffic, so nothing changes on a normal day.
+[18:11] Them: Marcus. How high? Because during a big price update, we push a lot.
+[18:16] Them: Daniel. I looked at your last month. Your normal peak is about forty requests per second. I'd set the limit at a hundred and fifty. Saturday's storm was over a thousand.
+[18:29] Them: Marcus. Okay, a hundred and fifty is fine. We never go near that legitimately.
+[18:34] Them: Daniel. And on your side, the connector should retry only the failed part of a batch, and wait longer between retries. Exponential backoff.
+[18:45] Them: Marcus. Yes, I know. Honestly, I think I should just rewrite the connector. It's old, it's on the old API, it does full batches. I'll rewrite the ERP connector against the new API before Thursday, my team can do it this week.
+[19:00] Them: Daniel. Marcus, before you commit to that, can I suggest something smaller? A full rewrite before Thursday is risky. If something goes wrong in the new connector, you find out on promo day. There are two settings in your current connector, the batch size and the retry delay. If you set the batch size to two hundred instead of five thousand, and the retry delay to thirty seconds, the storm can't happen, even with the old code.
+[19:31] Them: Marcus. Oh. I didn't think about just changing the config. That's much safer.
+[19:36] Them: Rachel. Marcus, I'd rather we don't rewrite anything this week. Not before a promo.
+[19:43] Them: Marcus. Agreed. Okay, scrap the rewrite, I won't rewrite the connector before Thursday. I'll change the batch size and the retry delay in the config tomorrow morning. The rewrite can wait until after the promo season.
+[19:57] Them: Daniel. That's a great plan.
+[20:00] You: And whenever the rewrite happens, it should go against the v1.5 API, the one with proper rate limits and OAuth. We'll give you whatever help you need then.
+[20:11] Them: Marcus. Sounds good.
+[20:13] 📝 NOTE: Marcus: rewrite cancelled -> config change (batch 200, retry 30s) tomorrow morning. Daniel: rate limit on their key today.
+[20:14] You: Two, double payments. Daniel?
+[20:17] Them: Daniel. That one is fully ours. The protection against double payment has a time window problem under load. The fix is to put a lock on the order before we call the payment provider, so a second click waits and then sees that the order is already being paid. It's not a big change, but it's in checkout, so it needs careful testing.
+[20:39] Them: Rachel. Will it be fixed before Thursday?
+[20:44] Them: Daniel. Yes. I'll have the double payment fix deployed by Tuesday, so we have two days of normal traffic on it before your promo. And I'll test it with a simulated double-click under load on staging first.
+[20:59] Them: Rachel. Tuesday. Okay.
+[21:03] Them: Priya. And I can add a check that counts duplicate payments per hour, platform-wide. If that number goes above a handful, someone gets paged. On Saturday, we would have known at nine fifteen, not at noon.
+[21:17] You: Yes, please do that. Before Thursday, ideally.
+[21:20] Them: Priya. I'll set up the duplicate payment alert by Wednesday. It's mostly a query and an alert rule.
+[21:29] Them: Rachel. That's the kind of thing I need to hear. Things that tell you before my customers do.
+[21:36] You: Three, stock accuracy. That's partly fixed by the connector config, right Daniel?
+[21:41] Them: Daniel. Mostly. With small batches and backoff, updates arrive in order. But there's one more thing I'd like to do: a safety buffer for promo days. Rachel, if you set the "low stock threshold" to, say, three, then the site shows "out of stock" when there are three left. You lose a few sales, but you don't oversell.
+[22:02] Them: Rachel. For promo products, that's fine. Better to say "sold out" than to sell something we don't have.
+[22:10] Them: Marcus. That's a setting on our side, in the product settings, right? I can set it for all promo products in bulk.
+[22:18] Them: Daniel. Yes, through the API or the admin.
+[22:21] Them: Marcus. Then I'll set a stock buffer of three for all the promo products before Thursday.
+[22:28] Them: Marcus. Daniel, one thing about the buffer. When the promo ends, I need to set it back to zero, right? Otherwise we'll be showing items as sold out when we still have three.
+[22:40] Them: Daniel. Right. Or keep it at one for fast-moving products. A lot of stores keep a small buffer permanently, because stock in the warehouse is never exactly right anyway.
+[22:52] Them: Rachel. That's true, actually. Our warehouse counts are off by one or two all the time. Damaged items, items in the wrong place.
+[23:01] Them: Marcus. Then maybe one, permanently, and three during promos. That's the warehouse team's call more than mine, though.
+[23:09] Them: Priya. If you want, the data can tell you how often an item showed "in stock" but the warehouse couldn't find it. If that happens a lot for certain product groups, those could get a bigger buffer.
+[23:23] Them: Rachel. That's an interesting analysis. Let's talk about it on one of the Monday calls, after the promo season.
+[23:30] Them: Rachel. Good.
+[23:33] You: Four, communication. Rachel, you said nobody reached out on Saturday. That's the part I'm least happy about, honestly. What would you have needed?
+[23:45] Them: Rachel. A phone call. Or even a message. Something like "we see a problem, we're working on it, here's what you should tell customers". By ten o'clock. Instead, my team was guessing.
+[23:57] Them: Maya. Our incident process says the on-call engineer focuses on fixing, and someone else handles communication. On Saturday, the someone else was me, and I was only paged at eleven, because the first alert went to the engineer and he assumed it was a load spike that would pass. So you got nothing for three hours.
+[24:20] Them: Daniel. That was me, on call. I should have escalated earlier. I thought it was traffic and would settle. That's a lesson for me.
+[24:30] Them: Rachel. I appreciate the honesty, Daniel.
+[24:33] You: So for your promo days specifically, here's what I'd suggest. On Thursday, Daniel is on call, but he's also watching your store actively from eight in the morning, not waiting for alerts. And Marcus gets a direct number to reach our on-call engineer, so if your team sees anything odd, you don't go through support.
+[24:54] Them: Marcus. That would help a lot. On Saturday I spent an hour in the support queue before I reached anyone technical.
+[25:02] You: I'll send Marcus the on-call escalation number and the escalation steps today, after this call.
+[25:09] Them: Daniel. And on Thursday I'll be online from seven thirty, watching your store's traffic, the database and the connector, until the email peak is over. If I see anything, I'll message Marcus directly.
+[25:24] Them: Marcus. Perfect. I'll be online from seven thirty too.
+[25:30] Them: Rachel. Can we have a dedicated engineer for our account? Someone who knows our setup and who we can always call?
+[25:40] You: Rachel, honestly, no, not as a permanent arrangement. We're a small team, and if we give one customer a dedicated engineer, we'd have to do it for everyone, and we'd stop building the product. What I can offer is the escalation number, which reaches whoever is on call, and I'll write a short brief about your setup for all our on-call engineers before Thursday, so whoever picks up knows who you are.
+[26:08] Them: Rachel. Okay. I understand. As long as someone who knows what they're doing picks up.
+[26:14] Them: Daniel. We'll make sure of that. Your setup is a bit special, with the ERP sync, so the brief helps.
+[26:21] Them: Maya. Rachel, one more thing on communication. I'd like to suggest a short weekly call, every Monday, through the end of your promo season. Fifteen minutes. What went well, what's coming up, anything we should prepare for.
+[26:37] Them: Rachel. Yes, I'd like that. Our season runs until the end of January.
+[26:44] Them: Maya. Then I'll set up a weekly Monday call with your team until the end of January, starting next Monday. I'll send the invite today.
+[26:54] Them: Rachel. Great. And for that to be useful, you should know our promo calendar. We have six more promos before the end of January, and two of them are big ones, Black Friday and the week before Christmas.
+[27:09] You: That would be really useful for us. If we know the dates, we can avoid deploying anything risky on those days and have someone watching.
+[27:20] Them: Rachel. I'll send Maya our promo calendar with all the dates and the expected email sizes by Friday.
+[27:28] Them: Maya. Perfect.
+[27:31] You: Okay. Rachel, you mentioned your CEO earlier. What does he need to see?
+[27:37] Them: Rachel. He needs three things. First, a written explanation of what happened. Not a technical document, but clear enough for a board member. Second, what you're changing. Third, and I'll be honest, some compensation. Saturday cost us money: the call center overtime, the vouchers for the oversold orders, and probably lost customers.
+[27:59] You: Fair. The first two I can give you. I'll write an incident report for your CEO, plain language, what happened, why, what we've changed and what we're still changing, and send it to you by Friday.
+[28:14] Them: Rachel. Friday works, our management meeting is on Monday.
+[28:19] Them: Maya. And on compensation. I can't promise a number on this call, because I need approval, but our contract has a service credit for availability problems, and I think Saturday qualifies, even if the platform wasn't technically down. I'll get approval for a service credit and send you a proposal by Monday, before your management meeting.
+[28:42] Them: Rachel. Monday morning, please, the meeting is at eleven.
+[28:46] Them: Maya. Monday morning, by nine.
+[28:49] Them: Rachel. And the vouchers. We gave customers vouchers for the oversold orders. Could you cover those?
+[28:57] Them: Maya. Rachel, I'm sorry, but we can't cover the vouchers directly. Those are your business decisions about your customers, and we can't take on that kind of open-ended cost. What I can do is make the service credit reflect the impact properly, and I'll be fair about it.
+[29:16] Them: Rachel. I understand. I had to ask.
+[29:18] Them: Marcus. Rachel, I think the service credit is reasonable. Honestly, part of the problem was our connector.
+[29:27] Them: Rachel. I know. Okay.
+[29:29] You: Rachel, there's one more thing your team asked for in the email on Monday: refunding every promo order from Saturday, not just the duplicates, as a goodwill gesture. I want to be straight with you: we can't do that. It would be several hundred thousand euros, most of those orders were perfectly fine and were delivered. The duplicates we refund, fully, and quickly.
+[29:53] Them: Rachel. Yes, that was our marketing team's idea, after a very bad day. I didn't really expect you to say yes.
+[30:01] You: I understand where it came from.
+[30:03] Them: Marcus. Can I go back to the technical side for a moment? I'd like to understand the database part better. Why does a stock update slow down checkout?
+[30:14] Them: Daniel. Sure. When a customer checks out, we lock the stock rows for the products in their cart, so two people can't buy the last item. Your stock updates also lock those rows, briefly, to write the new number. Normally both are fast and nobody notices. But when there are thousands of stock updates per second, each one holding a lock, checkout has to wait for them. And when checkout waits too long, it times out, and the customer sees an error or a spinner.
+[30:47] Them: Marcus. So our batches of five thousand were locking five thousand rows at once?
+[30:52] Them: Daniel. Not all at once, but in one transaction, so the locks were held until the whole batch was written. With a batch of two hundred, the locks are held for a much shorter time.
+[31:05] Them: Marcus. That makes a lot of sense. I wish I'd known that two years ago.
+[31:12] Them: Daniel. It wasn't a problem two years ago, your catalog was a third of the size.
+[31:17] Them: Priya. I can add one number here. On a normal day, your stock updates are about two percent of database time for your store. On Saturday at nine thirty, sixty-one percent.
+[31:28] Them: Rachel. That's a striking number.
+[31:30] Them: Marcus. Daniel, could I get the logs from your side for Saturday? I'd like to compare them with our connector's logs and see exactly where the retries started.
+[31:43] Them: Daniel. Sure, but they contain request details from other stores too. I'll filter them to your API key and send you the API logs for Saturday by tomorrow.
+[31:54] Them: Marcus. Thanks. And I'll send you our connector logs for the same period today, so you can see it from our side.
+[32:03] Them: Daniel. Great, that helps both of us.
+[32:07] Them: Marcus. Daniel, while we're at it, can I ask about the new API? You mentioned v1.5. What's actually different, apart from rate limits?
+[32:17] Them: Daniel. Three main things. Authentication: v1 uses a permanent key, v1.5 uses OAuth or personal access tokens, which can be scoped and revoked. Rate limits: v1.5 has clear, documented limits and returns headers telling you how much you have left. And batch endpoints: v1.5 has a proper bulk stock endpoint that accepts up to five hundred items and processes them in one efficient operation, with a report of which ones failed.
+[32:46] Them: Marcus. A report of which ones failed. That would have saved us on Saturday. Our connector retries everything because v1 just says "error" for the whole batch.
+[32:58] Them: Daniel. Exactly. With v1.5, a timeout on item three hundred doesn't mean the first two hundred and ninety-nine failed. You know exactly what to retry.
+[33:09] Them: Marcus. And webhooks? Right now we poll for new orders every five minutes. That's another load on both sides.
+[33:17] Them: Daniel. v1.5 has order webhooks. We call you when an order is created or changes. No polling. You'd need an endpoint on your side that we can reach.
+[33:27] Them: Marcus. Our ERP sits behind a firewall. We'd need a small service in our cloud account to receive them and forward them.
+[33:35] Them: Daniel. That's what most of our bigger customers do. It's a common pattern.
+[33:40] Them: Marcus. Okay. That's a bigger change than I thought, but it makes sense. It's also exactly the kind of thing I don't want to touch before Black Friday.
+[33:50] Them: Daniel. Agreed. January.
+[33:54] Them: Rachel. Marcus, how big a project is that, roughly? I need to plan budget for next year.
+[34:00] Them: Marcus. Rewrite against v1.5 with webhooks, maybe six to eight weeks for my team, including testing. It's not huge, but it's not small either.
+[34:10] Them: Rachel. Okay. Good to know for planning.
+[34:15] Them: Priya. Marcus, one thing that would help us a lot: when you rewrite, if the connector sends a clear identifier in the user agent, like "HarborLane-ERP-Connector version two", we can tell versions apart in our logs immediately. On Saturday it took Daniel a while to even identify the source.
+[34:36] Them: Marcus. That's easy, yes. Good idea.
+[34:38] Them: Daniel. And it helps us call the right person, if the number in the escalation sheet is up to date.
+[34:45] You: Okay. I want to spend some time on Black Friday, because if Saturday was hard, Black Friday will be harder. Rachel, what do you expect?
+[34:54] Them: Rachel. Last year Black Friday was about three times a normal promo. This year we're planning a bigger email list, so maybe four times. And we're doing a countdown: the deals go live at exactly seven in the morning, and the email goes out at the same time.
+[35:12] Them: Daniel. Exactly at seven, everyone at once. That's the hardest pattern for any system. A slow ramp is easy, a cliff is hard.
+[35:22] Them: Rachel. Marketing loves the countdown. They say it creates urgency.
+[35:26] Them: Daniel. It definitely creates urgency for the database.
+[35:31] Them: Rachel. Ha. Okay, what would you suggest?
+[35:36] Them: Daniel. A few things, and some of them are on your side. The simplest is to stagger the email. Instead of three hundred thousand emails at seven, send in four waves, fifteen minutes apart. The deals can still go live at seven. The people who come first are the ones who were waiting anyway.
+[35:56] Them: Rachel. Marketing will push back on that. But if you tell me that the alternative is another Saturday, I think they'll accept it.
+[36:06] Them: Maya. We've seen other stores do waves, and their conversion didn't drop. If anything, it went up, because the site stayed fast.
+[36:15] Them: Priya. I can confirm that from the data, actually. We have two stores that switched to waves last year. Their conversion rate on promo day went up slightly, and the number of abandoned checkouts went down by about a third.
+[36:31] Them: Rachel. That's a good argument. Marketing will listen to numbers like that.
+[36:36] Them: Marcus. And on the integration side, what should we do on Black Friday? Pause the stock sync during the peak?
+[36:45] Them: Daniel. Not pause. If you pause, stock goes out of date and you oversell again. But you could avoid pushing price updates during the peak. Prices for the promo should be set the night before, and only stock moves during the day.
+[37:01] Them: Marcus. That makes sense. We usually push the promo prices at six in the morning, an hour before. We can do it the evening before.
+[37:10] Them: Daniel. That's much better. Then during the peak, the only writes are stock changes from actual sales, which are small.
+[37:18] You: Daniel, what about our side? What's the capacity picture for four times a promo?
+[37:24] Them: Daniel. Honestly, with the fixes we discussed, the web layer and the database can handle it. What I'm less sure about is the payment provider. They have their own rate limits per merchant, and on Saturday we were already at about half of yours.
+[37:42] Them: Rachel. The payment provider has limits? Nobody told us that.
+[37:46] Them: Daniel. Most do. It's usually in the contract, as transactions per second. For your account, it's about fifty per second. At four times Saturday's peak, you'd be close.
+[37:59] Them: Rachel. That's our contract with them, not with you, right?
+[38:03] Them: Daniel. Right, it's your merchant account. But we see the errors when you hit it. It's worth asking them to raise it temporarily for Black Friday. Most providers do that if you ask in advance.
+[38:18] Them: Rachel. Marcus, do we know who our contact there is?
+[38:22] Them: Marcus. Finance has that relationship, not IT.
+[38:26] Them: Rachel. Let's talk about it after this call.
+[38:29] Them: Maya. Another thing some of our bigger stores use on peak days is a waiting room. When traffic goes above a threshold, new visitors see a friendly page saying "you're in line, you'll be in in about two minutes". It sounds bad, but customers accept it much better than a slow or broken site.
+[38:48] Them: Rachel. A queue? For a supermarket? I don't know. Our customers are not concert ticket buyers.
+[38:56] Them: Maya. It's only a safety net. If everything works, nobody ever sees it. It kicks in only if the site would otherwise get slow.
+[39:05] Them: Rachel. Hmm. As a safety net, maybe. I'd want to see what it looks like.
+[39:12] Them: Daniel. It's a feature we have, it's just not switched on for your store. It's a setting with a threshold. We could show it to you on a staging copy of your store some time, so you can see the page.
+[39:25] Them: Rachel. Let's decide that on the Monday call, not today. I need to think about it, and talk to marketing.
+[39:34] You: Fair, that's a good topic for the first Monday call.
+[39:39] Them: Priya. Can I raise caching? Most of the traffic on a promo morning is people looking at the same twenty products. Those pages could be served from cache, without touching the database at all.
+[39:53] Them: Daniel. They are, mostly. Product pages are cached for one minute. But the stock number on the page isn't, because it needs to be live. That's one database read per page view.
+[40:06] Them: Priya. Does it need to be live to the second? If it's ten seconds old, the worst case is that someone sees "in stock" and then gets "sorry, sold out" at checkout.
+[40:17] Them: Rachel. That happens anyway with popular promo items. Customers understand it, as long as they're not charged.
+[40:26] Them: Daniel. That's a good point. A ten-second cache on stock display would cut the database load from browsing to almost nothing. The real stock check still happens at checkout, so we never sell what isn't there.
+[40:40] You: That's a decision we can make on our side, it's a platform setting, not something special for Harbor Lane. Let's discuss it internally after this call.
+[40:51] Them: Daniel. Agreed, it affects all stores, so it needs a proper look.
+[40:56] Them: Marcus. And search? On Saturday, search was also slow for us.
+[41:02] Them: Daniel. Search was slow because it shares the database connection pool with checkout for the stock filter. "Show only products in stock". That's another live stock read.
+[41:13] Them: Marcus. So the stock buffer and the caching would help search too.
+[41:19] Them: Daniel. Yes. Everything comes back to stock reads, really. That's the main lesson from Saturday on our side.
+[41:27] Them: Rachel. I'm learning a lot about stock today. I thought stock was the boring part.
+[41:33] Them: Priya. Stock is never boring on promo day.
+[41:36] Them: Rachel. Can I ask about the mobile app? About a third of our orders come through the app now, and on Saturday the app had the same problems, I assume.
+[41:48] Them: Maya. Yes, the app talks to the same backend, so checkout was slow there too. Interestingly, the app users retried less. Priya, do you have that?
+[41:59] Them: Priya. I do. In the app, the pay button is disabled after the first tap until there's a response. So app users couldn't double-tap. The duplicates were almost all on the website.
+[42:12] Them: Rachel. So the app protected its users better than the website.
+[42:18] Them: Daniel. In that one respect, yes. The website button also gets disabled, but only after a short delay, and people with fast fingers got two clicks in. The backend fix makes that irrelevant, though: even if two requests arrive, only one payment goes through.
+[42:35] Them: Rachel. Good. Belt and braces.
+[42:38] Them: Marcus. What about push notifications? Our marketing team wants to send a push on Black Friday morning to app users, on top of the email. Is that more risk?
+[42:48] Them: Daniel. A push to all app users at once is the same cliff as the email, maybe sharper, because people open pushes faster than emails. If you do both at seven, the first five minutes are the hardest.
+[43:01] Them: Rachel. Then the push should go out later? After the first email wave?
+[43:06] Them: Daniel. That's what I'd do. Push at seven thirty, after the first wave has settled. The app users are your most loyal customers anyway, they'll come.
+[43:16] Them: Rachel. Marketing will hate me for all this. Waves, later pushes.
+[43:21] Them: Maya. If it helps, the numbers Priya mentioned about waves are from stores in a similar category. Groceries and household. Not fashion. The pattern held.
+[43:33] Them: Rachel. That helps. Marketing respects numbers from similar businesses more than technical arguments.
+[43:40] Them: Priya. I can share the anonymised comparison on one of the Monday calls if marketing wants to see it. It's not specific to any store, just the before and after shape.
+[43:51] Them: Rachel. Let's see if they ask. They might just take my word for it.
+[43:57] Them: Marcus. Another question. Our stores have in-store tablets that show the online stock for staff, so they can tell customers "it's available online". On Saturday, those showed wrong stock too. Are those reading from the same place?
+[44:13] Them: Daniel. Yes, they use the same API, with your key. Actually, wait. Are those tablets also polling stock every few seconds?
+[44:21] Them: Marcus. Every thirty seconds, I think, for every product page that's open.
+[44:26] Them: Daniel. Across forty stores, that's not huge, but it's another reader. Fine for now. In the rewrite, they could use the webhook data from your own system instead of asking us.
+[44:40] Them: Marcus. Makes sense, it's all part of the same picture.
+[44:46] Them: Rachel. I didn't even know those tablets talked to your system. I'm learning a lot about my own company today.
+[44:53] Them: Maya. That's usually how incident reviews go. Everyone learns something about their own side.
+[45:00] Them: Rachel. Can I ask one uncomfortable question? On Saturday, could anything else have gone wrong that didn't? I want to know what else could bite us on Black Friday that we haven't talked about.
+[45:14] You: That's a good question, and I appreciate you asking it. Daniel?
+[45:20] Them: Daniel. Honestly, two things I think about. One, the payment provider limit, which we discussed. Two, the email itself. Your email provider sends three hundred thousand emails, and every link in them goes to the same few product pages. If those pages aren't cached because of a tracking parameter in the URL, every click is a fresh page render. I checked, and on Saturday the tracking parameters did bypass our cache for some pages.
+[45:51] Them: Rachel. What does that mean in plain words?
+[45:55] Them: Daniel. It means the links in your email made our servers work harder than necessary. It wasn't the main cause, but it added load. The fix is on our side, ignoring tracking parameters for caching. It's a small configuration change, and it already went out on Sunday with the first emergency changes.
+[46:17] Them: Rachel. Okay. Anything else?
+[46:21] Them: Daniel. Nothing I know of. But I'd rather say "nothing I know of" than "nothing".
+[46:28] Them: Rachel. I appreciate that.
+[46:30] Them: Priya. From the data side, one more. Saturday's traffic was twelve times normal. If Black Friday is four times a normal promo, that could be fifty times a normal Saturday. We've never had a single store at fifty times. We don't know what breaks at fifty.
+[46:49] Them: Rachel. That's sobering.
+[46:52] Them: Daniel. Which is why the waves matter so much. With four waves, the peak is maybe fifteen to twenty times, which is close to what we just survived, with fixes in place.
+[47:05] Them: Rachel. Okay. Waves it is. It's really not optional anymore, is it.
+[47:11] Them: Maya. I'd say it's the single most effective thing on the list.
+[47:17] Them: Priya. Rachel, would it be useful if I walked you through what Saturday looked like from the customer side, in numbers? It might help with your CEO conversation, because it shows where the real damage was.
+[47:33] Them: Rachel. Yes, please. I only have the call center numbers.
+[47:37] Them: Priya. Okay. So on a normal promo day, about four percent of visitors place an order. On Saturday, between eight and nine, it was four and a half, slightly above normal, because the deals were good and the site was still fine. Between nine and eleven thirty, it dropped to one point two percent. After eleven thirty, when Daniel's team throttled the sync, it recovered to about three and a half.
+[48:04] Them: Rachel. So we lost most of the sales in those two and a half hours.
+[48:10] Them: Priya. A large part, yes. If the conversion had stayed at four percent, you'd have had roughly eleven thousand more orders in that window. Some of those people came back later in the day, and some on Sunday. When I look at returning visitors, about forty percent of the people who left during the slow period came back and bought something within forty-eight hours.
+[48:36] Them: Rachel. Forty percent came back. That's better than I feared.
+[48:40] Them: Priya. It's a rough estimate, but the pattern is clear. Loyal customers came back. New customers, the ones who came from the email for the first time, mostly didn't.
+[48:51] Them: Maya. That's an important nuance for the CEO conversation, I think. The loss is real, but it's concentrated in new customers.
+[49:00] Them: Rachel. Yes. Our marketing team spent a lot to acquire those new customers. So that's where it hurts.
+[49:07] Them: Priya. And one more number, about the double charges. Of the three hundred and twelve customers who were charged twice, twenty-eight have already placed another order since. So it hasn't driven everyone away. But I'd expect the social media complaints to come mostly from that group.
+[49:28] Them: Rachel. That matches what we see, yes.
+[49:32] You: Priya, these numbers should go into the incident report for Rachel's CEO. Not every detail, but the shape: what was lost, what came back.
+[49:43] Them: Priya. Sure, it's all in my notes, you can take whatever you need.
+[49:47] Them: Marcus. Out of curiosity, how do you know who came back? Do you track individual customers?
+[49:53] Them: Priya. Only within your store, and only as your store's customers. We see that a customer with a given account or email placed an order. We don't track them across other stores, and we don't share anything outside your account.
+[50:09] Them: Marcus. Okay, good. Our data protection officer will ask, so I wanted to know.
+[50:14] Them: Rachel. Can I ask a broader question, now that the urgent part is covered? I'd like to understand where your platform is going. We're thinking about the next two or three years, and frankly, Saturday made us ask whether you can grow with us.
+[50:32] Them: Maya. That's a fair question. What are you planning on your side?
+[50:37] Them: Rachel. Three things. First, click and collect. Customers order online and pick up in one of our forty stores. Right now we hack it with a "shipping method" called "pickup", and each store manages it by hand. Second, we want to show stock per store, so customers can see what's available in the store near them. Third, more marketplaces. We've started selling on Shopnest, and Marcus's team is managing that separately, which is painful.
+[51:07] Them: Marcus. Very painful. It's a second system for stock, with its own sync.
+[51:13] Them: Maya. That's really helpful, because two of those three are close to what we're working on. Marketplace integrations are a candidate for next year, and Shopnest specifically is the first one we're looking at. We had a call about it this week. I can't promise dates yet, but you're exactly the kind of customer it's for.
+[51:36] Them: Rachel. That would be a big deal for us. We'd test it as early as you let us.
+[51:43] Them: Maya. Noted. And click and collect: we have a basic pickup option, but not multi-location stock. That's a bigger piece of work. It's not on our plan for the next quarter, honestly.
+[51:56] Them: Rachel. How many of your customers ask for it?
+[51:59] Them: Maya. More every year. Mostly bigger retailers with physical stores, like you. It's on our list of candidates, but I don't want to give you a date I can't keep.
+[52:10] Them: Rachel. I appreciate that. I'd rather hear "not yet" than a date that slips.
+[52:15] Them: Daniel. On the technical side, multi-location stock is mostly a data model change. Stock today is one number per product. With locations, it's a number per product per location. Everything that reads stock has to change. Which, after today, we know is a lot of places.
+[52:33] Them: Rachel. Ha. Yes, I'm getting a feeling for that.
+[52:38] Them: Marcus. Our ERP already has stock per store. If you ever build it, we can send it per location from day one.
+[52:45] Them: Daniel. That would make it much easier. The hard part is usually getting the data, not storing it.
+[52:52] Them: Rachel. Okay. I'm not asking you to commit to anything today. I just needed to know whether these are on your radar. It sounds like they are.
+[53:03] You: They are. And what I'd suggest is that we use the Monday calls not just for promos, but also to keep you up to date on these. Maya can share what's coming when it's real.
+[53:16] Them: Rachel. That would be good.
+[53:18] Them: Priya. Can I ask you something, Rachel? From the analytics side. You said you want to show stock per store. Do you know how many of your online customers live near a store? Because if most do, click and collect could be a big share of your orders.
+[53:34] Them: Rachel. We estimate seventy percent live within ten kilometres of a store. We're a regional chain, we're everywhere in our area.
+[53:45] Them: Priya. That's very high. That makes the case for click and collect much stronger.
+[53:52] Them: Maya. That's a number I'll remember. Seventy percent.
+[53:56] Them: Rachel. Our CEO repeats it at every meeting.
+[54:01] Them: Maya. Rachel, can I ask how the last five years have been, apart from Saturday? It's useful for us to hear, and honestly, I'd like to know what we do well, not only what we did badly this week.
+[54:14] Them: Rachel. Sure. When we started with you, we were a chain with a very basic online shop. You were small too, I remember the first account manager answered emails at eleven at night. Since then, the checkout got much better, the mobile site is good, and the admin panel is something my team actually likes, which I can't say about most software. And until Saturday, honestly, our promos ran smoothly. Last Black Friday was a record and nothing broke.
+[54:45] Them: Maya. That's really good to hear. Thank you.
+[54:50] Them: Rachel. What's been harder: reporting. My team builds every report in Excel from exports. And integrations, which Marcus can tell you more about. Every time we add something, it's a project.
+[55:04] Them: Priya. Reporting is close to my heart, actually. We're working on seller analytics right now. It's early, but the plan is a dashboard with revenue, orders, best sellers, products that are viewed a lot but rarely bought.
+[55:21] Them: Rachel. That last one is something our category managers would love. They ask for it every quarter.
+[55:30] Them: Priya. That's the one every seller asks for. I can't give a date yet, but we're planning a small beta with a few stores in spring.
+[55:41] Them: Rachel. We'd be happy to be one of them. If that's possible.
+[55:45] Them: Maya. You'd be a great beta store, honestly, with your size. No promises yet, but noted.
+[55:51] Them: Rachel. Noted is enough for today.
+[55:53] Them: Marcus. And for integrations, the main pain is that every integration is a separate system for us. The ERP sync, Shopnest, the delivery companies. If your platform could be the hub, that would make my life much easier.
+[56:10] Them: Daniel. That's very much the direction, at least for marketplaces. Delivery companies we already connect directly.
+[56:18] Them: Marcus. Yes, the delivery part works well, that's true.
+[56:22] Them: Rachel. So, overall, I'd say: good partner, Saturday was bad, and the next few weeks decide whether it was a one-off. That's what I'll tell my CEO.
+[56:33] You: That's fair. And honestly, that's how I'd want to be judged too.
+[56:39] Them: Marcus. Before we wrap up, could Daniel walk us through the timeline once more, minute by minute? I need to write an internal note for our IT management, and I'd like to get the order of events right.
+[56:54] Them: Daniel. Of course. So, times are local, your time. Eight o'clock, the promo email goes out. Eight oh five, traffic starts climbing. By eight fifteen, it's at about twelve times a normal Saturday. Everything is fine at that point, response times are normal.
+[57:13] Them: Daniel. Eight twenty, your connector starts its regular sync, the one that runs every ten minutes. It sends a batch of about five thousand stock updates. Because the database is busy with promo traffic, the batch takes longer than usual. Your connector's timeout is thirty seconds. At eight twenty and thirty seconds, it times out and retries the whole batch.
+[57:37] Them: Marcus. And the first batch is still running on your side when the second arrives.
+[57:44] Them: Daniel. Exactly. Now there are two batches of five thousand updates, both holding locks. By eight thirty, when the next scheduled sync starts, there are already four or five copies running. Each one makes the others slower.
+[58:00] Them: Daniel. Eight forty, checkout response times start rising. Most customers don't notice yet, it's two or three seconds instead of one. Eight fifty, response times are around ten seconds. That's when people start double-clicking the pay button.
+[58:17] Them: Priya. And the first duplicate payment in the data is at eight fifty-three.
+[58:23] Them: Daniel. Nine oh five, the first automated alert fires. It's an alert on checkout response times. It comes to me, I'm on call. I look at the dashboards, I see high traffic, and I make the mistake of assuming it's just the promo. I add more web servers, which doesn't help, because the web servers are not the bottleneck.
+[58:45] Them: Rachel. So from nine to eleven, you were working on the wrong thing.
+[58:51] Them: Daniel. For the first hour, yes. At ten fifteen I noticed the number of active database connections from one API key, which was your connector. At first I thought it was an attack. At ten forty I confirmed it was your connector retrying. Then I had to decide what to do. I didn't want to block your connector entirely, because then your stock would stop updating completely.
+[59:18] Them: Marcus. You could have called me. Well, you didn't have my number.
+[59:22] Them: Daniel. Right. That's exactly why the escalation contact matters. At ten fifty, I put a temporary limit on your key, very low, two requests per second. The storm stopped within five minutes. Eleven ten, the database recovered. Eleven twenty, checkout times were back to normal. Eleven thirty, I raised the limit to something more reasonable, and the sync caught up over the next half hour.
+[59:49] Them: Maya. And I was paged at eleven, when Daniel realised it was customer-impacting for a specific store. That's when I updated the status page, at about twelve.
+[59:59] Them: Rachel. And called nobody.
+[60:03] Them: Maya. And called nobody. Yes.
+[60:05] Them: Marcus. That's very clear, thank you. One question: after eleven thirty, did any of the wrong stock numbers stay wrong?
+[60:14] Them: Daniel. Some, yes. Updates that arrived out of order left a few hundred products with stale stock until your next full sync on Sunday night. That's partly why oversold orders continued into the afternoon.
+[60:29] Them: Marcus. So we should have run a full sync manually on Saturday afternoon.
+[60:36] Them: Daniel. In hindsight, yes. Neither of us thought of it at the time.
+[60:41] Them: Rachel. Is that something that should be in a checklist? "After an incident, run a full sync"?
+[60:49] Them: Daniel. Yes. For any store with an ERP integration, a full resync after a sync incident makes sense. That's a good addition to our incident process.
+[60:59] You: Agreed. Let's put it in our runbook as a step for integration incidents.
+[61:06] Them: Marcus. Our runbook already has it for the nightly sync, actually. It just never occurred to us to use it during the day.
+[61:14] Them: Rachel. Good.
+[61:17] Them: Priya. Can I add one more observation from the data, for the timeline? Between ten and eleven, the number of customers who added items to the cart was still very high, almost normal. It was the checkout step that failed. So people were trying hard to buy. They wanted those deals.
+[61:37] Them: Rachel. That's both good and painful to hear.
+[61:41] Them: Maya. It's a sign that the promo itself worked. The demand was there.
+[61:48] Them: Marcus. Daniel, one more technical question, if I may. The timeout of thirty seconds in our connector. Is that too short, too long?
+[61:59] Them: Daniel. For a batch of two hundred, thirty seconds is plenty, a normal batch should take under a second. The important thing is not the timeout itself, it's what happens after it: wait before retrying, and wait longer each time. Thirty seconds, then sixty, then two minutes. And give up after a few attempts and alert someone, instead of retrying forever.
+[62:25] Them: Marcus. Our connector retries forever. That's the old code.
+[62:30] Them: Daniel. Then the config change helps, but the real fix is in your rewrite later. Until then, small batches and a long retry delay keep it safe.
+[62:40] Them: Marcus. Understood.
+[62:43] You: Okay, we're close to time. Let me go through everything we agreed, so we all leave with the same list. Rachel, Marcus, stop me if something is wrong.
+[62:55] You: Today. Daniel puts a rate limit of a hundred and fifty requests per second on your connector's key. I send Marcus the escalation number and steps. I send Rachel the customer statement about double charges and data safety for approval. Maya sends the bulk-cancel guide. Marcus sends his connector logs. Rachel decides the voucher amount with marketing. Maya sends the invite for the Monday calls.
+[63:21] Them: Rachel. Yes.
+[63:24] You: Tomorrow. Priya sends the list of duplicate charges by noon. Rachel's team confirms it, and Daniel runs the bulk refund the same day. Marcus changes the connector config in the morning: batch size two hundred, retry delay thirty seconds. Daniel sends Marcus our API logs for Saturday, filtered to your key.
+[63:46] Them: Marcus. Yes, that's right.
+[63:49] You: Before Thursday. Daniel deploys the double payment fix by Tuesday. Priya sets up the duplicate payment alert by Wednesday. Marcus sets a stock buffer of three on all promo products. I write the brief about your setup for our on-call engineers. Rachel sends the promo calendar by Friday. And on Thursday, Daniel and Marcus are both online from seven thirty.
+[64:15] Them: Daniel. Correct.
+[64:19] You: For your management. I send the incident report by Friday. Maya sends the service credit proposal by Monday at nine.
+[64:27] Them: Maya. Nine at the latest.
+[64:31] You: And to be clear about what we said no to: no dedicated engineer, no coverage of the vouchers, no refund of the non-duplicate promo orders. And Marcus is not rewriting the connector before the promo; that waits.
+[64:47] Them: Rachel. That's clear. And for the record, I think the "no" answers were fair, even if I didn't love them.
+[64:54] Them: Marcus. And I'm relieved about not rewriting the connector this week, honestly.
+[65:00] Them: Rachel. Alex, Maya, everyone, thank you. I came into this call expecting to have a very difficult conversation, and I still had one, but I feel much better about Thursday than I did this morning.
+[65:14] You: Thank you, Rachel. We let you down on Saturday, and the only way to fix that is to do what we said, on time. You'll see it in the next few days.
+[65:24] Them: Maya. And talk on Monday.
+[65:27] Them: Rachel. Talk on Monday. Bye everyone.
+[65:30] Them: Marcus. Thanks, bye.
+[65:32] Them: Daniel. Bye.
+[65:36] Them: Priya. Bye, take care.
+[65:39] You: Okay, they've dropped off. Let's take five more minutes, just us. Is everyone okay to stay?
+[65:47] Them: Maya. Yes.
+[65:51] Them: Daniel. Sure.
+[65:53] Them: Priya. Yes, I have time.
+[65:57] You: First, how do you feel that went?
+[66:00] Them: Maya. Better than I expected. Rachel came in ready to leave, I think. The CEO line wasn't a bluff. But by the end she was talking about being a beta store. That's a big shift.
+[66:13] Them: Priya. I think the numbers helped. When she heard forty percent came back, her face changed.
+[66:19] Them: Daniel. I felt bad during the timeline part, honestly. Saying out loud that I spent an hour adding web servers that didn't help.
+[66:28] You: Daniel, I want to say this clearly: that part is exactly why she trusted us by the end. You were honest about it. Nobody expects us to be perfect, they expect us to be straight.
+[66:42] Them: Maya. Agreed. Rachel said it herself, she appreciated the honesty.
+[66:46] Them: Daniel. Thanks. Still, it's a lesson. When the alert fires on a promo day, my first question should be "what's different from a normal busy day", not "add capacity".
+[66:57] Them: Priya. Honestly, the dashboards didn't help you either. There was no view that showed load by API key. You found it by digging.
+[67:07] Them: Daniel. True. A "top clients by database time" panel would have shown it in a minute.
+[67:15] You: That's a good thing for the incident review next week. Let's not design it now, but let's not lose it either.
+[67:24] Them: Maya. Can we talk about the service credit? I said I'd get approval. What do we think is fair? Our contract says ten percent of the monthly fee for availability below the SLA. Technically, the platform was up. Checkout was slow, not down.
+[67:40] Them: Priya. Technically up, but for two and a half hours conversion was a quarter of normal. For the customer, that's down.
+[67:48] Them: Maya. That's my view too. I'd argue for treating it as an availability breach. Ten percent, maybe a bit more as goodwill. It's a few thousand euros. Losing them would be a hundred times that.
+[68:02] You: I agree. Argue for it. If leadership pushes back, I'll back you up with the numbers Priya showed.
+[68:10] Them: Maya. Thank you, that helps.
+[68:12] Them: Daniel. Something I want to raise: the ten-second stock cache Priya suggested. I think it's a good idea, but it's a platform-wide change. There are stores where ten seconds matters, like the ones selling limited sneakers, where stock goes from fifty to zero in twenty seconds.
+[68:32] Them: Priya. For those, the checkout check still prevents overselling. They'd just see "in stock" a bit longer before getting "sold out" at checkout.
+[68:44] Them: Daniel. Which for a sneaker drop is a terrible experience. Hundreds of people add to cart and then get rejected.
+[68:52] Them: Maya. Could it be a setting per store? Default on, sneaker stores turn it off?
+[68:59] Them: Daniel. Possible. Or adaptive, cache only when the store is under heavy load. That's more complex.
+[69:08] You: Let's take this to the architecture review on Thursday. Not decide it in a debrief at the end of a long call. It's a real trade-off.
+[69:19] Them: Daniel. Agreed.
+[69:23] Them: Priya. Another thing. I was surprised Rachel didn't know about the payment provider limits. I wonder how many of our big stores don't know theirs.
+[69:34] Them: Maya. Probably most. Nobody reads that part of the provider contract.
+[69:40] Them: Daniel. We can see when a store gets close to its limit, the provider sends a specific error code. We just don't do anything with it.
+[69:51] Them: Priya. Then it's a simple query: which stores hit that error code in the last year. That's a list of stores to warn before Black Friday.
+[70:01] Them: Maya. That's a nice proactive thing for the account managers. A "before Black Friday" checklist for big stores: payment limits, waiting room, staggered emails, stock buffer.
+[70:14] You: I like that a lot. Turning Saturday into something every big store benefits from. Let's put it on the agenda for Monday's team meeting, and decide there who drives it. I don't want to hand out more tasks today, everyone just took on a lot.
+[70:31] Them: Maya. Fair. Monday.
+[70:35] Them: Daniel. One more honest thing. The rate limits on v1 keys. We've known for a year that they're basically unlimited. It's on the backlog. Saturday is what happens when a known risk sits on the backlog.
+[70:50] You: Yes. And that's exactly the argument for the v1 sunset we discussed in the roadmap. This is now a concrete example, with a cost. Maya, that goes into the roadmap discussion, not into today.
+[71:05] Them: Maya. Already in my notes.
+[71:09] Them: Priya. I'm also thinking about the double payment window. Was it really only Harbor Lane? Or did other stores have duplicates on Saturday, just fewer?
+[71:21] Them: Daniel. Good question. The lock fix covers everyone, but I don't know if other stores were affected.
+[71:28] Them: Priya. Actually, I can answer that, I ran it on Monday without the store filter. Only Harbor Lane had duplicates. They were the only store under that kind of load on Saturday morning.
+[71:40] Them: Daniel. Good. That's a relief.
+[71:42] You: Good. Then it's contained.
+[71:44] You: Okay. Thank you all. This was a hard week, and you handled the call really well. Go get some rest.
+[71:51] Them: Maya. Thanks, Alex.
+[71:55] Them: Daniel. Thanks.
+[71:58] Them: Priya. Bye.

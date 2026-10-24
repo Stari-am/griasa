@@ -7,8 +7,8 @@ import Foundation
 /// matching is greedy and one-to-one, quotes first. A prediction matches a gold
 /// promise when the two quotes are the same words (`QuoteMatch`, either way
 /// round, or a run of five words in common), otherwise when the owners are the
-/// same person and the tasks share enough words (Jaccard ≥ 0.3, words of three
-/// letters or more). Everything the scorer needs is in the files, so the same
+/// same person and the tasks share enough words (Jaccard ≥ 0.3 over word
+/// stems, `taskWords`), the most similar pairs first. Everything the scorer needs is in the files, so the same
 /// numbers come out on any Mac. Foundation only, for `test.sh`.
 enum BenchmarkScore {
     /// `meta.json`.
@@ -98,17 +98,21 @@ enum BenchmarkScore {
                 pairs.append(.init(gold: g, prediction: p, byQuote: true))
             }
         }
-        // Then the same owner and a similar task, the most similar first.
+        // Then the same owner and a similar task: every such pair, the most
+        // similar first, so one gold promise cannot take the prediction that
+        // another one fits better.
+        var candidates: [(g: Int, p: Int, similarity: Double)] = []
         for (g, item) in gold.enumerated() where !usedGold.contains(g) {
-            let candidates = predicted.indices.filter { !usedPrediction.contains($0)
-                && sameOwner(predicted[$0].owner, item.owner, meta: meta) }
-            let best = candidates.map { ($0, jaccard(predicted[$0].task, item.task)) }
-                .filter { $0.1 >= minJaccard }
-                .max { $0.1 < $1.1 }
-            if let (p, _) = best {
-                usedGold.insert(g); usedPrediction.insert(p)
-                pairs.append(.init(gold: g, prediction: p, byQuote: false))
+            for p in predicted.indices where !usedPrediction.contains(p)
+                && sameOwner(predicted[p].owner, item.owner, meta: meta) {
+                let similarity = jaccard(predicted[p].task, item.task)
+                if similarity >= minJaccard { candidates.append((g, p, similarity)) }
             }
+        }
+        candidates.sort { ($0.similarity, -$0.g, -$0.p) > ($1.similarity, -$1.g, -$1.p) }
+        for c in candidates where !usedGold.contains(c.g) && !usedPrediction.contains(c.p) {
+            usedGold.insert(c.g); usedPrediction.insert(c.p)
+            pairs.append(.init(gold: c.g, prediction: c.p, byQuote: false))
         }
         pairs.sort { $0.gold < $1.gold }
 
@@ -157,13 +161,39 @@ enum BenchmarkScore {
         return name
     }
 
-    /// Word overlap of two tasks, ignoring words shorter than three letters.
+    /// Word overlap of two tasks, over `taskWords`.
     static func jaccard(_ a: String, _ b: String) -> Double {
-        func words(_ s: String) -> Set<Substring> {
-            Set(QuoteMatch.normalize(s).split(separator: " ").filter { $0.count >= 3 })
-        }
-        let x = words(a), y = words(b)
+        let x = taskWords(a), y = taskWords(b)
         let union = x.union(y).count
         return union == 0 ? 0 : Double(x.intersection(y).count) / Double(union)
     }
+
+    /// The words of a task that say what it is, in a form that survives
+    /// Russian and Ukrainian endings: lower case, "ё" as "е", no punctuation or
+    /// quotes (`QuoteMatch.normalize`), no words shorter than three letters or
+    /// on `stopWords`, and each word cut to its first `stemLength` letters —
+    /// "мобильном" and "мобильное" are both "мобил", "технических" and
+    /// "Технические" both "техни". Crude, and meant to be: it is the same on
+    /// every Mac and needs no dictionary.
+    static func taskWords(_ text: String) -> Set<String> {
+        Set(QuoteMatch.normalize(text).split(separator: " ")
+            .filter { $0.count >= 3 && !stopWords.contains(String($0)) }
+            .map { String($0.prefix(stemLength)) })
+    }
+
+    static let stemLength = 5
+
+    /// Words of three letters or more that say nothing about the task.
+    static let stopWords: Set<String> = [
+        // ru
+        "для", "что", "это", "эти", "как", "при", "под", "над", "все", "всех", "всем", "его", "она", "они",
+        "или", "так", "уже", "тоже", "также", "еще", "чтобы", "после", "перед", "через", "без", "про",
+        "них", "нам", "вам", "мне", "себя", "свой", "свои", "этот", "этой", "этом",
+        // uk (words spelled as in ru are listed once, above)
+        "які", "який", "яка", "або", "після", "щоб", "від", "всіх", "цей", "цього", "також",
+        // en
+        "the", "and", "for", "with", "from", "into", "onto", "that", "this", "these", "those", "their", "them",
+        "they", "its", "our", "your", "his", "her", "all", "any", "about", "after", "before", "will", "then",
+        "than", "also", "out", "off", "via", "per",
+    ]
 }

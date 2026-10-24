@@ -81,7 +81,12 @@ one to one, greedily:
 2. **Then by owner and task.** For gold promises still unmatched, a found promise
    with the same owner — the user in any form ("You", "Alex", "Алекс"), or the
    same name in any script or by a listed alias — and a task sharing enough words
-   (Jaccard ≥ 0.3 over words of three letters or more) matches; the closest wins.
+   matches. Tasks are compared as sets of word stems (Jaccard ≥ 0.3): lower
+   case, "ё" as "е", no punctuation or quotes, no words under three letters or
+   on a short ru/uk/en stop-word list, and each word cut to its first five
+   letters, so "в мобильном приложении" and "в мобильное приложение" are the
+   same words. Every candidate pair is ranked and the most similar pairs are
+   taken first.
 
 One found promise matches one gold promise at most. Then:
 

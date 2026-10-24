@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.20 — 2026-10-24
+
+**The Claude Desktop extension is published with every release.** `Griasa.mcpb`
+is now attached to the GitHub release next to the disk image, so MCP directories
+and the official MCP Registry can list it and installers can check its hash. It
+is the same extension Settings → "Add to Claude Desktop" builds, and that button
+works as before. The extension now links Griasa's privacy policy.
+
+**A written privacy policy.** [stari-am.github.io/griasa/privacy.html](https://stari-am.github.io/griasa/privacy.html)
+says in one place what Griasa records, where it is kept, what goes to a cloud
+provider and only when you choose one, how long it stays and how to remove it.
+The README's privacy list links to it.
+
+**The project page no longer says a new install uses Ollama or LM Studio.** It
+uses Griasa's own engine; Ollama and LM Studio are still used when they are
+already there.
+
 ## 1.0.19 — 2026-10-19
 
 **Long meetings complete on the local model, and every promise keeps the words it

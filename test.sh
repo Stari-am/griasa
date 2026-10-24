@@ -48,6 +48,7 @@ swiftc -O \
   Sources/Griasa/QuoteMatch.swift \
   Sources/Griasa/LongMeetingMap.swift \
   Sources/Griasa/PromiseOwner.swift \
+  Sources/Griasa/BenchmarkScore.swift \
   Sources/Griasa/LanguageGuess.swift \
   Sources/Griasa/MeetingLanguage.swift \
   Sources/Griasa/Prompts.swift \
@@ -81,6 +82,7 @@ swiftc -O \
   Tests/LlamaServerChecks.swift \
   Tests/ResumeChecks.swift \
   Tests/LongMeetingChecks.swift \
+  Tests/BenchmarkChecks.swift \
   Tests/GrammarChecks.swift \
   Tests/main.swift \
   -o "$BIN"

@@ -57,17 +57,10 @@ final class MCPServer: ObservableObject {
         lastInstallMessage = nil
         isInstalling = true
         let destination = StoreRoot.file(MCPBundle.fileName)
-        let listings = MCPTools.listings
-        let tools = listings.map { (name: $0["name"] as? String ?? "",
-                                    description: $0["description"] as? String ?? "") }
+        let tools = Self.bundleTools()
         let version = Self.appVersion
-        // Snapshot of what the app answers now, handed over as bytes so it can
-        // cross to the background task; the bridge serves it while the app is shut.
-        let state = try? JSONSerialization.data(withJSONObject: [
-            "tools": listings,
-            "instructions": MCPEndpoint.instructions,
-            "versions": MCPEndpoint.legacyVersions,
-        ] as [String: Any])
+        // Handed over as bytes so it can cross to the background task.
+        let state = try? JSONSerialization.data(withJSONObject: Self.bundleSnapshot())
         // The icon is drawn with AppKit, so it is made here; zipping is the slow
         // part and runs off the main actor.
         let icon = Self.iconPNG()
@@ -105,6 +98,27 @@ final class MCPServer: ObservableObject {
                 self?.lastInstallMessage = "Claude Desktop could not open the extension: \(error.localizedDescription)"
             }
         }
+    }
+
+    private static func bundleTools() -> [(name: String, description: String)] {
+        MCPTools.listings.map { (name: $0["name"] as? String ?? "",
+                                 description: $0["description"] as? String ?? "") }
+    }
+
+    /// What the app answers now; the bridge serves it while the app is shut.
+    private static func bundleSnapshot() -> [String: Any] {
+        ["tools": MCPTools.listings,
+         "instructions": MCPEndpoint.instructions,
+         "versions": MCPEndpoint.legacyVersions]
+    }
+
+    /// `Griasa --build-mcpb <path>`: the same extension the Settings button
+    /// builds, written for release.sh to attach to the GitHub release, which is
+    /// where the MCP Registry points installers.
+    static func writeBundle(to destination: URL) throws {
+        _ = NSApplication.shared  // iconPNG reads NSApp
+        try MCPBundle.build(into: destination, appVersion: appVersion, tools: bundleTools(),
+                            iconPNG: iconPNG(), staticState: bundleSnapshot())
     }
 
     private static func iconPNG() -> Data? {

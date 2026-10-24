@@ -1,0 +1,37 @@
+{
+  "promises": [
+    {"owner": "Priya", "isMine": false, "task": "Pull the list of API v1 clients with traffic in the last 90 days, matched to accounts via billing data", "due": "Thursday", "quote": "I'll pull the list of v1 clients with traffic in the last ninety days"},
+    {"owner": "Иван", "isMine": false, "task": "Add Deprecation and Sunset headers to all API v1 responses", "due": "this sprint", "quote": "I'll add the Deprecation and Sunset headers to all v1 responses, this sprint"},
+    {"owner": "Иван", "isMine": false, "task": "Write the migration guide from API v1 to v1.5", "due": "by the end of the month", "quote": "I'll write the migration guide from v1 to v1.5 by the end of the month."},
+    {"owner": "Maya", "isMine": false, "task": "Email all API v1 integrators personally about the sunset date, with the migration guide", "due": "once the list and the guide are ready", "quote": "I'll email all the v1 integrators about the sunset date, with the guide attached."},
+    {"owner": "Даниил", "isMine": false, "task": "Set up ClickHouse on staging with a month of events to test real queries and volumes", "due": "about a week", "quote": "Я подниму ClickHouse на стейдже и залью туда события за месяц, чтобы посмотреть на реальные запросы и объёмы."},
+    {"owner": "Alex", "isMine": true, "task": "Write the architecture for the analytics event pipeline (outbox and view events)", "due": "by the next roadmap call", "quote": "I'll write up the architecture for the event pipeline, outbox plus the view events, by the next roadmap call"},
+    {"owner": "Priya", "isMine": false, "task": "Write the metric definitions doc for the seller dashboard", "due": "in two weeks", "quote": "I'll write the metric definitions doc for the dashboard"},
+    {"owner": "Maya", "isMine": false, "task": "Set up a technical call with the Shopnest partner team and ask for the NDA and seller numbers", "due": "next week", "quote": "I'll set up a call with the Shopnest partner team next week, and I'll ask for the NDA and the seller numbers at the same time."},
+    {"owner": "Иван", "isMine": false, "task": "Review the Shopnest API and sandbox and list questions for the call", "due": "this Friday", "quote": "Тогда я посмотрю их API в эту пятницу"},
+    {"owner": "Alex", "isMine": true, "task": "Fill in the Shopnest technical questionnaire", "due": "before the call", "quote": "I'll fill in the Shopnest technical questionnaire before the call, so they have it in advance."},
+    {"owner": "Maya", "isMine": false, "task": "Share the pricing proposal deck with the team before it goes to leadership", "due": "by Monday", "quote": "I'll share the pricing proposal deck with you all by Monday"},
+    {"owner": "Priya", "isMine": false, "task": "Sanity-check the revenue estimates in Maya's pricing deck", "due": "before Wednesday", "quote": "Okay, send it over when it's ready and I'll take a look before Wednesday."},
+    {"owner": "Tom", "isMine": false, "task": "Fix the two worst Android tablet bugs (rotation crash on order details, cut-off packing list)", "due": "next sprint", "quote": "So instead of the plan, I'll fix the two worst tablet bugs next sprint."},
+    {"owner": "Tom", "isMine": false, "task": "Send Priya the tablet crash breakdown by device model", "due": "tomorrow", "quote": "I'll send you the tablet crash breakdown by device model tomorrow"},
+    {"owner": "Priya", "isMine": false, "task": "Add the tablet share of processed orders to the monthly product report", "due": null, "quote": "And I'll add the tablet share of processed orders to the monthly product report from now on"},
+    {"owner": "Alex", "isMine": true, "task": "Post in the product channel that the tablet decision is reversed and why", "due": "today, right after the meeting", "quote": "Я напишу в общий продуктовый канал, что решение по планшетам отменили и почему."},
+    {"owner": "Даниил", "isMine": false, "task": "Make a list of SOC 2 gaps: what we have and what is missing", "due": "two weeks", "quote": "I'll make a list of the gaps for SOC 2, what we have and what's missing"},
+    {"owner": "Иван", "isMine": false, "task": "Prepare five or six starter tasks for the new backend engineer", "due": "by the end of January", "quote": "Я подготовлю пять-шесть стартовых задач для нового бэкендера к концу января"},
+    {"owner": "Tom", "isMine": false, "task": "Ask Marek whether he can extend through March to build the analytics frontend, and at what cost", "due": "this week", "quote": "I'll ask Marek this week whether he can extend through March and do the analytics frontend"},
+    {"owner": "Alex", "isMine": true, "task": "Put together the Q1 timeline draft with owners, dependencies, risks and what slips first", "due": "by Wednesday", "quote": "I'll put together the Q1 timeline draft with all of this by Wednesday"}
+  ],
+  "traps": [
+    {"quote": "I'll write the deprecation plan for the tablet layouts by next Friday", "note": "Cancelled: the tablet decision is reversed later in the meeting and Tom says he won't write the plan."},
+    {"quote": "Тогда, когда Том напишет план, я уберу планшетные эмуляторы из CI.", "note": "Cancelled with the tablet decision: Daniel keeps the emulators."},
+    {"quote": "Then let's decide: we drop the dedicated Android tablet layouts in Q1.", "note": "A decision reversed an hour later after Priya's data. Not a promise; anything built on it is wrong."},
+    {"quote": "Priya, while you're on it, could you also build a churn prediction model for sellers?", "note": "Declined by Priya (not this quarter)."},
+    {"quote": "Priya, can you pull the list of API v1 clients", "note": "Alex's request to Priya. The promise is Priya's reply, not Alex's."},
+    {"quote": "One day we should really have proper API analytics", "note": "Someday talk, explicitly not this quarter."},
+    {"quote": "когда-нибудь у нас будет своя BI-система для всех внутренних отчётов", "note": "A dream, said as such."},
+    {"quote": "Мне кажется, когда-нибудь мы и бэкенд на Kotlin перепишем", "note": "A joke, withdrawn at once."},
+    {"quote": "If the number is reasonable, I'll fight for it", "note": "Conditional support for a budget, not a task."},
+    {"quote": "I'll keep it on my list, it's a good interview topic.", "note": "A vague intention about a future interview topic."},
+    {"quote": "Если будет запись, скину ссылку.", "note": "Conditional small talk during the break."}
+  ]
+}

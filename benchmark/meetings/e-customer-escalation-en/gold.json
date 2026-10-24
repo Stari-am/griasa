@@ -1,0 +1,35 @@
+{
+  "promises": [
+    {"owner": "Priya", "isMine": false, "task": "Send the list of duplicate charges with order numbers and amounts, already-refunded ones marked", "due": "by tomorrow noon", "quote": "I'll send you a list of all duplicate charges with order numbers and amounts by tomorrow noon"},
+    {"owner": "Daniel", "isMine": false, "task": "Run the bulk refund for the duplicate charges once the list is confirmed, and send a confirmation file", "due": "the same day the list is confirmed", "quote": "I'll run the bulk refund for the duplicates the same day"},
+    {"owner": "Rachel", "isMine": false, "task": "Decide the voucher amount for oversold orders with marketing", "due": "today", "quote": "I'll decide the amount with marketing today."},
+    {"owner": "Maya", "isMine": false, "task": "Send Harbor Lane a guide with screenshots for bulk-cancelling orders with a message", "due": "this afternoon", "quote": "I'll send you a short guide with screenshots this afternoon"},
+    {"owner": "Alex", "isMine": true, "task": "Write a customer-facing statement about the double charges and data safety and send it to Rachel for approval", "due": "today", "quote": "I'll write a customer-facing statement about the double charges and data safety today"},
+    {"owner": "Daniel", "isMine": false, "task": "Set a rate limit (150 req/s) on Harbor Lane's connector API key", "due": "today", "quote": "I'll set the rate limit on your connector's key today"},
+    {"owner": "Marcus", "isMine": false, "task": "Change the connector config: batch size 200, retry delay 30 seconds", "due": "tomorrow morning", "quote": "I'll change the batch size and the retry delay in the config tomorrow morning."},
+    {"owner": "Daniel", "isMine": false, "task": "Deploy the double payment fix (lock before calling the provider), tested under load on staging", "due": "by Tuesday", "quote": "I'll have the double payment fix deployed by Tuesday"},
+    {"owner": "Priya", "isMine": false, "task": "Set up a platform-wide duplicate payment alert", "due": "by Wednesday", "quote": "I'll set up the duplicate payment alert by Wednesday."},
+    {"owner": "Marcus", "isMine": false, "task": "Set a stock buffer of three on all promo products", "due": "before Thursday", "quote": "Then I'll set a stock buffer of three for all the promo products before Thursday."},
+    {"owner": "Alex", "isMine": true, "task": "Send Marcus the on-call escalation number and steps", "due": "today", "quote": "I'll send Marcus the on-call escalation number and the escalation steps today"},
+    {"owner": "Alex", "isMine": true, "task": "Write a brief about Harbor Lane's setup for all on-call engineers", "due": "before Thursday", "quote": "I'll write a short brief about your setup for all our on-call engineers before Thursday"},
+    {"owner": "Daniel", "isMine": false, "task": "Actively watch Harbor Lane's store, database and connector on promo day from 7:30", "due": "Thursday", "quote": "on Thursday I'll be online from seven thirty, watching your store's traffic"},
+    {"owner": "Marcus", "isMine": false, "task": "Be online from 7:30 on promo day", "due": "Thursday", "quote": "I'll be online from seven thirty too."},
+    {"owner": "Maya", "isMine": false, "task": "Set up a weekly Monday call with Harbor Lane until the end of January and send the invite", "due": "invite today", "quote": "I'll set up a weekly Monday call with your team until the end of January"},
+    {"owner": "Rachel", "isMine": false, "task": "Send Maya the promo calendar with dates and expected email sizes", "due": "by Friday", "quote": "I'll send Maya our promo calendar with all the dates and the expected email sizes by Friday."},
+    {"owner": "Alex", "isMine": true, "task": "Write a plain-language incident report for Harbor Lane's CEO", "due": "by Friday", "quote": "I'll write an incident report for your CEO"},
+    {"owner": "Maya", "isMine": false, "task": "Get approval for a service credit and send Harbor Lane a proposal", "due": "by Monday 9:00", "quote": "I'll get approval for a service credit and send you a proposal by Monday"},
+    {"owner": "Daniel", "isMine": false, "task": "Send Marcus Saturday's API logs filtered to their key", "due": "by tomorrow", "quote": "I'll filter them to your API key and send you the API logs for Saturday by tomorrow"},
+    {"owner": "Marcus", "isMine": false, "task": "Send Daniel the connector logs for Saturday", "due": "today", "quote": "And I'll send you our connector logs for the same period today"}
+  ],
+  "traps": [
+    {"quote": "I'll rewrite the ERP connector against the new API before Thursday", "note": "Cancelled a few lines later: Marcus changes the config instead and the rewrite waits until after the promo season."},
+    {"quote": "Can we have a dedicated engineer for our account?", "note": "Declined by Alex."},
+    {"quote": "Could you cover those?", "note": "Rachel asks Harbor Lane's vouchers to be covered; Maya declines."},
+    {"quote": "I want to be straight with you: we can't do that.", "note": "Declined: refunding every promo order, not only the duplicates."},
+    {"quote": "Priya, can you get a final list of the duplicate payments", "note": "Alex's request to Priya. The promise is Priya's reply, not Alex's."},
+    {"quote": "I can't promise dates yet", "note": "Explicitly not a promise about Shopnest."},
+    {"quote": "If leadership pushes back, I'll back you up with the numbers Priya showed.", "note": "Conditional support in the internal debrief, not a task."},
+    {"quote": "I can share the anonymised comparison on one of the Monday calls if marketing wants to see it.", "note": "Conditional offer; Rachel says marketing may not ask."},
+    {"quote": "That's what I'll tell my CEO.", "note": "Talk, not a task."}
+  ]
+}

@@ -39,6 +39,16 @@ enum GriasaMain {
             let cloud = args.firstIndex(of: "--cloud").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
             await LongMeetingEval.run(count: count, cloudRaw: cloud)
         }
+        // `Griasa --benchmark benchmark/meetings [--cloud <provider>] [--only a,b]`
+        // runs the same three versions on the public, invented meetings and scores
+        // their promises against gold.json. Reads no store; writes dist/benchmark-<date>/.
+        if let flag = args.firstIndex(of: "--benchmark") {
+            let directory = args.count > flag + 1 ? args[flag + 1] : "benchmark/meetings"
+            let cloud = args.firstIndex(of: "--cloud").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
+            let only = args.firstIndex(of: "--only").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
+                .map { Set($0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }) }
+            await BenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
+        }
         if let flag = args.firstIndex(of: "--build-mcpb"), args.count > flag + 1 {
             let destination = URL(fileURLWithPath: args[flag + 1])
             do {

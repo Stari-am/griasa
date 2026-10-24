@@ -141,6 +141,15 @@ works on a machine with only the Command Line Tools. Each failure message states
 the rule and why it matters, because "expected true, got false" tells whoever reads
 it nothing.
 
+**Benchmark.** How well Griasa finds promises is measured on six invented
+meetings in [`benchmark/`](benchmark/README.md) — Russian, English, Ukrainian and
+mixed, from a 12,000-character sync to a 90,000-character roadmap session — each
+with the promises a person marked by hand. `"Griasa Dev.app/Contents/MacOS/Griasa"
+--benchmark benchmark/meetings` runs today's single pass, the long-meeting path
+and (with `--cloud <provider>`) a cloud reference on them and prints recall,
+precision and mine/theirs accuracy. Nobody in them is real, so anyone can rerun
+it and compare.
+
 ## Distribute it yourself
 
 ```sh

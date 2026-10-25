@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.21 — 2026-10-25
+
+**Promises read back at the end of a meeting are no longer counted twice.**
+When someone reads the action items back ("Даня — план миграции с откатом,
+Ваня — пуши…"), each item is matched to the promise as it was made earlier in
+the call, which keeps its quote, time and owner. A promise first heard on an
+unnamed "Them" line now takes the name the read-back gives it. On a long
+benchmark meeting this cut the promises found by the on-device AI from 50 to 38
+for 27 real ones.
+
+**Names are matched across spellings.** "You" in a model's answer is you. "Алекс"
+is "Alex", "Аня" is "Anya", "Ваня" is "Vanya", "Юля" is "Julia". A timestamp or
+bold copied into a name ("[55:35] Alex") is ignored. Before, a Cyrillic spelling of
+your own name could file your promises under someone else.
+
+**A public benchmark.** `benchmark/` holds six invented meetings in Russian,
+English, Ukrainian and a mix, with 141 promises checked by hand, and
+`Griasa --benchmark` scores the on-device and cloud models against them.
+Anyone can run it on their own Mac; no real meeting is involved.
+
+**Install with Homebrew.** `brew install --cask stari-am/tap/griasa` installs the
+app with both engines it uses.
+
 ## 1.0.20 — 2026-10-24
 
 **The Claude Desktop extension is published with every release.** `Griasa.mcpb`

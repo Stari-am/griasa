@@ -42,11 +42,15 @@ enum GriasaMain {
         // `Griasa --benchmark benchmark/meetings [--cloud <provider>] [--only a,b]`
         // runs the same three versions on the public, invented meetings and scores
         // their promises against gold.json. Reads no store; writes dist/benchmark-<date>/.
+        // With `--rescore <results dir>` it runs no model and re-scores what a run saved there.
         if let flag = args.firstIndex(of: "--benchmark") {
-            let directory = args.count > flag + 1 ? args[flag + 1] : "benchmark/meetings"
+            let directory = args.count > flag + 1 && !args[flag + 1].hasPrefix("--") ? args[flag + 1] : "benchmark/meetings"
             let cloud = args.firstIndex(of: "--cloud").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
             let only = args.firstIndex(of: "--only").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
                 .map { Set($0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }) }
+            if let saved = args.firstIndex(of: "--rescore").flatMap({ args.count > $0 + 1 ? args[$0 + 1] : nil }) {
+                await BenchmarkRun.rescore(directory: directory, results: saved, only: only)
+            }
             await BenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
         }
         if let flag = args.firstIndex(of: "--build-mcpb"), args.count > flag + 1 {

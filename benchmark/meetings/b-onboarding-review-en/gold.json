@@ -19,13 +19,16 @@
     {"owner": "Alex", "isMine": true, "task": "Add CSV encoding detection to the list for Daniel", "due": null, "quote": "I'll put it on the list for Daniel too."},
     {"owner": "Maya", "isMine": false, "task": "Raise the pricing page problems with the web team", "due": null, "quote": "Fair, I'll raise it with them."},
     {"owner": "Maya", "isMine": false, "task": "Book a follow-up design review", "due": "the 20th", "quote": "I'll book a follow-up review for the 20th, same time, same people."},
-    {"owner": "Alex", "isMine": true, "task": "Post the meeting summary in the onboarding channel", "due": "right after this call", "quote": "I'll post the summary of this meeting in the onboarding channel right after this call."}
+    {"owner": "Alex", "isMine": true, "task": "Post the meeting summary in the onboarding channel", "due": "right after this call", "quote": "I'll post the summary of this meeting in the onboarding channel right after this call."},
+    {"owner": "Olena", "isMine": false, "task": "Add a per-country \"required fields\" hint to the invoice templates once she has the list", "due": "after Maya sends the compliance doc", "quote": "Good catch. I can add a \"required fields\" hint per country. But I need the list."},
+    {"owner": "Olena", "isMine": false, "task": "Write the copy for the three onboarding emails from Maya's structure", "due": "when the frames are done", "quote": "Sure, as long as it's short. Three emails, max a hundred words each?"}
   ],
   "traps": [
     {"quote": "I'll redo the illustrations for all five steps so it feels consistent.", "note": "Cancelled a few lines later: the team ships with plain icons and Olena says she won't redo them now."},
     {"quote": "No, sorry, I can't take that on this sprint", "note": "Declined: Maya asks Alex to fix the pricing page; Alex refuses and it goes to the web team."},
     {"quote": "Priya, can you add the onboarding step events", "note": "Alex's request to Priya. The promise is Priya's reply, not Alex's."},
     {"quote": "We should really do a proper design system audit at some point", "note": "Someday talk, explicitly not this quarter."},
-    {"quote": "Translations after the user tests.", "note": "A decision with no owner, not a promise."}
+    {"quote": "Translations after the user tests.", "note": "A decision with no owner, not a promise."},
+    {"quote": "If I have it Wednesday I can mock it Thursday.", "note": "Conditional on Alex's contract; a plan, not a promise of its own."}
   ]
 }

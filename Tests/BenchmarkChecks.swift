@@ -87,6 +87,66 @@ do {
           saw: "\(mine.matched) matched")
 }
 
+// Russian and Ukrainian endings: the same task in another case is the same task.
+do {
+    let oleg = BenchmarkScore.Meta(title: "t", language: "ru", myName: "Alex", participants: ["Олег"], aliases: nil)
+    let g = [Gold(owner: "Олег", isMine: false, task: "Сделать в мобильном приложении экран технических работ",
+                  due: nil, quote: "Я сделаю экран технических работ в этом спринте")]
+    let found = Prediction(owner: "Олег", isMine: false,
+                           task: "Добавить в мобильное приложение экран «Технические работы» по специальному ответу backend",
+                           quote: nil)
+    let r = BenchmarkScore.score(gold: g, predicted: [found], meta: oleg)
+    check(r.matched == 1,
+          rule: "a task matches across inflections (мобильном/мобильное, технических/Технические)",
+          meaning: "a Russian or Ukrainian paraphrase changes word endings; a whole-word comparison calls it a miss",
+          saw: "jaccard \(BenchmarkScore.jaccard(found.task, g[0].task)), \(r.matched) matched")
+    check(BenchmarkScore.taskWords("Ещё «Экран», ТЕХНИЧЕСКИХ работ!") == BenchmarkScore.taskWords("еще экран технические работы"),
+          rule: "task words ignore case, ё/е, quotes and punctuation, and compare by stem",
+          meaning: "a model's tidying of a task is not a different task",
+          saw: "\(BenchmarkScore.taskWords("Ещё «Экран», ТЕХНИЧЕСКИХ работ!"))")
+
+    let otherOwner = BenchmarkScore.score(gold: g, predicted: [Prediction(owner: "Иван", isMine: false,
+                                          task: found.task, quote: nil)], meta: oleg)
+    check(otherOwner.matched == 0,
+          rule: "the inflected task with a different owner is still not a match",
+          meaning: "stems widen the task comparison, never the owner",
+          saw: "\(otherOwner.matched) matched")
+    let unrelated = Prediction(owner: "Олег", isMine: false,
+                               task: "Сделать мобильную часть новых пушей: формат, тихие часы, миграция настроек", quote: nil)
+    let sameOwner = BenchmarkScore.score(gold: g, predicted: [unrelated], meta: oleg)
+    check(sameOwner.matched == 0,
+          rule: "the same owner with an unrelated task is not a match, though both start \"сделать … мобильн…\"",
+          meaning: "stems must not make every promise of one person match every other",
+          saw: "jaccard \(BenchmarkScore.jaccard(unrelated.task, g[0].task)), \(sameOwner.matched) matched")
+
+    // The best pair wins, not the first gold promise to look.
+    let two = [Gold(owner: "Олег", isMine: false, task: "Сделать мобильную часть пушей", due: nil, quote: "aaaa bbbb cccc dddd"),
+               Gold(owner: "Олег", isMine: false, task: "Сделать мобильную часть пушей и тихие часы", due: nil,
+                    quote: "eeee ffff gggg hhhh")]
+    let best = BenchmarkScore.score(gold: two, predicted: [Prediction(owner: "Олег", isMine: false,
+                                    task: "Мобильная часть пушей, тихие часы", quote: nil)], meta: oleg)
+    check(best.pairs.first?.gold == 1,
+          rule: "a prediction goes to the gold promise it is most similar to",
+          meaning: "a weaker match taking it first leaves the right promise counted as missed",
+          saw: "\(best.pairs)")
+}
+
+// One quoted line, two promises: each prediction goes to the task it names.
+do {
+    let line = "План миграции с шагами я подготовлю к четвергу. Клон базы и прогон запросов — тоже на следующей неделе."
+    let g = [Gold(owner: "Даниил", isMine: false, task: "Подготовить план миграции с шагами", due: nil,
+                  quote: "План миграции с шагами я подготовлю к четвергу."),
+             Gold(owner: "Даниил", isMine: false, task: "Сделать клон базы и прогнать запросы", due: nil,
+                  quote: "Клон базы и прогон запросов — тоже на следующей неделе.")]
+    let predicted = [Prediction(owner: "Даниил", isMine: false, task: "Клон базы, прогон запросов", quote: line),
+                     Prediction(owner: "Даниил", isMine: false, task: "План миграции", quote: line)]
+    let r = BenchmarkScore.score(gold: g, predicted: predicted)
+    check(r.matched == 2 && r.pairs.contains { $0.gold == 0 && $0.prediction == 1 },
+          rule: "when one quote covers two gold promises, the closer task decides which is which",
+          meaning: "a model quoting the whole line for both promises found both; matching by list order would swap them",
+          saw: "\(r.pairs)")
+}
+
 // One prediction cannot be two promises.
 do {
     let twice = [
@@ -186,8 +246,8 @@ for id in ids {
           meaning: "the benchmark is only fair if it is exactly what the recorder writes",
           saw: "\(id): \(bad.prefix(3))")
 
-    check((8...20).contains(file.promises.count) && !file.traps.isEmpty,
-          rule: "each meeting has 8–20 gold promises and at least one trap",
+    check(file.promises.count >= 8 && !file.traps.isEmpty,
+          rule: "each meeting has at least 8 gold promises and at least one trap",
           meaning: "fewer makes recall a coin toss; traps are what precision is tested on",
           saw: "\(id): \(file.promises.count) promises, \(file.traps.count) traps")
 

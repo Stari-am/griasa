@@ -85,8 +85,11 @@ The short version is below; the full policy is at [stari-am.github.io/griasa/pri
 With Homebrew, one command installs the app and both engines it uses (whisper.cpp for speech, llama.cpp for the on-device AI):
 
 ```sh
+brew trust --cask stari-am/tap/griasa
 brew install --cask stari-am/tap/griasa
 ```
+
+Homebrew 7 loads casks from taps outside its own only after you trust them; the first line does that for this one cask.
 
 Free, and nothing is held back: there is no license check, and under GPL-3.0 there could not be a meaningful one. If it saves you time, [$29 on Ko-fi would make my day — any amount does](https://ko-fi.com/griasa), and none is fine too.
 

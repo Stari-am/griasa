@@ -155,19 +155,62 @@ enum PromiseDuplicate {
 
     /// Index of the earlier copy of this promise, if there is one: the same
     /// words for the same owner; the same quoted sentence with similar wording;
-    /// or the same owner and nearly the same wording.
+    /// the same owner and nearly the same wording; or — the recap at the end of
+    /// a meeting ("Даня — план миграции с откатом") — the same work in other
+    /// words for the same person, or for a "Them" nobody could name yet.
     static func duplicate(text: String, owner: String, quote: String?, of seen: [Seen]) -> Int? {
         let t = QuoteMatch.normalize(text), o = owner.lowercased()
         let q = quote.map(QuoteMatch.normalize) ?? ""
         let words = Set(t.split(separator: " "))
+        let stems = stems(of: t)
         for (index, s) in seen.enumerated() {
             let similarity = jaccard(words, Set(s.text.split(separator: " ")))
             if s.text == t, s.owner == o { return index }
             if !q.isEmpty, s.quote == q, similarity >= 0.5 { return index }
             if s.owner == o, similarity >= 0.8 { return index }
+            if sameOwner(s.owner, o), restates(stems, self.stems(of: s.text)) { return index }
         }
         return nil
     }
+
+    /// An owner nobody could name: a "Them" line, or none at all.
+    static func isUnnamed(_ owner: String) -> Bool {
+        ["", "them"].contains(owner.lowercased())
+    }
+
+    /// The same person, or one side not yet named.
+    private static func sameOwner(_ a: String, _ b: String) -> Bool {
+        isUnnamed(a) || isUnnamed(b) || PromiseOwner.sameName(a, b)
+    }
+
+    /// One task wording contains the other: every stem of the shorter one when
+    /// it has two or three, three quarters of them when it has more. "Сделать
+    /// постмортем" against "Написать постмортем по инциденту до пятницы" is the
+    /// same work; "тест-план для bulk edit" against "базовый API для bulk edit" is not.
+    static func restates(_ a: Set<String>, _ b: Set<String>) -> Bool {
+        let shorter = min(a.count, b.count)
+        guard shorter >= 2 else { return false }
+        let shared = Double(a.intersection(b).count)
+        return shorter <= 3 ? shared == Double(shorter) : shared / Double(shorter) >= 0.75
+    }
+
+    /// Content words cut to five letters, so "мобильном" and "мобильное" meet;
+    /// task verbs and filler ("сделать", "make", "для") are left out.
+    static func stems(of normalized: String) -> Set<String> {
+        Set(normalized.split(separator: " ").compactMap { word -> String? in
+            let w = String(word)
+            guard w.count >= 3, !stopWords.contains(w) else { return nil }
+            return String(w.prefix(5))
+        })
+    }
+
+    private static let stopWords: Set<String> = [
+        "сделать", "сделаю", "сделает", "для", "это", "что", "как", "все", "всех", "всем", "при", "после",
+        "чтобы", "или", "его", "она", "они", "тоже", "уже", "так", "только", "через", "под", "над", "без",
+        "до", "про", "зробити", "зроблю", "щоб", "або", "після",
+        "make", "do", "the", "and", "for", "with", "from", "into", "that", "this", "will", "get", "set",
+        "up", "out", "all", "after", "before", "about", "our", "their", "them",
+    ]
 
     static func isDuplicate(text: String, owner: String, quote: String?, of seen: [Seen]) -> Bool {
         duplicate(text: text, owner: owner, quote: quote, of: seen) != nil

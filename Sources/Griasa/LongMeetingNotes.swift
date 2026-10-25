@@ -79,10 +79,15 @@ enum LongMeetingNotes {
                 let task = (action.task ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let entry = MapDraft(text: task, owner: who.owner, quote: action.quote)
                 if let earlier = PromiseDuplicate.duplicate(text: task, owner: who.owner, quote: action.quote, of: seen) {
-                    // The copy on the user's own line wins.
+                    // The copy on the user's own line wins; a recap that names
+                    // whose it is names the earlier copy too.
                     if who.isMine, who.located, !actions[earlier].isMine {
                         actions[earlier].isMine = true
                         actions[earlier].owner = who.owner
+                    } else if PromiseDuplicate.isUnnamed(actions[earlier].owner), !PromiseDuplicate.isUnnamed(who.owner) {
+                        actions[earlier].owner = who.owner
+                        seen[earlier] = PromiseDuplicate.entry(text: actions[earlier].text, owner: who.owner,
+                                                               quote: actions[earlier].quote)
                     }
                     continue
                 }

@@ -153,12 +153,13 @@ enum PromiseOwner {
     }
 
     /// "Айк", "Aik" and "aïk" are one name: transliterated to Latin, folded for
-    /// case and accents, with й/y read as i.
+    /// case and accents, with й/y read as i and x as ks ("Алекс" is "Alex").
     static func fold(_ name: String) -> String {
         let latin = name.applyingTransform(.toLatin, reverse: false) ?? name
         let folded = latin.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
         return folded.filter { $0.isLetter || $0.isNumber || $0 == " " }
             .replacingOccurrences(of: "j", with: "i").replacingOccurrences(of: "y", with: "i")
+            .replacingOccurrences(of: "x", with: "ks")
             .trimmingCharacters(in: .whitespaces)
     }
 
@@ -167,7 +168,7 @@ enum PromiseOwner {
     static func isMe(_ name: String, myName: String) -> Bool {
         let n = fold(name)
         if n.isEmpty { return false }
-        if n == "you" || n == "me" { return true }
+        if n == fold("you") || n == "me" { return true }  // fold reads y as i
         let mine = fold(myName)
         guard !mine.isEmpty else { return false }
         let first = mine.split(separator: " ").first.map(String.init) ?? mine

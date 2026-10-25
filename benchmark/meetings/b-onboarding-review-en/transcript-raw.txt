@@ -1,0 +1,108 @@
+[00:03] You: Hi everyone. Let's give it one more minute, Priya said she might be a bit late.
+[00:09] Them: Hey Alex. Maya here. No rush, I'm still finding the right Figma link anyway.
+[00:15] Them: Hi, it's Olena. I shared the file in the chat, the page is called Onboarding v3.
+[00:20] Them: Tom here, hi all. Got it open.
+[00:24] Them: Sorry, sorry, Priya here, I was stuck in another call that ran over. Did I miss anything?
+[00:32] You: No, perfect timing, we're just starting. So, the goal for today: walk through Olena's new onboarding flow, agree what changes, and leave with a list of who does what so it can go into the next sprint. Olena, do you want to drive?
+[00:49] Them: Sure. So, quick recap of why we're doing this. Right now about forty percent of new workspaces never get past the import step. People sign up, they see an empty dashboard, they get asked to upload a spreadsheet of their clients, and they leave. Maya and I looked at the session recordings last week and the pattern is very clear.
+[01:12] Them: Yeah, Maya here, just to add a number: of the people who do finish the import, almost seventy percent are still active after a month. So the import step is basically the whole game.
+[01:25] You: Okay. So the new flow tries to get people through import faster.
+[01:31] Them: Right. Five steps instead of three, which sounds worse, but each step is tiny. Step one is your company name and logo. Step two, invite a teammate, which you can skip. Step three is the import, but now with a sample file you can download and a preview of what we parsed. Step four is your first invoice template. Step five is a little checklist that stays on the dashboard.
+[01:57] Them: Tom here. Quick question on step two. If they skip the invite, do we nag them later?
+[02:05] Them: Once, on day three, with an email. Not in the app.
+[02:08] You: I like that. Let's look at step three in detail, since that's the one that matters.
+[02:14] Them: So on step three you drag a file in or click to browse. While we parse it, there's a progress bar. Then you see a table with the first ten rows and the columns we detected, and you can remap a column if we guessed wrong. Then you confirm.
+[02:30] Them: The progress bar is new, we don't have a component for that. Our current spinner is just a spinner. I'd want a real determinate progress bar for big files, otherwise people think it's frozen. I'll spike the progress bar component tomorrow and see if the upload API even gives us progress events.
+[02:52] You: It should, the upload goes through the signed URL, so the browser knows the bytes. Parsing is the part that doesn't report progress.
+[03:02] Them: Then maybe two phases, upload with a real bar, parsing with an indeterminate one. I'll check tomorrow.
+[03:09] Them: Priya here. How big are these files in practice? Because the preview table assumes we parse the whole thing before showing anything.
+[03:20] Them: Most are tiny, a few hundred rows. But we've seen accountants upload files with twenty thousand clients.
+[03:29] You: And the import service has a size limit, I think it's ten megabytes, but I'm honestly not sure if that's still true after Daniel's rewrite. I'll ask Daniel whether the import service can take files over ten megabytes now, and what happens if it can't.
+[03:47] Them: Thanks. Because if it fails at eleven megabytes with a generic error, the whole new flow is pointless for exactly the customers we care about.
+[03:56] 📝 NOTE: Ask Daniel: import size limit after rewrite?
+[03:57] You: Right. Olena, on the preview, what happens when a column can't be detected at all?
+[04:04] Them: Then it's shown in amber with "Choose a field" and you have to pick one or mark it as ignored. You can't confirm until every column is mapped or ignored.
+[04:15] Them: Tom again. That blocking behavior worries me a little. If someone has thirty columns of junk, that's thirty dropdowns.
+[04:23] Them: Good point. Maybe an "Ignore all unmatched" link at the top?
+[04:29] You: Yeah, that's simple and it solves it. Let's do that.
+[04:34] Them: Okay, I'll add that. Small change.
+[04:37] You: Now, the API side. The preview needs a new endpoint, something like parse-preview, that returns detected columns and the first rows without committing anything. I'll write up the API contract for the preview endpoint by end of day Wednesday, so Tom isn't blocked on the frontend.
+[04:56] Them: That works. If I have it Wednesday I can mock it Thursday.
+[05:02] Them: Priya here. Can I ask about tracking? We currently have one event for "import completed" and that's it. If we're redesigning this, I'd really like events for each step, so we can see exactly where people drop.
+[05:16] You: Definitely. Priya, can you add the onboarding step events to the tracking plan? Just the names and properties, Tom can wire them up.
+[05:26] Them: Yes, I'll add the onboarding events to the tracking plan, step viewed, step completed, step skipped, with the step number. Probably early next week.
+[05:36] Them: And I'll wire them once they're in the plan, that's ten minutes per event.
+[05:42] You: Great. Priya, while we're at it, do we have the current funnel numbers per step? Not just for import.
+[05:49] Them: Not broken down that finely. But I can pull it from the raw events, it's a bit of SQL. I'll pull the funnel numbers for the current flow before Monday, so we have a baseline to compare against.
+[06:04] Them: Maya here, that baseline is really important, thank you. Otherwise in a month we'll be arguing about whether the new flow helped.
+[06:15] You: Okay. Step four, the invoice template. Olena?
+[06:19] Them: So here we show three templates, and the one we preselect is based on the country they entered in step one. We fill it with their logo so it already looks like their invoice. That's the moment people usually go "oh, nice".
+[06:36] Them: I love it. One thing though. In Germany and a few other countries, there's legally required stuff on an invoice, like a tax number. If we show them a template without it, it looks like we don't know what we're doing.
+[06:50] Them: Good catch. I can add a "required fields" hint per country. But I need the list.
+[06:56] You: Who has that list? Maya?
+[06:58] Them: The compliance doc from last year has it for the EU. I'll send Olena the compliance doc with the required invoice fields today.
+[07:07] Them: Thanks, Maya.
+[07:09] Them: And then there's the consent checkbox thing. Step one currently has the marketing emails checkbox pre-checked, and I'm pretty sure that's not okay in the EU.
+[07:20] Them: It's not, it has to be unchecked by default. But I'd rather have legal confirm the exact wording. I'll talk to legal about the consent checkbox wording and get back to you.
+[07:32] You: Thanks. Olena, until legal comes back, just make it unchecked.
+[07:37] Them: Already done in the latest frame.
+[07:41] You: Then step five, the checklist.
+[07:44] Them: Right, the checklist sits at the top of the dashboard: import clients, send first invoice, connect bank, invite teammate. Each one ticks off. It disappears when everything is done or when you dismiss it.
+[07:58] Them: Tom here. Is it per user or per workspace? Because if I invite a teammate, do they see "import clients" even though I already did it?
+[08:08] Them: Per workspace for the shared things, per user for "connect bank". Hmm, actually I didn't think about that properly. Let me think about it and put it in the spec.
+[08:19] You: Can you add that to the spec before Tom starts on it?
+[08:23] Them: Yes, I'll update the spec with the per-workspace versus per-user rules by Thursday, together with the other changes.
+[08:32] Them: Oh, and while I'm in there. I was planning to redo the illustrations for all five steps, the current ones are from the old brand. I'll redo the illustrations for all five steps so it feels consistent.
+[08:47] You: Hmm. How long would that take you?
+[08:49] Them: Honestly, a week, maybe more. Illustrations are slow.
+[08:53] Them: Maya here. I'd rather not block the release on illustrations. What if we use the plain icons from the design system for now and do illustrations later if the flow works?
+[09:06] You: I agree with Maya. Ship with icons, measure, then decide.
+[09:12] Them: Okay, that's fair. So I won't redo the illustrations now, icons it is. That actually frees up my week.
+[09:19] You: Good. Since that frees up your week, could you do some quick user tests on the new copy?
+[09:26] Them: Yes, I'd love that. I'll run five quick user tests with the new copy next week, unmoderated, through the panel we used in the summer.
+[09:37] Them: Priya here, can I sit in on the results? I want to see if the tracking events make sense to real people's paths.
+[09:44] Them: Of course, I'll add you to the doc.
+[09:47] You: Okay. Tom, anything on mobile? This is web first, but the iPhone app has the same onboarding.
+[09:53] Them: Right, so one bug I already know about. On small iPhones, the SE size, the keyboard covers the email field on the invite step. People literally can't see what they type. That's independent of the redesign, it's broken today. I can fix that this week, it's a scroll inset thing.
+[10:12] You: Please do, that's embarrassing. And the redesign on mobile?
+[10:16] Them: I'd do mobile one sprint after web, reuse the same API. If the preview endpoint is the same, mobile is mostly layout.
+[10:25] You: One more topic before we wrap. The onboarding emails. Right now there's the welcome email and the day-three nudge Olena mentioned. Who owns those?
+[10:35] Them: Maya here. Technically marketing, but in practice nobody. The welcome email still says "Welcome to the beta", which, you know, we left beta eighteen months ago.
+[10:46] Them: Oh no. I didn't know that.
+[10:48] Them: Yeah. I think the copy should come from us, because it has to match the steps. Olena, would you be okay writing the copy if I give you the structure?
+[10:58] Them: Sure, as long as it's short. Three emails, max a hundred words each?
+[11:04] Them: Perfect. Then I'll send you the structure for the three onboarding emails by Friday, and you turn it into copy whenever the frames are done.
+[11:14] You: And the sending itself is our email service, so no engineering work except the trigger for day three. Tom, that trigger, is that frontend or backend?
+[11:26] Them: Backend, it's a scheduled job. Not me. Probably Daniel's team.
+[11:32] You: Okay, then it goes with my question to Daniel, I'll just add it to the same message.
+[11:38] Them: Priya here. Can I bring up localisation? The current onboarding is English only, and something like a quarter of new signups are from Germany, Poland and Ukraine. If we're rewriting every string anyway, it's the cheapest moment to make them translatable.
+[11:57] Them: Tom. They're already in the strings file on web, actually. It's mobile where some are hardcoded.
+[12:05] Them: Then at least the new ones shouldn't be hardcoded. Can we make that a rule for this project?
+[12:13] You: Yes, agreed, no hardcoded strings in the new flow. Tom, you'll keep an eye on that in review?
+[12:20] Them: Yep, I'll check every PR for hardcoded strings, it's a quick grep anyway.
+[12:26] Them: And actual translations?
+[12:28] Them: Maya here. Not in this release. We'll ship English, measure, and if it works, translate. Translations for five steps and three emails are cheap, but I don't want to translate copy we're about to change after the user tests.
+[12:44] You: Makes sense. Translations after the user tests.
+[12:48] Them: Olena, quick thing about the sample file on step three. Is it a CSV or an Excel file?
+[12:54] Them: Both, I think. People on Windows mostly have Excel, and a CSV opened in Excel with the wrong encoding looks broken, especially with Polish or Ukrainian names.
+[13:06] Them: Priya. That's a real thing, by the way, we had three support tickets last month with broken characters in imported names. All CSVs saved from Excel in the old Windows encoding.
+[13:18] You: Then the preview step will show broken characters right in the table, which is actually good, people will notice before they confirm. But we should detect the encoding. That's again the import service. I'll put it on the list for Daniel too. My message to Daniel is getting long.
+[13:37] Them: Ha, Daniel's going to love you.
+[13:41] Them: Maya here. Alex, can you also take a look at the pricing page while you're in onboarding? It has the same old illustrations and the plan comparison table is wrong for annual billing.
+[13:53] You: No, sorry, I can't take that on this sprint, I've got the API contract and the import limit question, and the pricing page belongs to the marketing site anyway. Let's ask the web team.
+[14:05] Them: Fair, I'll raise it with them.
+[14:09] Them: Priya. One more thing, should we put this behind a feature flag? Roll out to ten percent first?
+[14:15] You: Yes, definitely. Tom, we can use the existing flag service, right?
+[14:19] Them: Yep. Flag per workspace, created at signup. Easy.
+[14:23] Them: We should really do a proper design system audit at some point, by the way. Half of these components are from three different eras.
+[14:32] Them: Ha, yes, someday. Not this quarter.
+[14:36] You: Someday. Okay, I think we have it. Maya, when do we look at this again?
+[14:42] Them: Once Olena has the revised frames and Tom has the spike. How about the 20th? I'll book a follow-up review for the 20th, same time, same people.
+[14:53] You: Works for me. Let me read back what I've got, so nobody walks away with a different list.
+[14:59] 📝 NOTE: Follow-up review on the 20th, Maya books.
+[15:00] You: Olena: revised frames with "Ignore all unmatched", spec update on per-workspace rules by Thursday, five user tests next week, no illustrations for now. Tom: progress bar spike tomorrow, the iPhone keyboard bug this week, wire tracking events when Priya's plan is ready. Priya: tracking plan early next week, baseline funnel before Monday. Maya: compliance doc to Olena today, legal on the consent wording, pricing page to the web team, follow-up on the 20th. Me: API contract for the preview endpoint by Wednesday, the size limit question for Daniel. Did I miss anything?
+[15:38] Them: Maya here. That's it. And can you post that in the channel? I'll never remember it otherwise.
+[15:45] You: Sure, I'll post the summary of this meeting in the onboarding channel right after this call.
+[15:52] Them: Thanks, Alex. Bye everyone.
+[15:54] Them: Bye!
+[15:58] Them: Thanks, bye.

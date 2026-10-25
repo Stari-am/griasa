@@ -15,17 +15,26 @@ import Foundation
 /// the files, on this Mac.
 @MainActor
 enum LongMeetingEval {
-    private struct Variant {
+    struct Variant {
         var seconds: Double?
         var promisesSeconds: Double?
-        var promises: Int?
+        var found: [Commitment]?
         var error: String?
+        var promises: Int? { found?.count }
     }
 
-    static func run(count: Int, cloudRaw: String?) async -> Never {
-        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("dist/eval-2026-10", isDirectory: true)
+    /// The three readings of one meeting: today's local single pass, the local
+    /// path in parts, and the cloud reference (when there is one).
+    struct Outcome {
+        var single = Variant(), chunked = Variant(), cloud = Variant()
+        var chunks = 0
+        var droppedActions = 0
+    }
 
+    /// Griasa's own engine, and the cloud reference: `--cloud <provider>`, or —
+    /// when `currentIfCloud` — the selected provider if it is a cloud one.
+    /// Exits with a message when there is no local model to evaluate.
+    static func configs(cloudRaw: String?, currentIfCloud: Bool) -> (local: LLMConfig, cloud: LLMConfig?) {
         guard let local = LLMConfig.ownEngine() else {
             print("No local model is downloaded for Griasa's own engine — nothing to evaluate.")
             exit(2)
@@ -41,11 +50,18 @@ enum LongMeetingEval {
                 exit(2)
             }
             cloud = LLMConfig.config(for: provider)
-        } else {
+        } else if currentIfCloud {
             let current = LLMConfig.current()
             cloud = current.runsOnThisMac ? nil : current
         }
         if let candidate = cloud, !candidate.isConfigured { cloud = nil }
+        return (local, cloud)
+    }
+
+    static func run(count: Int, cloudRaw: String?) async -> Never {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("dist/eval-2026-10", isDirectory: true)
+        let (local, cloud) = configs(cloudRaw: cloudRaw, currentIfCloud: true)
         print("local model: Griasa's own engine · cloud reference: \(cloud.map { $0.provider.rawValue } ?? "none (no cloud provider configured)")")
 
         // The N longest by the transcript on disk.
@@ -63,120 +79,18 @@ enum LongMeetingEval {
         let myName = ParticipantRoster.shared.myName
         for (index, meeting) in meetings.enumerated() {
             let raw = meeting.raw
-            let participants = meeting.entry.participants ?? []
-            let hasNotes = raw.contains("📝 NOTE:")
             let folder = root.appendingPathComponent(meeting.entry.id.uuidString, isDirectory: true)
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let chunkCount = TranscriptChunker.chunks(
-                raw, maxChars: TranscriptChunker.chunkSize(contextCharLimit: local.contextCharLimit)).count
-
-            var single = Variant(), chunked = Variant(), reference = Variant()
-            var droppedActions = 0
-
-            func timed<T>(_ work: () async throws -> T) async -> (T?, Double, String?) {
-                let started = Date()
-                do {
-                    let value = try await work()
-                    return (value, Date().timeIntervalSince(started), nil)
-                } catch {
-                    return (nil, Date().timeIntervalSince(started), error.localizedDescription)
-                }
-            }
-            func save(_ text: String, _ name: String) {
-                try? text.write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
-            }
-            func promises(of notes: String, config: LLMConfig, inParts: Bool, name: String,
-                          into variant: inout Variant, mapActions: [LongMeetingMap.MapAction]? = nil,
-                          timeout: TimeInterval? = nil) async {
-                let (found, seconds, error) = await timed {
-                    try await CommitmentExtractor.findCommitments(
-                        markdown: notes, rawTranscript: raw, mapActions: mapActions, timeout: timeout, participants: participants, myName: myName,
-                        sourceTitle: "eval", sourceEntryID: nil, config: config, inParts: inParts)
-                }
-                variant.promisesSeconds = seconds
-                if let error { variant.error = (variant.error.map { $0 + " · " } ?? "") + "promises: " + error }
-                guard let found else { return }
-                variant.promises = found.commitments.count
-                let list: [[String: Any]] = found.commitments.map { item in
-                    ["text": item.text, "owner": item.owner, "isMine": item.isMine,
-                     "dueHint": item.dueHint ?? NSNull(), "sourceQuote": item.sourceQuote ?? NSNull(),
-                     "sourceAt": item.sourceAt ?? NSNull()]
-                }
-                let document: [String: Any] = [
-                    "promises": list, "requests": found.requests, "proposed": found.proposed,
-                    "droppedForNoQuote": found.unquoted, "unreadableReplies": found.unreadable,
-                ]
-                if let data = try? JSONSerialization.data(withJSONObject: document,
-                                                          options: [.prettyPrinted, .sortedKeys]) {
-                    try? data.write(to: folder.appendingPathComponent(name))
-                }
-            }
-
-            // 1. Today's local single pass, truncated as today.
-            let (singleNotes, singleSeconds, singleError) = await timed {
-                try await MeetingTranscriber.aiFormat(
-                    raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
-                    allowCloudFallback: false, config: local, mode: .singlePass)
-            }
-            single.seconds = singleSeconds
-            single.error = singleError
-            if let singleNotes {
-                save(singleNotes, "single.md")
-                await promises(of: singleNotes, config: local, inParts: false, name: "promises-single.json", into: &single)
-            }
-
-            // 2. The new path.
-            let (chunkedOutput, chunkedSeconds, chunkedError) = await timed {
-                try await LongMeetingNotes.make(raw: raw, participants: participants, myName: myName,
-                                                hasNotes: hasNotes, allowCloudFallback: false, config: local)
-            }
-            chunked.seconds = chunkedSeconds
-            chunked.error = chunkedError
-            if let chunkedOutput {
-                droppedActions = chunkedOutput.droppedActions
-                save(chunkedOutput.markdown, "chunked.md")
-                save(chunkedOutput.partNotes.joined(separator: "\n\n"), "chunked-parts.md")
-                await promises(of: chunkedOutput.markdown, config: local, inParts: true,
-                               name: "promises-chunked.json", into: &chunked, mapActions: chunkedOutput.actions)
-            }
-
-            // 3. A cloud model reading the whole transcript in one request.
-            if let cloud {
-                let (cloudNotes, cloudSeconds, cloudError) = await timed {
-                    try await MeetingTranscriber.aiFormat(
-                        raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
-                        allowCloudFallback: false, config: cloud, mode: .singlePass, timeout: 900)
-                }
-                reference.seconds = cloudSeconds
-                reference.error = cloudError
-                if let cloudNotes {
-                    save(cloudNotes, "cloud.md")
-                    await promises(of: cloudNotes, config: cloud, inParts: false,
-                                   name: "promises-cloud.json", into: &reference, timeout: 300)
-                }
-            }
-
-            func json(_ v: Variant) -> [String: Any] {
-                ["notesSeconds": v.seconds.map { ($0 * 10).rounded() / 10 } ?? NSNull(),
-                 "promisesSeconds": v.promisesSeconds.map { ($0 * 10).rounded() / 10 } ?? NSNull(),
-                 "promises": v.promises ?? NSNull(), "error": v.error ?? NSNull()]
-            }
-            let timing: [String: Any] = [
-                "rawChars": raw.count, "chunks": chunkCount, "unquotedActionsDroppedInChunkedNotes": droppedActions,
-                "single": json(single), "chunked": json(chunked), "cloud": json(reference),
-            ]
-            if let data = try? JSONSerialization.data(withJSONObject: timing, options: [.prettyPrinted, .sortedKeys]) {
-                try? data.write(to: folder.appendingPathComponent("timing.json"))
-            }
+            let outcome = await runVariants(raw: raw, participants: meeting.entry.participants ?? [],
+                                            myName: myName, local: local, cloud: cloud, folder: folder)
 
             func cell(_ v: Variant) -> String {
                 guard let seconds = v.seconds else { return "failed" }
                 return String(format: "%.0fs+%.0fs", seconds, v.promisesSeconds ?? 0)
             }
             func count(_ v: Variant) -> String { v.promises.map(String.init) ?? "-" }
-            print("\(index + 1). \(meeting.entry.id.uuidString.prefix(8)) · \(raw.count) chars, \(chunkCount) chunks"
-                  + " · notes+promises seconds: single \(cell(single)), chunked \(cell(chunked)), cloud \(cell(reference))"
-                  + " · promises: single \(count(single)), chunked \(count(chunked)), cloud \(count(reference))")
+            print("\(index + 1). \(meeting.entry.id.uuidString.prefix(8)) · \(raw.count) chars, \(outcome.chunks) chunks"
+                  + " · notes+promises seconds: single \(cell(outcome.single)), chunked \(cell(outcome.chunked)), cloud \(cell(outcome.cloud))"
+                  + " · promises: single \(count(outcome.single)), chunked \(count(outcome.chunked)), cloud \(count(outcome.cloud))")
         }
 
         // No stop(): when Griasa itself is running, the probe adopted Griasa's
@@ -184,5 +98,117 @@ enum LongMeetingEval {
         // the probe started is adopted by the app later, or unloads when idle.
         print("\nfiles: \(root.path)/<entry-id>/ — nothing in any store was changed.")
         exit(0)
+    }
+
+    /// The three variants on one transcript. Writes, into `folder`: `single.md`,
+    /// `chunked.md`, `chunked-parts.md`, `cloud.md`,
+    /// `promises-{single,chunked,cloud}.json` and `timing.json`. Shared with
+    /// `BenchmarkRun`, so both probes measure exactly the same thing.
+    static func runVariants(raw: String, participants: [String], myName: String,
+                            local: LLMConfig, cloud: LLMConfig?, folder: URL) async -> Outcome {
+        let hasNotes = raw.contains("📝 NOTE:")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var outcome = Outcome()
+        outcome.chunks = TranscriptChunker.chunks(
+            raw, maxChars: TranscriptChunker.chunkSize(contextCharLimit: local.contextCharLimit)).count
+
+        func timed<T>(_ work: () async throws -> T) async -> (T?, Double, String?) {
+            let started = Date()
+            do {
+                let value = try await work()
+                return (value, Date().timeIntervalSince(started), nil)
+            } catch {
+                return (nil, Date().timeIntervalSince(started), error.localizedDescription)
+            }
+        }
+        func save(_ text: String, _ name: String) {
+            try? text.write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+        func promises(of notes: String, config: LLMConfig, inParts: Bool, name: String,
+                      into variant: inout Variant, mapActions: [LongMeetingMap.MapAction]? = nil,
+                      timeout: TimeInterval? = nil) async {
+            let (found, seconds, error) = await timed {
+                try await CommitmentExtractor.findCommitments(
+                    markdown: notes, rawTranscript: raw, mapActions: mapActions, timeout: timeout, participants: participants, myName: myName,
+                    sourceTitle: "eval", sourceEntryID: nil, config: config, inParts: inParts)
+            }
+            variant.promisesSeconds = seconds
+            if let error { variant.error = (variant.error.map { $0 + " · " } ?? "") + "promises: " + error }
+            guard let found else { return }
+            variant.found = found.commitments
+            let list: [[String: Any]] = found.commitments.map { item in
+                ["text": item.text, "owner": item.owner, "isMine": item.isMine,
+                 "dueHint": item.dueHint ?? NSNull(), "sourceQuote": item.sourceQuote ?? NSNull(),
+                 "sourceAt": item.sourceAt ?? NSNull()]
+            }
+            let document: [String: Any] = [
+                "promises": list, "requests": found.requests, "proposed": found.proposed,
+                "droppedForNoQuote": found.unquoted, "unreadableReplies": found.unreadable,
+            ]
+            if let data = try? JSONSerialization.data(withJSONObject: document,
+                                                      options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: folder.appendingPathComponent(name))
+            }
+        }
+
+        // 1. Today's local single pass, truncated as today.
+        let (singleNotes, singleSeconds, singleError) = await timed {
+            try await MeetingTranscriber.aiFormat(
+                raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
+                allowCloudFallback: false, config: local, mode: .singlePass)
+        }
+        outcome.single.seconds = singleSeconds
+        outcome.single.error = singleError
+        if let singleNotes {
+            save(singleNotes, "single.md")
+            await promises(of: singleNotes, config: local, inParts: false, name: "promises-single.json",
+                           into: &outcome.single)
+        }
+
+        // 2. The new path.
+        let (chunkedOutput, chunkedSeconds, chunkedError) = await timed {
+            try await LongMeetingNotes.make(raw: raw, participants: participants, myName: myName,
+                                            hasNotes: hasNotes, allowCloudFallback: false, config: local)
+        }
+        outcome.chunked.seconds = chunkedSeconds
+        outcome.chunked.error = chunkedError
+        if let chunkedOutput {
+            outcome.droppedActions = chunkedOutput.droppedActions
+            save(chunkedOutput.markdown, "chunked.md")
+            save(chunkedOutput.partNotes.joined(separator: "\n\n"), "chunked-parts.md")
+            await promises(of: chunkedOutput.markdown, config: local, inParts: true,
+                           name: "promises-chunked.json", into: &outcome.chunked, mapActions: chunkedOutput.actions)
+        }
+
+        // 3. A cloud model reading the whole transcript in one request.
+        if let cloud {
+            let (cloudNotes, cloudSeconds, cloudError) = await timed {
+                try await MeetingTranscriber.aiFormat(
+                    raw: raw, participants: participants, myName: myName, hasNotes: hasNotes,
+                    allowCloudFallback: false, config: cloud, mode: .singlePass, timeout: 900)
+            }
+            outcome.cloud.seconds = cloudSeconds
+            outcome.cloud.error = cloudError
+            if let cloudNotes {
+                save(cloudNotes, "cloud.md")
+                await promises(of: cloudNotes, config: cloud, inParts: false,
+                               name: "promises-cloud.json", into: &outcome.cloud, timeout: 300)
+            }
+        }
+
+        func json(_ v: Variant) -> [String: Any] {
+            ["notesSeconds": v.seconds.map { ($0 * 10).rounded() / 10 } ?? NSNull(),
+             "promisesSeconds": v.promisesSeconds.map { ($0 * 10).rounded() / 10 } ?? NSNull(),
+             "promises": v.promises ?? NSNull(), "error": v.error ?? NSNull()]
+        }
+        let timing: [String: Any] = [
+            "rawChars": raw.count, "chunks": outcome.chunks,
+            "unquotedActionsDroppedInChunkedNotes": outcome.droppedActions,
+            "single": json(outcome.single), "chunked": json(outcome.chunked), "cloud": json(outcome.cloud),
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: timing, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: folder.appendingPathComponent("timing.json"))
+        }
+        return outcome
     }
 }

@@ -492,6 +492,37 @@ do {
           rule: "with no quote the model's own name for the owner is kept",
           meaning: "\"Them\" in place of a name the model gave loses information that was there",
           saw: "\(legacy)")
+    check(PromiseOwner.sameName("Аня", "Anya") && PromiseOwner.sameName("Ваня", "Vanya")
+          && PromiseOwner.sameName("Даня", "Danya") && PromiseOwner.sameName("Мария", "Maria")
+          && PromiseOwner.sameName("Юля", "Julia") && !PromiseOwner.sameName("Аня", "Ваня"),
+          rule: "a Cyrillic name with я or ю is the same name as its usual Latin spelling",
+          meaning: "the system transliteration makes \"Аня\" \"Ânâ\", so Anya's promises in a mixed meeting became a stranger's",
+          saw: "\(PromiseOwner.fold("Аня")) \(PromiseOwner.fold("Anya")) \(PromiseOwner.fold("Мария"))")
+    check(PromiseOwner.normalizeOwner("[55:35] Alex") == "Alex" && PromiseOwner.normalizeOwner("**Майя**") == "Майя"
+          && PromiseOwner.normalizeOwner("[1:02:03] Tom") == "Tom",
+          rule: "a timestamp or bold copied along with an owner's name is dropped",
+          meaning: "\"[55:35] Alex\" is nobody, so the user's promise was filed under a name no one has",
+          saw: PromiseOwner.normalizeOwner("[55:35] Alex"))
+    let recapSeen = [PromiseDuplicate.entry(
+        text: "Подготовить письменный план миграции Postgres с шагами, проверками и планом отката",
+        owner: "Them", quote: "План миграции с шагами, проверками и планом отката я подготовлю к следующему четвергу.")]
+    check(PromiseDuplicate.duplicate(text: "Сделать план миграции Postgres с откатом", owner: "Даня",
+                                     quote: "Даня — план миграции с откатом к следующему четвергу", of: recapSeen) == 0
+          && PromiseDuplicate.duplicate(text: "Сделать постмортем по инцидентам", owner: "Alex", quote: nil,
+                                        of: [PromiseDuplicate.entry(text: "Написать постмортем по инциденту поиска до пятницы",
+                                                                    owner: "Alex", quote: nil)]) == 0,
+          rule: "the recap at the end of a meeting is the same promise, and names an unnamed earlier copy's owner",
+          meaning: "every promise read back in the recap was counted twice — once as \"Them\" from the talk, once by name",
+          saw: "")
+    check(PromiseDuplicate.duplicate(text: "Написать тест-план для bulk edit", owner: "Аня", quote: nil,
+                                     of: [PromiseDuplicate.entry(text: "Написать базовый API для bulk edit", owner: "Ваня", quote: nil)]) == nil
+          && PromiseDuplicate.duplicate(text: "Сделать раскатку фича-флага для пушей", owner: "Олег", quote: nil,
+                                        of: [PromiseDuplicate.entry(text: "Сделать мобильную часть пушей", owner: "Олег", quote: nil)]) == nil
+          && PromiseDuplicate.duplicate(text: "Написать тест-план для bulk edit", owner: "Аня", quote: nil,
+                                        of: [PromiseDuplicate.entry(text: "Написать базовый API для bulk edit", owner: "Them", quote: nil)]) == nil,
+          rule: "different work stays two promises, even for the same person or an unnamed one",
+          meaning: "merging on shared topic words would silently drop real promises",
+          saw: "")
     check(PromiseOwner.isMe("You", myName: "Aik") && PromiseOwner.isMe("me", myName: "Aik")
           && PromiseOwner.isMe("Алекс", myName: "Alex") && PromiseOwner.sameName("Max", "Макс")
           && !PromiseOwner.isMe("Yuri", myName: "Aik"),

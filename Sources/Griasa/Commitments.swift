@@ -388,7 +388,11 @@ enum CommitmentExtractor {
                 // The same promise in the overlap of two parts, or said twice: one
                 // copy, and the one on the user's own line wins.
                 if let earlier = PromiseDuplicate.duplicate(text: text, owner: who.owner, quote: quote, of: seen) {
-                    if who.isMine, who.located, !found.commitments[earlier].isMine { found.commitments[earlier] = commitment }
+                    if who.isMine, who.located, !found.commitments[earlier].isMine {
+                        found.commitments[earlier] = commitment
+                    } else if PromiseDuplicate.isUnnamed(found.commitments[earlier].owner), !PromiseDuplicate.isUnnamed(who.owner) {
+                        found.commitments[earlier].owner = who.owner
+                    }
                     continue
                 }
                 seen.append(PromiseDuplicate.entry(text: text, owner: who.owner, quote: quote))

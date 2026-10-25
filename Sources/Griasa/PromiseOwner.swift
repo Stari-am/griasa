@@ -134,8 +134,12 @@ enum PromiseOwner {
     /// The owner string a model returned, cleaned: a trailing parenthetical is
     /// dropped ("Саша (Саша Файн…)" is "Саша"); a group ("все участники",
     /// "everyone", "team") is "Them"; "unknown", "неопределенно", "—" or nothing is "".
+    /// A transcript timestamp or Markdown bold copied with the name ("[55:35] Alex",
+    /// "**Alex**") is dropped.
     static func normalizeOwner(_ raw: String?) -> String {
-        var name = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var name = (raw ?? "").replacingOccurrences(of: "**", with: "")
+        name = name.replacingOccurrences(of: #"^\s*\[\d{1,2}(:\d{2}){1,2}\]\s*"#, with: "", options: .regularExpression)
+        name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if let paren = name.firstIndex(where: { $0 == "(" || $0 == "（" }) {
             name = String(name[..<paren]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -154,12 +158,27 @@ enum PromiseOwner {
 
     /// "Айк", "Aik" and "aïk" are one name: transliterated to Latin, folded for
     /// case and accents, with й/y read as i and x as ks ("Алекс" is "Alex").
+    /// я, ю and ё are spelled out first, the way names are written in Latin —
+    /// the system transliteration makes "Аня" "Ânâ", which never meets "Anya" —
+    /// and a doubled i is one, so "Мария" is still "Maria".
     static func fold(_ name: String) -> String {
-        let latin = name.applyingTransform(.toLatin, reverse: false) ?? name
+        var spelled = ""
+        for ch in name {
+            switch ch {
+            case "я": spelled += "ya"
+            case "Я": spelled += "Ya"
+            case "ю": spelled += "yu"
+            case "Ю": spelled += "Yu"
+            case "ё": spelled += "yo"
+            case "Ё": spelled += "Yo"
+            default: spelled.append(ch)
+            }
+        }
+        let latin = spelled.applyingTransform(.toLatin, reverse: false) ?? spelled
         let folded = latin.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
         return folded.filter { $0.isLetter || $0.isNumber || $0 == " " }
             .replacingOccurrences(of: "j", with: "i").replacingOccurrences(of: "y", with: "i")
-            .replacingOccurrences(of: "x", with: "ks")
+            .replacingOccurrences(of: "x", with: "ks").replacingOccurrences(of: "ii", with: "i")
             .trimmingCharacters(in: .whitespaces)
     }
 

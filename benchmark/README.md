@@ -77,7 +77,8 @@ one to one, greedily:
 1. **By quote first.** A found promise matches a gold one when its quote and the
    gold quote are the same words — one found in the other by `QuoteMatch` (the
    same tolerant comparison the app uses to keep a promise at all), either way
-   round, or five words in a row in common.
+   round, or five words in a row in common. When one quoted line holds two
+   gold promises, the pair with the same owner and the closer task wins.
 2. **Then by owner and task.** For gold promises still unmatched, a found promise
    with the same owner — the user in any form ("You", "Alex", "Алекс"), or the
    same name in any script or by a listed alias — and a task sharing enough words
@@ -125,6 +126,19 @@ variant produced, `timing.json` and `score.json` (what matched what, what was
 missed, what was extra); and `RESULTS.md`, the table it also prints, with the
 Mac, its memory, and the models used. A long meeting on a local model takes
 several minutes per variant.
+
+To score a saved run again after the gold or the scorer changed, without
+running any model:
+
+```sh
+"Griasa Dev.app/Contents/MacOS/Griasa" --benchmark benchmark/meetings --rescore dist/benchmark-2026-10-24
+```
+
+It reads each meeting's `promises-*.json` and `timing.json` from that folder,
+and rewrites `score.json` and `RESULTS.md` there.
+
+How the gold was checked against the first full run, line by line, is in
+[`AUDIT.md`](AUDIT.md).
 
 The validity of the data is itself checked by `./test.sh`: every file decodes,
 every transcript line is a line the recorder could have written, in time order,

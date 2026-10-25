@@ -90,13 +90,20 @@ enum BenchmarkScore {
         var usedGold = Set<Int>(), usedPrediction = Set<Int>()
         var pairs: [Result.Pair] = []
 
-        // Quotes first: the same words are the strongest evidence there is.
+        // Quotes first: the same words are the strongest evidence there is. A
+        // long quote can hold two gold promises (one line, two tasks), so among
+        // the pairs whose quotes match, the same owner and the closer task win.
+        var quoted: [(g: Int, p: Int, owner: Int, similarity: Double)] = []
         for (g, item) in gold.enumerated() {
-            if let p = predicted.indices.first(where: { !usedPrediction.contains($0)
-                && predicted[$0].quote.map { sameQuote($0, item.quote) } == true }) {
-                usedGold.insert(g); usedPrediction.insert(p)
-                pairs.append(.init(gold: g, prediction: p, byQuote: true))
+            for p in predicted.indices where predicted[p].quote.map({ sameQuote($0, item.quote) }) == true {
+                quoted.append((g, p, sameOwner(predicted[p].owner, item.owner, meta: meta) ? 1 : 0,
+                               jaccard(predicted[p].task, item.task)))
             }
+        }
+        quoted.sort { ($0.owner, $0.similarity, -$0.g, -$0.p) > ($1.owner, $1.similarity, -$1.g, -$1.p) }
+        for c in quoted where !usedGold.contains(c.g) && !usedPrediction.contains(c.p) {
+            usedGold.insert(c.g); usedPrediction.insert(c.p)
+            pairs.append(.init(gold: c.g, prediction: c.p, byQuote: true))
         }
         // Then the same owner and a similar task: every such pair, the most
         // similar first, so one gold promise cannot take the prediction that

@@ -131,6 +131,22 @@ do {
           saw: "\(best.pairs)")
 }
 
+// One quoted line, two promises: each prediction goes to the task it names.
+do {
+    let line = "План миграции с шагами я подготовлю к четвергу. Клон базы и прогон запросов — тоже на следующей неделе."
+    let g = [Gold(owner: "Даниил", isMine: false, task: "Подготовить план миграции с шагами", due: nil,
+                  quote: "План миграции с шагами я подготовлю к четвергу."),
+             Gold(owner: "Даниил", isMine: false, task: "Сделать клон базы и прогнать запросы", due: nil,
+                  quote: "Клон базы и прогон запросов — тоже на следующей неделе.")]
+    let predicted = [Prediction(owner: "Даниил", isMine: false, task: "Клон базы, прогон запросов", quote: line),
+                     Prediction(owner: "Даниил", isMine: false, task: "План миграции", quote: line)]
+    let r = BenchmarkScore.score(gold: g, predicted: predicted)
+    check(r.matched == 2 && r.pairs.contains { $0.gold == 0 && $0.prediction == 1 },
+          rule: "when one quote covers two gold promises, the closer task decides which is which",
+          meaning: "a model quoting the whole line for both promises found both; matching by list order would swap them",
+          saw: "\(r.pairs)")
+}
+
 // One prediction cannot be two promises.
 do {
     let twice = [

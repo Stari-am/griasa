@@ -19,7 +19,12 @@
     {"owner": "Alex", "isMine": true, "task": "Write a plain-language incident report for Harbor Lane's CEO", "due": "by Friday", "quote": "I'll write an incident report for your CEO"},
     {"owner": "Maya", "isMine": false, "task": "Get approval for a service credit and send Harbor Lane a proposal", "due": "by Monday 9:00", "quote": "I'll get approval for a service credit and send you a proposal by Monday"},
     {"owner": "Daniel", "isMine": false, "task": "Send Marcus Saturday's API logs filtered to their key", "due": "by tomorrow", "quote": "I'll filter them to your API key and send you the API logs for Saturday by tomorrow"},
-    {"owner": "Marcus", "isMine": false, "task": "Send Daniel the connector logs for Saturday", "due": "today", "quote": "And I'll send you our connector logs for the same period today"}
+    {"owner": "Marcus", "isMine": false, "task": "Send Daniel the connector logs for Saturday", "due": "today", "quote": "And I'll send you our connector logs for the same period today"},
+    {"owner": "Rachel", "isMine": false, "task": "Have her team bulk-cancel the fully oversold orders today, with the cancellation email to customers", "due": "today", "quote": "Then we do it today."},
+    {"owner": "Marcus", "isMine": false, "task": "Push the Black Friday promo prices the evening before instead of at six in the morning", "due": "Black Friday", "quote": "We can do it the evening before."},
+    {"owner": "Marcus", "isMine": false, "task": "Send a clear connector identifier and version in the user agent when the connector is rewritten", "due": "the rewrite, after the promo season", "quote": "That's easy, yes. Good idea."},
+    {"owner": "Rachel", "isMine": false, "task": "Send the Black Friday email in staggered waves", "due": "Black Friday", "quote": "Okay. Waves it is."},
+    {"owner": "Alex", "isMine": true, "task": "Add a full resync after a sync incident to the runbook for integration incidents", "due": null, "quote": "Let's put it in our runbook as a step for integration incidents."}
   ],
   "traps": [
     {"quote": "I'll rewrite the ERP connector against the new API before Thursday", "note": "Cancelled a few lines later: Marcus changes the config instead and the rewrite waits until after the promo season."},
@@ -30,6 +35,8 @@
     {"quote": "I can't promise dates yet", "note": "Explicitly not a promise about Shopnest."},
     {"quote": "If leadership pushes back, I'll back you up with the numbers Priya showed.", "note": "Conditional support in the internal debrief, not a task."},
     {"quote": "I can share the anonymised comparison on one of the Monday calls if marketing wants to see it.", "note": "Conditional offer; Rachel says marketing may not ask."},
-    {"quote": "That's what I'll tell my CEO.", "note": "Talk, not a task."}
+    {"quote": "That's what I'll tell my CEO.", "note": "Talk, not a task."},
+    {"quote": "Let's decide that on the Monday call, not today.", "note": "Deferred: the waiting room is decided later, nobody takes a task now."},
+    {"quote": "Let's take this to the architecture review on Thursday.", "note": "Deferred: the stock cache is a platform trade-off for the review, no owner."}
   ]
 }

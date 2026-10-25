@@ -24,6 +24,7 @@
     {"quote": "Я тогда напишу в саппорт Stripe и спрошу про retry policy.", "note": "Cancelled a minute later: Ivan already wrote to Stripe, Alex says he won't."},
     {"quote": "Можешь глянуть логи за выходные, нет ли там ещё каких-то типов событий", "note": "Alex's request to Anna. The promise is Anna's reply, not Alex's."},
     {"quote": "когда-нибудь надо будет вообще переписать этот модуль на нормальную очередь событий", "note": "A wish, said as 'dreams'. Nobody takes it."},
-    {"quote": "давайте это обсудим на планировании, когда будет roadmap на следующий квартал", "note": "Deferred to planning, no owner."}
+    {"quote": "давайте это обсудим на планировании, когда будет roadmap на следующий квартал", "note": "Deferred to planning, no owner."},
+    {"quote": "Если Brightmoor ответят что-то важное, добавь, пожалуйста.", "note": "A conditional request; nothing to do unless Brightmoor reply with something important."}
   ]
 }

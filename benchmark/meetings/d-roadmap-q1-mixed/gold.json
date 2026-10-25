@@ -19,7 +19,15 @@
     {"owner": "Даниил", "isMine": false, "task": "Make a list of SOC 2 gaps: what we have and what is missing", "due": "two weeks", "quote": "I'll make a list of the gaps for SOC 2, what we have and what's missing"},
     {"owner": "Иван", "isMine": false, "task": "Prepare five or six starter tasks for the new backend engineer", "due": "by the end of January", "quote": "Я подготовлю пять-шесть стартовых задач для нового бэкендера к концу января"},
     {"owner": "Tom", "isMine": false, "task": "Ask Marek whether he can extend through March to build the analytics frontend, and at what cost", "due": "this week", "quote": "I'll ask Marek this week whether he can extend through March and do the analytics frontend"},
-    {"owner": "Alex", "isMine": true, "task": "Put together the Q1 timeline draft with owners, dependencies, risks and what slips first", "due": "by Wednesday", "quote": "I'll put together the Q1 timeline draft with all of this by Wednesday"}
+    {"owner": "Alex", "isMine": true, "task": "Put together the Q1 timeline draft with owners, dependencies, risks and what slips first", "due": "by Wednesday", "quote": "I'll put together the Q1 timeline draft with all of this by Wednesday"},
+    {"owner": "Maya", "isMine": false, "task": "Route every sales request that is not on the Q1 roadmap through herself, default answer \"Q2 candidate\"", "due": "Q1", "quote": "So in Q1, anything sales want that's not on this roadmap goes through me"},
+    {"owner": "Иван", "isMine": false, "task": "Add personal access tokens (scoped, revocable, optional expiry) to API v1.5 as part of the migration guide work", "due": "before the integrator emails", "quote": "Логично, без таких токенов гайд будет сложным."},
+    {"owner": "Иван", "isMine": false, "task": "Add generous rate limits to API v1 for the notice period, based on a month of logs of normal clients", "due": "during the notice period", "quote": "But during those six months, I want to add the deprecation header to every v1 response, and rate limits, at least generous ones"},
+    {"owner": "Maya", "isMine": false, "task": "Take the buyer-data question (showing view aggregates to sellers) and the minimum count rule to legal", "due": "before launch", "quote": "It goes on the list for legal, together with the minimum count rule."},
+    {"owner": "Иван", "isMine": false, "task": "Build entitlements in January", "due": "January", "quote": "Тогда я в январе делаю entitlements и v1"},
+    {"owner": "Иван", "isMine": false, "task": "Build bulk edit undo and scheduled changes in February and help the new engineer with the pipeline", "due": "February", "quote": "в феврале — undo и scheduled changes, и помогаю новому человеку."},
+    {"owner": "Tom", "isMine": false, "task": "Bring a one-page Kotlin Multiplatform experiment proposal (module, duration, stop criteria) to the Q2 session", "due": "the Q2 session", "quote": "Sounds good. It was always meant as a Q2 thing, I just wanted it on the radar early."},
+    {"owner": "Alex", "isMine": true, "task": "Add a \"what does the data say\" check to the roadmap session template", "due": "next session", "quote": "Agreed. Let's make it part of the template for the next session."}
   ],
   "traps": [
     {"quote": "I'll write the deprecation plan for the tablet layouts by next Friday", "note": "Cancelled: the tablet decision is reversed later in the meeting and Tom says he won't write the plan."},
@@ -32,6 +40,8 @@
     {"quote": "Мне кажется, когда-нибудь мы и бэкенд на Kotlin перепишем", "note": "A joke, withdrawn at once."},
     {"quote": "If the number is reasonable, I'll fight for it", "note": "Conditional support for a budget, not a task."},
     {"quote": "I'll keep it on my list, it's a good interview topic.", "note": "A vague intention about a future interview topic."},
-    {"quote": "Если будет запись, скину ссылку.", "note": "Conditional small talk during the break."}
+    {"quote": "Если будет запись, скину ссылку.", "note": "Conditional small talk during the break."},
+    {"quote": "I'd want to double check it properly, it was a ten-minute query.", "note": "A wish to re-check, not a commitment; nobody asks for it."},
+    {"quote": "Then you and Maya decide on the budget.", "note": "Tom hands the decision back; not a task anyone takes."}
   ]
 }

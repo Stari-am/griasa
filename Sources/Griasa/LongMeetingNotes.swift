@@ -37,6 +37,7 @@ enum LongMeetingNotes {
             ($0.index, PromiseOwner.Index(text: $0.modelInput, myName: myName)) })
         var actions: [LongMeetingMap.MapAction] = []
         var seen: [PromiseDuplicate.Seen] = []
+        var readBacks: Set<Int> = []
         let speakerRules = speakerRules(participants: participants, myName: myName)
         let noteRules = hasNotes
             ? " Lines in the form \"[mm:ss] 📝 NOTE: …\" are notes the user typed by hand during the meeting — their own words, not recognized speech, so they are highly reliable; reflect their content prominently."
@@ -72,8 +73,22 @@ enum LongMeetingNotes {
             // Whose each promise is comes from who spoke the quoted line, not from the model.
             let index = ownerIndex[chunk.index]!
             var attributed: [LongMeetingMap.Action] = []
-            for action in believed.actions ?? [] {
-                let who = index.resolve(quote: action.quote, modelOwner: action.owner, participants: participants)
+            let resolved = (believed.actions ?? []).map {
+                ($0, index.resolve(quote: $0.quote, modelOwner: $0.owner, participants: participants)) }
+            // Three or more promises from one line is someone reading the action items back.
+            var perLine: [String: Int] = [:]
+            for (_, who) in resolved where who.located { if let at = who.at { perLine[at, default: 0] += 1 } }
+            for (action, who) in resolved {
+                let readBack = who.located && who.at.map { perLine[$0, default: 0] >= 3 } == true
+                if readBack, let earlier = PromiseDuplicate.restatement(
+                    text: action.task ?? "", of: seen, skipping: readBacks) {
+                    if PromiseDuplicate.isUnnamed(actions[earlier].owner), !PromiseDuplicate.isUnnamed(who.owner) {
+                        actions[earlier].owner = who.owner
+                        seen[earlier] = PromiseDuplicate.entry(text: actions[earlier].text, owner: who.owner,
+                                                               quote: actions[earlier].quote)
+                    }
+                    continue
+                }
                 var tagged = action
                 tagged.owner = who.owner
                 let task = (action.task ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -91,6 +106,7 @@ enum LongMeetingNotes {
                     }
                     continue
                 }
+                if readBack { readBacks.insert(seen.count) }
                 seen.append(PromiseDuplicate.entry(text: entry.text, owner: entry.owner, quote: entry.quote))
                 attributed.append(tagged)
                 actions.append(.init(

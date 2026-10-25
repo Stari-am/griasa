@@ -492,6 +492,18 @@ do {
           rule: "with no quote the model's own name for the owner is kept",
           meaning: "\"Them\" in place of a name the model gave loses information that was there",
           saw: "\(legacy)")
+    let talk = [PromiseDuplicate.entry(text: "Подготовить оффер для кандидата А через HR до пятницы", owner: "Alex", quote: nil),
+                PromiseDuplicate.entry(text: "Сделать группировку пушей на бэкенде", owner: "Them", quote: nil),
+                PromiseDuplicate.entry(text: "Сгруппировать уведомления на бэкенде", owner: "Иван", quote: nil)]
+    check(PromiseDuplicate.restatement(text: "Отправить оффер кандидату А", of: talk, skipping: []) == 0
+          && PromiseDuplicate.restatement(text: "Группировка пушей на бэкенде", of: talk, skipping: []) == 1
+          && PromiseDuplicate.restatement(text: "Группировка пушей на бэкенде", of: talk, skipping: [1]) == nil
+          && PromiseDuplicate.restatement(text: "Экран технических работ", of: talk, skipping: []) == nil,
+          rule: "an item of a read-back matches the promise as it was made, whoever the read-back names; "
+              + "items of the same read-back never match each other",
+          meaning: "the recap is one line the model splits among people and misattributes — "
+                 + "the offer read back under Ivan's name was counted as a second promise",
+          saw: "")
     check(PromiseOwner.sameName("Аня", "Anya") && PromiseOwner.sameName("Ваня", "Vanya")
           && PromiseOwner.sameName("Даня", "Danya") && PromiseOwner.sameName("Мария", "Maria")
           && PromiseOwner.sameName("Юля", "Julia") && !PromiseOwner.sameName("Аня", "Ваня"),

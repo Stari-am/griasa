@@ -173,6 +173,17 @@ enum PromiseDuplicate {
         return nil
     }
 
+    /// The earlier promise a read-back restates, whoever it is attributed to.
+    /// One person reading the action items back ("Ваня — пуши, Alex — валидация,
+    /// Даня — план миграции") is a single line the model has to split among
+    /// people, and it gets the names wrong; the promise itself was already heard
+    /// when it was made. Promises that came from read-backs are skipped, so two
+    /// items of one recap never swallow each other.
+    static func restatement(text: String, of seen: [Seen], skipping readBacks: Set<Int>) -> Int? {
+        let mine = stems(of: QuoteMatch.normalize(text))
+        return seen.indices.first { !readBacks.contains($0) && restates(mine, stems(of: seen[$0].text)) }
+    }
+
     /// An owner nobody could name: a "Them" line, or none at all.
     static func isUnnamed(_ owner: String) -> Bool {
         ["", "them"].contains(owner.lowercased())
@@ -183,15 +194,21 @@ enum PromiseDuplicate {
         isUnnamed(a) || isUnnamed(b) || PromiseOwner.sameName(a, b)
     }
 
-    /// One task wording contains the other: every stem of the shorter one when
-    /// it has two or three, three quarters of them when it has more. "Сделать
-    /// постмортем" against "Написать постмортем по инциденту до пятницы" is the
-    /// same work; "тест-план для bulk edit" against "базовый API для bulk edit" is not.
+    /// One task wording contains the other: both stems of a two-stem task, two
+    /// of three (the verb is often the one that differs: "отправить оффер
+    /// кандидату" is "подготовить оффер кандидату"), three quarters of a longer
+    /// one. "Сделать постмортем" against "Написать постмортем по инциденту до
+    /// пятницы" is the same work; "тест-план для bulk edit" against "базовый API
+    /// для bulk edit" is not.
     static func restates(_ a: Set<String>, _ b: Set<String>) -> Bool {
         let shorter = min(a.count, b.count)
         guard shorter >= 2 else { return false }
-        let shared = Double(a.intersection(b).count)
-        return shorter <= 3 ? shared == Double(shorter) : shared / Double(shorter) >= 0.75
+        let shared = a.intersection(b).count
+        switch shorter {
+        case 2: return shared == 2
+        case 3: return shared >= 2
+        default: return Double(shared) / Double(shorter) >= 0.75
+        }
     }
 
     /// Content words cut to five letters, so "мобильном" and "мобильное" meet;

@@ -420,6 +420,71 @@ do {
     check(false, rule: "the assistant-write checks run", meaning: "fixture setup", saw: "\(error)")
 }
 
+do {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let good = "secret-token"
+    func admit(_ method: String = "POST", path: String = "/conversations", headers: [String: String] = [:],
+               size: Int = 100, token: String = good, recent: [Date] = [], on: Bool = true) -> IngestHTTP.Admission {
+        var h = ["authorization": "Bearer \(good)", "host": "127.0.0.1:8179"]
+        for (k, v) in headers { h[k] = v }
+        return IngestHTTP.admit(method: method, path: path, headers: h, bodySize: size, token: token,
+                                recent: recent, now: now, switchOn: on)
+    }
+    check(admit() == .accept, rule: "a well-formed local request with the token is accepted", meaning: "the happy path", saw: "\(admit())")
+    check(admit(headers: ["authorization": "Bearer nope"]) == .unauthorized
+            && admit(headers: ["authorization": ""]) == .unauthorized
+            && admit(token: "") == .unauthorized,
+          rule: "a wrong, missing or never-created token is unauthorized", meaning: "the token is the door",
+          saw: "\(admit(headers: ["authorization": "Bearer nope"]))")
+    check(admit(headers: ["origin": "https://evil.example"]) == .forbiddenOrigin
+            && admit(headers: ["origin": "http://127.0.0.1.evil.example"]) == .forbiddenOrigin
+            && admit(headers: ["host": "evil.example"]) == .forbiddenOrigin,
+          rule: "another origin, or another host name, is refused", meaning: "a web page must not reach this endpoint",
+          saw: "\(admit(headers: ["origin": "https://evil.example"]))")
+    check(admit(headers: ["origin": "http://127.0.0.1:3000"]) == .accept
+            && admit(headers: ["origin": "http://localhost"]) == .accept,
+          rule: "a local origin, or none, is allowed", meaning: "local tools may send one", saw: "refused")
+    check(admit(size: IngestHTTP.maxBody) == .accept && admit(size: IngestHTTP.maxBody + 1) == .tooLarge
+            && IngestHTTP.maxBody == 2 * 1_048_576,
+          rule: "2 MB is the most; 2 MB + 1 is too large", meaning: "the body limit", saw: "\(admit(size: IngestHTTP.maxBody + 1))")
+    let thirty = (0..<30).map { now.addingTimeInterval(-Double($0)) }
+    let stale = (0..<30).map { now.addingTimeInterval(-61 - Double($0)) }
+    check(admit(recent: Array(thirty.prefix(29))) == .accept && admit(recent: thirty) == .rateLimited
+            && admit(recent: stale) == .accept,
+          rule: "the 31st request within 60 seconds is rate limited; older ones do not count",
+          meaning: "30 a minute", saw: "\(admit(recent: thirty))")
+    check(admit("GET") == .methodNotAllowed, rule: "GET is not allowed", meaning: "only POST", saw: "\(admit("GET"))")
+    check(admit(on: false) == .notFound && admit(path: "/other") == .notFound,
+          rule: "the route is not found while the switch is off, or on another path",
+          meaning: "a closed door looks like no door", saw: "\(admit(on: false))")
+
+    switch IngestHTTP.decode(Data(#"{"source":"other","chat":{"id":"1","title":"t"},"messages":[]}"#.utf8)) {
+    case .success(let b): check(b.count == 1, rule: "one object is one batch", meaning: "body shape", saw: "\(b.count)")
+    case .failure(let f): check(false, rule: "one object is one batch", meaning: "body shape", saw: f.message)
+    }
+    switch IngestHTTP.decode(Data(#"[{"source":"other","chat":{"id":"1","title":"t"},"messages":[]},{"source":"slack","chat":{"id":"2","title":"u"},"messages":[]}]"#.utf8)) {
+    case .success(let b): check(b.count == 2, rule: "an array is several batches", meaning: "body shape", saw: "\(b.count)")
+    case .failure(let f): check(false, rule: "an array is several batches", meaning: "body shape", saw: f.message)
+    }
+    if case .failure(let f) = IngestHTTP.decode(Data(#"{"source":"other","chat":{"id":"1","title":"t"},"messages":[{"id":"1","author":"A","at":"x","text":"PRIVATE-WORDS"}]}"#.utf8)) {
+        check(false, rule: "decode keeps text out of errors", meaning: "never log content", saw: f.message)
+    }
+    if case .failure(let f) = IngestHTTP.decode(Data(#"{"chat":{"id":"1"},"messages":"PRIVATE-WORDS"}"#.utf8)) {
+        check(!f.message.contains("PRIVATE-WORDS"), rule: "a shape error never repeats the message text",
+              meaning: "errors reach logs and clients", saw: f.message)
+    }
+
+    // The route's larger body limit does not widen the MCP route's.
+    var raw = Data("POST /conversations HTTP/1.1\r\nContent-Length: \(IngestHTTP.maxBody)\r\n\r\n".utf8)
+    var raw2 = Data("POST /mcp HTTP/1.1\r\nContent-Length: \(IngestHTTP.maxBody)\r\n\r\n".utf8)
+    let limit: (String) -> Int = { $0 == IngestHTTP.path ? IngestHTTP.maxBody : HTTPRequest.maxBody }
+    if case .refuse = HTTPRequest.parse(raw, limit: limit) { check(false, rule: "the ingest route reads up to 2 MB", meaning: "chats are big", saw: "refused") }
+    if case .refuse(let status, _) = HTTPRequest.parse(raw2, limit: limit) {
+        check(status == 413, rule: "the MCP route keeps its 1 MB limit", meaning: "only /conversations is widened", saw: "\(status)")
+    } else { check(false, rule: "the MCP route keeps its 1 MB limit", meaning: "only /conversations is widened", saw: "accepted") }
+    raw.removeAll(); raw2.removeAll()
+}
+
 return failures
 }
 

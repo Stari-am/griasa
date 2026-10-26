@@ -64,6 +64,7 @@ swiftc -O \
   Sources/Griasa/ConversationModelGate.swift \
   Sources/Griasa/ConversationImportRules.swift \
   Sources/Griasa/AssistantWrites.swift \
+  Sources/Griasa/IngestHTTP.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \

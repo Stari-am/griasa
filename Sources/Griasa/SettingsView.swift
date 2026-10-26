@@ -983,6 +983,7 @@ private struct SnippetsSettings: View {
 
 private struct SystemSettings: View {
     @ObservedObject var state: AppState
+    @State private var tokenCopied = false
     @ObservedObject private var mcp = MCPServer.shared
     @ObservedObject private var stats = UsageStats.shared
     /// "Let assistants add to Griasa": the one switch for both MCP write tools
@@ -995,7 +996,7 @@ private struct SystemSettings: View {
         let forcedOff = policy.isLocked(key) && !policy.conversationIngestAllowed
         Toggle("Let assistants add to Griasa",
                isOn: Binding(get: { state.assistantsMayAdd && !forcedOff },
-                             set: { state.assistantsMayAdd = $0 }))
+                             set: { state.assistantsMayAdd = $0; tokenCopied = false }))
             .disabled(forcedOff || !policy.conversationsEnabled)
         if forcedOff || !policy.conversationsEnabled {
             managedNote("Set by your organization.")
@@ -1004,6 +1005,26 @@ private struct SystemSettings: View {
         }
         Text("Additions wait for your review in the Conversations tab. Nothing is changed or deleted.")
             .font(.caption).foregroundStyle(.secondary)
+        if AssistantWrites.isOpen(userSwitch: state.assistantsMayAdd, policy: policy) {
+            if mcp.isRunning {
+                LabeledContent("Conversations endpoint", value: mcp.ingestEndpoint).font(.caption)
+                HStack {
+                    Button(tokenCopied ? "Copied" : "Copy token") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(mcp.ingestToken(), forType: .string)
+                        tokenCopied = true
+                    }
+                    Button("Rotate token") { mcp.rotateIngestToken(); tokenCopied = false }
+                        .help("Invalidates the token already handed out")
+                }
+                Text("POST a chat as JSON with the header Authorization: Bearer <token>. The token is kept in your keychain and is separate from the assistant token above.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if let error = mcp.lastError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            } else {
+                Text("Starting…").font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 
     var body: some View {

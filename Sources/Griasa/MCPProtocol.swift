@@ -39,7 +39,11 @@ enum HTTPRequest {
     /// the app allocate until it dies.
     static let maxBody = 1_048_576
 
-    static func parse(_ buffer: Data) -> Outcome {
+    /// `limit` answers, for a request path, the largest body that route takes;
+    /// the default is `maxBody` for every path. Asked once the request line is
+    /// read, so a bigger allowance for one route is never a bigger allowance for
+    /// the others.
+    static func parse(_ buffer: Data, limit: (String) -> Int = { _ in maxBody }) -> Outcome {
         guard let headerEnd = range(of: Data("\r\n\r\n".utf8), in: buffer) else {
             // An enormous header block with no terminator is the same denial of
             // service as an enormous body.
@@ -89,8 +93,9 @@ enum HTTPRequest {
         guard declared >= 0 else {
             return .refuse(status: 400, reason: "negative Content-Length")
         }
-        guard declared <= maxBody else {
-            return .refuse(status: 413, reason: "body larger than \(maxBody) bytes")
+        let allowed = limit(path)
+        guard declared <= allowed else {
+            return .refuse(status: 413, reason: "body larger than \(allowed) bytes")
         }
         let available = buffer.distance(from: bodyStart, to: buffer.endIndex)
         guard available >= declared else { return .incomplete }

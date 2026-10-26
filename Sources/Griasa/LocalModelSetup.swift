@@ -569,6 +569,8 @@ final class LocalModelSetup: ObservableObject {
     /// A call while a round runs is not dropped (the delayed retry for a
     /// fresh meeting may land then): it runs one more round after this one.
     private func catchUp() {
+        // Chat days that waited for a model; its own gate decides what runs.
+        ConversationProcessor.shared.resume()
         if catchingUp { catchUpAgain = true; return }
         guard mayCatchUp else { return }
         catchingUp = true

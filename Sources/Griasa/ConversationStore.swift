@@ -100,12 +100,18 @@ final class ConversationStore {
             CREATE INDEX IF NOT EXISTS messages_by_day ON messages(chat_id, day, sent_at);
             CREATE TABLE IF NOT EXISTS days(
               chat_id INTEGER NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL,
-              summary TEXT, processed_up_to TEXT, PRIMARY KEY(chat_id, day));
+              summary TEXT, processed_up_to TEXT, attempts INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY(chat_id, day));
             CREATE TABLE IF NOT EXISTS review(
               id INTEGER PRIMARY KEY, received_at REAL NOT NULL, entrance TEXT NOT NULL,
               payload BLOB NOT NULL, message_count INTEGER NOT NULL,
               source TEXT NOT NULL, source_chat_id TEXT NOT NULL);
             """)
+        // Databases made before the pipeline counted attempts.
+        let columns = try query("PRAGMA table_info(days)", []) { $0.string(1) ?? "" }
+        if !columns.contains("attempts") {
+            try exec("ALTER TABLE days ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
+        }
         // The index is a copy of `messages.text`, kept in step by triggers so no
         // code path can forget it. If this build has no FTS5 the statement
         // fails, and that is the whole feature check.
@@ -161,6 +167,7 @@ final class ConversationStore {
             format.dateFormat = "yyyy-MM-dd"
 
             var touched = Set<String>()
+            var earliest: [String: Double] = [:]
             try exec("BEGIN")
             do {
                 for m in messages {
@@ -171,13 +178,26 @@ final class ConversationStore {
                         """, [.int(chat), .text(m.sourceMessageID), .optText(m.authorID), .text(m.authorName),
                               .real(m.sentAt.timeIntervalSince1970), .text(day), .text(m.text),
                               .int(m.isMine ? 1 : 0), .optText(m.forwardedFrom)])
-                    if added > 0 { touched.insert(day) }
+                    if added > 0 {
+                        touched.insert(day)
+                        earliest[day] = min(earliest[day] ?? .infinity, m.sentAt.timeIntervalSince1970)
+                    }
                 }
                 for day in touched {
                     try run("""
                         INSERT INTO days(chat_id, day, state) VALUES (?,?,'pending')
-                        ON CONFLICT(chat_id, day) DO UPDATE SET state = 'pending'
+                        ON CONFLICT(chat_id, day) DO UPDATE SET state = 'pending', attempts = 0
                         """, [.int(chat), .text(day)])
+                    // A message older than what was already read (an earlier part
+                    // of the history arriving later) must be read too: move the
+                    // mark to just before it.
+                    if let first = earliest[day] {
+                        try run("""
+                            UPDATE days SET processed_up_to = ?
+                            WHERE chat_id = ? AND day = ? AND processed_up_to IS NOT NULL
+                              AND CAST(processed_up_to AS REAL) >= ?
+                            """, [.text(Self.mark(first - 0.001)), .int(chat), .text(day), .real(first)])
+                    }
                 }
                 try exec("COMMIT")
             } catch {
@@ -221,6 +241,7 @@ final class ConversationStore {
             _ = try run("""
                 INSERT INTO days(chat_id, day, state, summary, processed_up_to) VALUES (?,?,?,?,?)
                 ON CONFLICT(chat_id, day) DO UPDATE SET state = excluded.state,
+                  attempts = CASE WHEN excluded.state = 'done' THEN 0 ELSE attempts END,
                   summary = COALESCE(excluded.summary, summary),
                   processed_up_to = COALESCE(excluded.processed_up_to, processed_up_to)
                 """, [.int(chat), .text(day), .text(state.rawValue),
@@ -235,8 +256,114 @@ final class ConversationStore {
         }
     }
 
+    /// The chat as it was imported, for the pipeline that works a day at a time.
+    func chat(_ id: Int64) throws -> (ref: ChatRef, myID: String?)? {
+        try locked {
+            try query("SELECT source, source_chat_id, title, type, my_id FROM chats WHERE id = ?",
+                      [.int(id)]) { row in
+                (ref: ChatRef(source: row.string(0) ?? "", sourceChatID: row.string(1) ?? "",
+                              title: row.string(2) ?? "", type: row.string(3) ?? ""),
+                 myID: row.string(4))
+            }.first
+        }
+    }
+
+    /// Up to `limit` messages of the chat sent before `date`, oldest first — what
+    /// was said just before a day's new messages, for a model that needs to know
+    /// what "yes, tomorrow" answers.
+    func messages(chat: Int64, before date: Date, limit: Int) throws -> [StoredMessage] {
+        try locked {
+            try query("""
+                SELECT source_message_id, author_id, author_name, sent_at, text, is_mine, forwarded_from
+                FROM messages WHERE chat_id = ? AND sent_at < ? ORDER BY sent_at DESC, id DESC LIMIT ?
+                """, [.int(chat), .real(date.timeIntervalSince1970), .int(Int64(limit))]) { row in
+                StoredMessage(sourceMessageID: row.string(0) ?? "", authorID: row.string(1),
+                              authorName: row.string(2) ?? "",
+                              sentAt: Date(timeIntervalSince1970: row.double(3)),
+                              text: row.string(4) ?? "", isMine: row.int(5) != 0,
+                              forwardedFrom: row.string(6))
+            }.reversed()
+        }
+    }
+
+    /// Messages of the day sent after what the pipeline has read: all of them
+    /// for a day never processed.
+    func unprocessedMessages(chat: Int64, day: String) throws -> [StoredMessage] {
+        let mark = try locked {
+            try query("SELECT processed_up_to FROM days WHERE chat_id = ? AND day = ?",
+                      [.int(chat), .text(day)]) { $0.string(0) }.first ?? nil
+        }.flatMap { Double($0) }
+        let all = try messages(chat: chat, day: day)
+        guard let mark else { return all }
+        return all.filter { $0.sentAt.timeIntervalSince1970 > mark }
+    }
+
+    /// The text `setDay(processedUpTo:)` stores for a moment.
+    static func mark(_ time: Double) -> String { String(time) }
+    static func mark(_ date: Date) -> String { mark(date.timeIntervalSince1970) }
+
+    // MARK: Attempts
+
+    /// A day is tried this many times before it stays `failed`.
+    static let maxAttempts = 3
+
+    /// Marks the day `processing` and counts the try. The count is made before
+    /// the work, so a crash in the middle still costs an attempt: a day that
+    /// crashes the app every time cannot loop forever.
+    @discardableResult
+    func beginAttempt(chat: Int64, day: String) throws -> Int {
+        try locked {
+            try run("UPDATE days SET state = 'processing', attempts = attempts + 1 WHERE chat_id = ? AND day = ?",
+                    [.int(chat), .text(day)])
+            return try query("SELECT attempts FROM days WHERE chat_id = ? AND day = ?",
+                             [.int(chat), .text(day)]) { Int($0.int(0)) }.first ?? 0
+        }
+    }
+
+    /// Ends a successful try: summary and mark saved, day `done` — but only if
+    /// it is still `processing`. A message imported meanwhile put the day back to
+    /// `pending`; then nothing is written and the next pass reads it all again.
+    /// Returns whether the day was completed.
+    @discardableResult
+    func complete(chat: Int64, day: String, summary: String?, processedUpTo: String?) throws -> Bool {
+        try locked {
+            try run("""
+                UPDATE days SET state = 'done', attempts = 0,
+                  summary = COALESCE(?, summary), processed_up_to = COALESCE(?, processed_up_to)
+                WHERE chat_id = ? AND day = ? AND state = 'processing'
+                """, [.optText(summary), .optText(processedUpTo), .int(chat), .text(day)]) > 0
+        }
+    }
+
+    /// After a failed try: back to `pending` to be retried later, or `failed`
+    /// once the attempts are used up. Returns the state the day is now in.
+    @discardableResult
+    func releaseAfterFailure(chat: Int64, day: String) throws -> DayState {
+        try locked {
+            try run("""
+                UPDATE days SET state = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END
+                WHERE chat_id = ? AND day = ?
+                """, [.int(Int64(Self.maxAttempts)), .int(chat), .text(day)])
+            let state = try query("SELECT state FROM days WHERE chat_id = ? AND day = ?",
+                                  [.int(chat), .text(day)]) { $0.string(0) ?? "" }.first
+            return state.flatMap { DayState(rawValue: $0) } ?? .failed
+        }
+    }
+
+    /// At launch nothing is running, so a day still `processing` was cut off by
+    /// a quit or a crash: it goes back to `pending`, unless its attempts are
+    /// already used up. Returns how many days were put back.
+    @discardableResult
+    func resetInterrupted() throws -> Int {
+        try locked {
+            try run("UPDATE days SET state = 'failed' WHERE state = 'processing' AND attempts >= ?",
+                    [.int(Int64(Self.maxAttempts))])
+            return try run("UPDATE days SET state = 'pending' WHERE state = 'processing'", [])
+        }
+    }
+
     /// Days waiting for the pipeline, oldest first. A day left `processing` by a
-    /// crash is the queue's to reset; this does not guess.
+    /// crash is put back by `resetInterrupted`; this does not guess.
     func pendingDays() throws -> [(chat: Int64, day: String)] {
         try locked {
             try query("SELECT chat_id, day FROM days WHERE state = 'pending' ORDER BY day, chat_id",

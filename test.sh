@@ -60,6 +60,7 @@ swiftc -O \
   Sources/Griasa/TelegramExport.swift \
   Sources/Griasa/ConversationIngest.swift \
   Sources/Griasa/ChatIdentity.swift \
+  Sources/Griasa/ChatDayText.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \

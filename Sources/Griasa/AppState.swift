@@ -163,6 +163,8 @@ final class AppState: ObservableObject {
         installHotkey()
         setupWhisper()
         Task { @MainActor in await LocalModelSetup.shared.refresh() }
+        // Chat days a quit cut off, or that waited for a model.
+        ConversationProcessor.shared.resume()
         // Straight into the session, with no per-partial main-actor hop: those
         // hops had no FIFO guarantee, and a transposed pair left Griasa's model
         // of the field describing something that wasn't there.

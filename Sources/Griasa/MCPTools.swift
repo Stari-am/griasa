@@ -74,12 +74,15 @@ enum MCPTools {
         schema: object([
             "person": string("Only promises owned by this person: the exact name as list_people returns it, case-insensitive. Omit for everyone."),
             "overdue_only": boolean("Only promises past their due date."),
+            "project": string("Only promises from meetings filed under this project id, from list_projects."),
             "limit": integer("Most items in each of the two lists. Default 50; older promises past the limit are left out."),
         ]),
         output: result(["mine": "array", "waiting_on_others": "array"])
     ) { params in
         let person = params["person"]?.stringValue
         let overdueOnly = params["overdue_only"]?.boolValue ?? false
+        let project = params["project"]?.stringValue.flatMap(UUID.init(uuidString:))
+        let entries = Dictionary(HistoryStore.shared.entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let limit = params["limit"]?.intValue ?? 50
         let store = CommitmentStore.shared
 
@@ -87,6 +90,11 @@ enum MCPTools {
             items
                 .filter { person == nil || $0.owner.caseInsensitiveCompare(person!) == .orderedSame }
                 .filter { !overdueOnly || ($0.dueDate.map { $0 < Date() } ?? false) }
+                .filter { item in
+                    guard let project else { return true }
+                    guard let id = item.sourceEntryID, let entry = entries[id] else { return false }
+                    return inProject(entry, project)
+                }
                 .prefix(limit)
                 .map(describe)
         }
@@ -138,15 +146,18 @@ enum MCPTools {
         schema: object([
             "query": string("Words to look for in the title or text."),
             "person": string("Only meetings this person took part in."),
+            "project": string("Only meetings filed under this project id, from list_projects."),
             "limit": integer("Most meetings to return. Default 10."),
         ]),
         output: result(["meetings": "array", "returned": "integer"])
     ) { params in
         let query = params["query"]?.stringValue
         let person = params["person"]?.stringValue
+        let project = params["project"]?.stringValue.flatMap(UUID.init(uuidString:))
         let limit = params["limit"]?.intValue ?? 10
         let hits = HistoryStore.shared.entries
             .filter { $0.kind == .meeting }
+            .filter { project == nil || inProject($0, project!) }
             .filter { entry in
                 guard let person else { return true }
                 if let names = entry.participants,
@@ -245,13 +256,19 @@ enum MCPTools {
         }]
     }
 
+    /// An entry with no project is in the Inbox, whose id list_projects never shows
+    /// but a caller may still pass.
+    nonisolated private static func inProject(_ entry: HistoryEntry, _ id: UUID) -> Bool {
+        (entry.projectID ?? Project.inboxID) == id
+    }
+
     static let projects = Tool(
         name: "list_projects",
         title: "Projects",
         summary: "List every project the user files recordings and notes under, with id and "
                + "name, in the order the user keeps them in Settings; unfiled items sit in an "
                + "Inbox that is not listed. Use to answer what the user is working on or to match a meeting to "
-               + "a project; to find the meetings themselves use search_meetings.",
+               + "a project; pass an id as project to search_meetings or list_commitments.",
         schema: noArguments,
         output: result(["projects": "array"])
     ) { _ in

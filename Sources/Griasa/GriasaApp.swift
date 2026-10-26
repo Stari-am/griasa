@@ -49,14 +49,14 @@ enum GriasaMain {
             let only = args.firstIndex(of: "--only").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
                 .map { Set($0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }) }
             if let saved = args.firstIndex(of: "--rescore").flatMap({ args.count > $0 + 1 ? args[$0 + 1] : nil }) {
-                await BenchmarkRun.rescore(directory: directory, results: saved, only: only)
+                BenchmarkRun.rescore(directory: directory, results: saved, only: only)
             }
             await BenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
         }
         if let flag = args.firstIndex(of: "--build-mcpb"), args.count > flag + 1 {
             let destination = URL(fileURLWithPath: args[flag + 1])
             do {
-                try await MainActor.run { try MCPServer.writeBundle(to: destination) }
+                try MCPServer.writeBundle(to: destination)
                 exit(0)
             } catch {
                 FileHandle.standardError.write(Data("build-mcpb: \(error.localizedDescription)\n".utf8))

@@ -8,15 +8,19 @@ enum CaptureAI {
         let title: String
         let notes: String?
         let due: Date?
+        /// A promise in the text, its quote checked against it; only ever offered.
+        let promise: CapturedPromise?
     }
 
     static func parseReminder(text: String) async -> ParsedReminder? {
         let now = localTimestamp(Date())
-        let system = Prompts.text(.reminderParse).filling(["now": now])
+        let myName = await MainActor.run { ParticipantRoster.shared.myName }
+        let system = Prompts.text(.reminderParse).filling([
+            "now": now, "me": myName.isEmpty ? "the person who captured this note" : myName])
         guard let raw = try? await AIFormatter.complete(
-            system: system, user: text, tier: .fast, maxTokens: 512)
+            system: system, user: text, tier: .fast, maxTokens: 768)
         else { return nil }
-        return parse(raw)
+        return parse(raw, capturedText: text, myName: myName)
     }
 
     static func draftReply(transcript: String) async -> String? {
@@ -29,15 +33,17 @@ enum CaptureAI {
 
     // MARK: - Parsing
 
-    private static func parse(_ raw: String) -> ParsedReminder? {
+    private static func parse(_ raw: String, capturedText: String, myName: String) -> ParsedReminder? {
         guard let start = raw.firstIndex(of: "{"),
               let end = raw.lastIndex(of: "}"), start < end else { return nil }
         let jsonString = String(raw[start...end])
         guard let data = jsonString.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let title = (obj["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !title.isEmpty
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
+        let promise = CapturedPromise.from(obj["promise"], capturedText: capturedText,
+                                           myName: myName, parseDate: parseDate)
+        let stated = (obj["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard let title = stated.isEmpty ? promise?.task : stated else { return nil }
 
         let notes = (obj["notes"] as? String)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -46,7 +52,7 @@ enum CaptureAI {
         if let iso = obj["dueDateISO"] as? String, !iso.isEmpty {
             due = parseDate(iso)
         }
-        return ParsedReminder(title: title, notes: notes, due: due)
+        return ParsedReminder(title: title, notes: notes, due: due, promise: promise)
     }
 
     private static func localTimestamp(_ date: Date) -> String {

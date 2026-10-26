@@ -105,6 +105,22 @@ enum CaptureController {
             }
 
             switch choice {
+            case .promiseOnly:
+                if let imageURL { try? FileManager.default.removeItem(at: imageURL) }
+                guard AIFormatter.isConfigured else {
+                    PopupController.shared.showMessage(
+                        title: "✅ Track as a promise",
+                        message: "Finding a promise in text needs an AI provider (Settings → AI & Actions).")
+                    return
+                }
+                PopupController.shared.showLoading(title: "✅ Track as a promise", canReplace: false, sourceApp: sourceApp)
+                guard let promise = await CaptureAI.parseReminder(text: source)?.promise else {
+                    PopupController.shared.showResult(
+                        "No promise found in that text — somebody has to commit to doing something.\n\n> \(source)")
+                    return
+                }
+                PopupController.shared.showResult("> \(promise.quote)")
+                PopupController.shared.offer(promise, from: origin)
             case .custom:
                 ReminderComposer.shared.show(text: source, origin: origin, imageURL: imageURL)
             case .fromText:
@@ -133,10 +149,12 @@ enum CaptureController {
         var title: String?
         var notes: String?
         var due: Date?
+        var promise: CapturedPromise?
         if AIFormatter.isConfigured, let parsed = await CaptureAI.parseReminder(text: text) {
             title = parsed.title
             notes = parsed.notes
             due = parsed.due
+            promise = parsed.promise
         }
         if title == nil {
             guard dueOverride != nil else {
@@ -178,6 +196,7 @@ enum CaptureController {
                 message += "\n\n\(notes)"
             }
             PopupController.shared.showResult(message)
+            if let promise { PopupController.shared.offer(promise, from: origin) }
             HistoryStore.shared.add(kind: .action, title: "Reminder", text: message,
                                     filePath: imageURL?.path)
         } catch {

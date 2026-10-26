@@ -45,7 +45,9 @@ enum MCPBundle {
                 ],
             ],
             "tools": tools.map { ["name": $0.name, "description": $0.description] },
-            "tools_generated": false,
+            // The list above is what the app answered when the bundle was built; after
+            // an app update the running server can return tools it does not name.
+            "tools_generated": true,
             "compatibility": [
                 "platforms": ["darwin"],
                 "runtimes": ["node": ">=16.0.0"],

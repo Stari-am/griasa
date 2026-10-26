@@ -267,6 +267,12 @@ final class MCPServer: ObservableObject {
     }
 
     private func answer(_ request: HTTPRequest.Parsed, on connection: NWConnection) {
+        // The server may be up only for the ingest route; reading stays off
+        // unless the person turned it on.
+        guard UserDefaults.standard.bool(forKey: "mcpEnabled") else {
+            send(status: 404, reason: "not found", on: connection)
+            return
+        }
         let gate = MCPGate(token: token, port: port)
         if case .refuse(let status, let reason) = gate.verdict(for: request) {
             send(status: status, reason: reason, on: connection)
@@ -274,7 +280,7 @@ final class MCPServer: ObservableObject {
         }
         let environment = MCPEndpoint.Environment(
             serverVersion: Self.appVersion,
-            tools: MCPTools.listings,
+            tools: MCPTools.liveListings,
             invoke: { MCPTools.invoke($0, $1) })
         let reply = MCPEndpoint.handle(body: request.body, headers: request.headers,
                                        environment: environment)
@@ -283,6 +289,13 @@ final class MCPServer: ObservableObject {
         } else {
             send(status: reply.status, reason: "", on: connection)
         }
+    }
+
+    /// Runs while the read side or the add side is switched on, and stops when
+    /// neither is. Called when either switch changes and at launch.
+    func reconcile() {
+        let wanted = UserDefaults.standard.bool(forKey: "mcpEnabled") || AssistantWrites.isOpenNow
+        wanted ? start() : stop()
     }
 
     private static var appVersion: String {

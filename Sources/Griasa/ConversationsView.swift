@@ -30,6 +30,11 @@ final class ConversationsNavigator: ObservableObject {
     }
 }
 
+extension Notification.Name {
+    /// A batch was added to the review list from outside the tab (MCP or HTTP).
+    static let conversationReviewChanged = Notification.Name("conversationReviewChanged")
+}
+
 /// What the tab reads from the store. Errors become a line of text, never
 /// message content.
 @MainActor
@@ -42,6 +47,9 @@ final class ConversationsModel: ObservableObject {
     @Published var authors: [(id: String?, name: String)] = []
     @Published var results: [(chat: Int64, day: String, messageID: String)] = []
     @Published var reviewCount = 0
+    /// What waits for a yes. Titles and counts only; the text stays in the store.
+    @Published var reviews: [(id: Int64, title: String, source: String, entrance: String,
+                              count: Int, received: Date)] = []
     @Published var error: String?
 
     private(set) var store: ConversationStore?
@@ -50,6 +58,11 @@ final class ConversationsModel: ObservableObject {
         do { store = try ConversationStore.live() }
         catch { self.error = error.localizedDescription }
         reload()
+        // The tab may be open when an assistant or the endpoint adds a batch.
+        NotificationCenter.default.addObserver(forName: .conversationReviewChanged, object: nil,
+                                               queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.reload() }
+        }
     }
 
     func reload() {
@@ -57,6 +70,10 @@ final class ConversationsModel: ObservableObject {
         do {
             chats = try store.chatList()
             reviewCount = try store.reviewCount()
+            reviews = try store.reviews().map { row in
+                let title = (try? JSONDecoder().decode(IngestBatch.self, from: row.payload))?.chat.title ?? ""
+                return (row.id, title, row.source, row.entrance, row.messageCount, row.receivedAt)
+            }
             if let selected, !chats.contains(where: { $0.id == selected }) { self.selected = nil }
             if selected == nil { selected = chats.first?.id }
             try loadSelected()
@@ -91,6 +108,31 @@ final class ConversationsModel: ObservableObject {
             // The promises taken from it stay: they are the person's list now.
             reload()
         } catch { self.error = error.localizedDescription }
+    }
+
+    /// Takes a waiting batch in: the same path an import takes (validate, store,
+    /// queue the new days for the model), then it leaves the list. Only this
+    /// click makes anything an assistant sent into messages.
+    func accept(_ id: Int64) {
+        guard let store, ManagedPolicy.live.conversationsEnabled else { return }
+        do {
+            guard let row = try store.review(id) else { reload(); return }
+            let batch = try JSONDecoder().decode(IngestBatch.self, from: row.payload)
+            switch ConversationIngest.validate([batch]) {
+            case .failure(let why): error = why.localizedDescription
+            case .success(let ok):
+                var days: [(Int64, String)] = []
+                for b in ok { days += try ConversationIngest.accept(into: store, batch: b, timeZone: .current) }
+                try store.deleteReview(id)
+                ConversationProcessor.shared.enqueue(days)
+            }
+            reload()
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// Declining removes the batch and nothing else.
+    func reject(_ id: Int64) {
+        do { try store?.deleteReview(id); reload() } catch { self.error = error.localizedDescription }
     }
 
     func title(of chat: Int64) -> String {
@@ -223,9 +265,7 @@ struct ConversationsView: View {
         }
     }
 
-    /// Batches an assistant sent that wait for the person's yes. The count is
-    /// real; the list and accept/reject belong to Task 8, which fills
-    /// `reviewList` in below.
+    /// Batches an assistant or the local endpoint sent, waiting for the person's yes.
     private var reviewSection: some View {
         Group {
             if model.reviewCount > 0 {
@@ -240,10 +280,26 @@ struct ConversationsView: View {
         }
     }
 
-    /// Task 8 hook: replace with the pending batches and their Accept / Reject.
     private var reviewList: some View {
-        Text("Chats sent by an assistant are waiting here for your yes.")
-            .font(.caption2).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(model.reviews, id: \.id) { item in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title.isEmpty ? "Untitled chat" : item.title)
+                        .font(.caption.weight(.medium)).lineLimit(1)
+                    Text("\(item.count) message\(item.count == 1 ? "" : "s") · \(item.source) · "
+                         + (item.entrance == "mcp" ? "from an assistant" : "from the local endpoint")
+                         + " · \(item.received.formatted(.relative(presentation: .named)))")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Button("Accept") { model.accept(item.id) }
+                        Button("Reject", role: .destructive) { model.reject(item.id) }
+                    }
+                    .controlSize(.small)
+                }
+            }
+            Text("Nothing is read or kept until you accept. Unanswered batches expire after 14 days.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
     }
 
     private var detail: some View {

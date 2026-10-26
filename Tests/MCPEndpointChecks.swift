@@ -290,6 +290,136 @@ do {
           saw: "\(String(describing: MCPEndpoint.decodeHeaderValue("=?base64?!!!?=")))")
 }
 
+// MARK: Assistants adding (Tasks 8 and 9)
+
+do {
+    let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("griasa-assist-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+    let store = try ConversationStore(url: tmpDir.appendingPathComponent("c.sqlite"))
+    var promises = [Commitment(text: "Send the deck", owner: "Maya", isMine: true, sourceTitle: "Chat"),
+                    Commitment(text: "Book venue", owner: "Maya", isMine: true, sourceTitle: "Chat")]
+    promises[1].done = true
+    let context = AssistantWrites.Context(
+        store: { store },
+        commitment: { id in promises.first { $0.id == id } },
+        propose: { id, quote in
+            if let i = promises.firstIndex(where: { $0.id == id }) { promises[i].proposeClosure(quote: quote) }
+        })
+    func environment(open: Bool) -> MCPEndpoint.Environment {
+        MCPEndpoint.Environment(serverVersion: "t", tools: [tool] + AssistantWrites.listings(open: open),
+                                invoke: { name, args in
+            AssistantWrites.invoke(name, args, open: open, context: context) })
+    }
+    func call(_ env: MCPEndpoint.Environment, _ method: String, _ params: [String: Any] = [:]) -> [String: Any] {
+        let body = try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": 1, "method": method, "params": params])
+        return json(MCPEndpoint.handle(body: body, headers: [:], environment: env).body)
+    }
+    func names(_ env: MCPEndpoint.Environment) -> [String] {
+        ((call(env, "tools/list")["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? [])
+            .compactMap { $0["name"] as? String }
+    }
+    let batchArguments: [String: Any] = [
+        "source": "telegram", "chat": ["id": "c9", "title": "Crew"], "me": "Maya",
+        "messages": [["id": "1", "author": "Maya", "at": "2026-10-20T10:00:00Z", "text": "I'll send the deck Friday"]],
+    ]
+
+    let off = environment(open: false), on = environment(open: true)
+    check(names(off) == ["list_people"],
+          rule: "with the switch off, tools/list has neither write tool",
+          meaning: "the MCP server stays read-only unless the person opens it", saw: "\(names(off))")
+    let refused = call(off, "tools/call", ["name": "add_conversation", "arguments": batchArguments])
+    check((refused["error"] as? [String: Any])?["code"] as? Int == -32602
+            && ((try? store.reviewCount()) ?? -1) == 0,
+          rule: "with the switch off, add_conversation is an unknown tool and stores nothing",
+          meaning: "a closed switch must not be a polite refusal that still wrote", saw: "\(refused)")
+
+    check(Set(names(on)) == ["list_people", "add_conversation", "propose_close_commitment"],
+          rule: "with the switch on, both write tools are listed",
+          meaning: "an assistant can only use what it is shown", saw: "\(names(on))")
+    let listed = ((call(on, "tools/list")["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? [])
+        .filter { ($0["name"] as? String) != "list_people" }
+    check(listed.count == 2 && listed.allSatisfy {
+            let a = $0["annotations"] as? [String: Any]
+            return a?["readOnlyHint"] as? Bool == false && a?["destructiveHint"] as? Bool == false
+                && a?["idempotentHint"] as? Bool == true
+          },
+          rule: "write tools say they write, and that they do not destroy",
+          meaning: "clients show the right confirmation from the annotations", saw: "\(listed.map { $0["annotations"] ?? "" })")
+
+    let added = call(on, "tools/call", ["name": "add_conversation", "arguments": batchArguments])
+    let addedResult = (added["result"] as? [String: Any])
+    let queued = addedResult?["structuredContent"] as? [String: Any]
+    check(addedResult?["isError"] as? Bool == false && queued?["queued"] as? Bool == true
+            && queued?["review_id"] is Int
+            && ((try? store.reviewCount()) ?? -1) == 1
+            && ((try? store.chatList().count) ?? -1) == 0
+            && ((try? store.pendingDays().count) ?? -1) == 0,
+          rule: "add_conversation queues a review item and processes nothing",
+          meaning: "an assistant's text cannot become messages, days or promises without the person's yes",
+          saw: "\(added) reviews \((try? store.reviewCount()) ?? -1), chats \((try? store.chatList().count) ?? -1)")
+    var wrong = batchArguments
+    wrong["source"] = "fax"
+    let bad = (call(on, "tools/call", ["name": "add_conversation", "arguments": wrong])["result"] as? [String: Any])
+    check(bad?["isError"] as? Bool == true && ((try? store.reviewCount()) ?? -1) == 1,
+          rule: "an invalid batch is an error result and adds nothing", meaning: "the model can read the reason and retry",
+          saw: "\(String(describing: bad))")
+
+    let open = promises[0]
+    let proposed = (call(on, "tools/call", ["name": "propose_close_commitment",
+        "arguments": ["id": open.id.uuidString, "quote_or_reason": "Sent it on Tuesday"]])["result"] as? [String: Any])
+    let suggested: Bool = promises[0].suggestedDoneQuote == "Sent it on Tuesday" && promises[0].suggestedDoneAt != nil
+    let notDone: Bool = promises[0].done == false && promises[0].hasClosureSuggestion
+    check(proposed?["isError"] as? Bool == false && notDone && suggested,
+          rule: "propose_close_commitment sets the suggestion and never done",
+          meaning: "only the person closes a promise", saw: "done \(promises[0].done), quote \(promises[0].suggestedDoneQuote ?? "nil")")
+    let unknown = (call(on, "tools/call", ["name": "propose_close_commitment",
+        "arguments": ["id": UUID().uuidString, "quote_or_reason": "x"]])["result"] as? [String: Any])
+    let finished = (call(on, "tools/call", ["name": "propose_close_commitment",
+        "arguments": ["id": promises[1].id.uuidString, "quote_or_reason": "x"]])["result"] as? [String: Any])
+    let unknownFailed: Bool = unknown?["isError"] as? Bool == true
+    let finishedFailed: Bool = finished?["isError"] as? Bool == true
+    check(unknownFailed && finishedFailed && promises[1].suggestedDoneQuote == nil,
+          rule: "an unknown or already-done promise id is an error result",
+          meaning: "a wrong id must not look like a success", saw: "\(String(describing: unknown)) \(String(describing: finished))")
+
+    // The switch's own rule.
+    func pol(_ values: [String: Any]) -> ManagedPolicy { ManagedPolicy(isForced: { values[$0] != nil }, value: { values[$0] }) }
+    check(AssistantWrites.isOpen(userSwitch: true, policy: pol([:]))
+            && !AssistantWrites.isOpen(userSwitch: false, policy: pol([:]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["conversationIngestEnabled": false]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["conversationIngestEnabled": "maybe"]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["conversationsEnabled": false]))
+            && !AssistantWrites.isOpen(userSwitch: false, policy: pol(["conversationIngestEnabled": true])),
+          rule: "assistants may add only when the person turned it on and no organisation key closes it",
+          meaning: "the MDM key is a veto, never an enabler", saw: "")
+
+    // A full review list refuses rather than dropping older batches.
+    let full = try ConversationStore(url: tmpDir.appendingPathComponent("full.sqlite"))
+    for i in 0..<ConversationIngest.maxReviewBatches {
+        try full.addReview(entrance: "http", payload: Data("{}".utf8), messageCount: 1, source: "other",
+                           sourceChatID: "c\(i)", receivedAt: Date())
+    }
+    let one = IngestBatch(source: "other", chat: .init(id: "x", title: "t", type: nil), me: nil,
+                          messages: [.init(id: "1", author_id: nil, author: "A", at: "2026-10-20T10:00:00Z",
+                                           text: "hi", is_mine: nil, forwarded_from: nil)])
+    check(AssistantWrites.queue([one], entrance: "http", store: full, now: Date()) == .failure(.full),
+          rule: "a full review list refuses new batches", meaning: "the limits are real", saw: "accepted")
+
+    // The review id round trip the tab relies on.
+    if let row = try store.reviews().first,
+       let back = try? JSONDecoder().decode(IngestBatch.self, from: row.payload) {
+        check(row.entrance == "mcp" && back.chat.id == "c9" && back.messages.count == 1 && row.messageCount == 1,
+              rule: "a waiting batch keeps its chat and messages", meaning: "accepting reads it back",
+              saw: "\(row.entrance) \(back.chat.id)")
+        try store.deleteReview(row.id)
+        check(((try? store.reviewCount()) ?? -1) == 0, rule: "rejecting removes the batch", meaning: "nothing is kept", saw: "left")
+    } else {
+        check(false, rule: "the queued batch can be read back", meaning: "accept depends on it", saw: "no row")
+    }
+} catch {
+    check(false, rule: "the assistant-write checks run", meaning: "fixture setup", saw: "\(error)")
+}
+
 return failures
 }
 

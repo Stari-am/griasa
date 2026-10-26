@@ -47,7 +47,9 @@ struct ManagedPolicy {
                                "customSmartModel", "mcpEnabled", allowCloudAIKey,
                                RecordingNotice.enabledKey, RecordingNotice.textKey,
                                "audioRetentionDays",
-                               "localModelID", "localModelAutoDownload", "localEnginePreferred"]
+                               "localModelID", "localModelAutoDownload", "localEnginePreferred",
+                               conversationsEnabledKey, conversationIngestEnabledKey,
+                               conversationRetentionDaysKey]
         + providerKeys.values.sorted()
 
     /// The providers that stay on this Mac. A custom endpoint counts even when

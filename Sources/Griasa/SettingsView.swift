@@ -985,6 +985,27 @@ private struct SystemSettings: View {
     @ObservedObject var state: AppState
     @ObservedObject private var mcp = MCPServer.shared
     @ObservedObject private var stats = UsageStats.shared
+    /// "Let assistants add to Griasa": the one switch for both MCP write tools
+    /// and the local HTTP endpoint. An organisation can only close it; when its
+    /// profile says no the switch is locked off, and when it says yes the
+    /// person still decides.
+    @ViewBuilder private var addToGriasa: some View {
+        let policy = ManagedPolicy.live
+        let key = ManagedPolicy.conversationIngestEnabledKey
+        let forcedOff = policy.isLocked(key) && !policy.conversationIngestAllowed
+        Toggle("Let assistants add to Griasa",
+               isOn: Binding(get: { state.assistantsMayAdd && !forcedOff },
+                             set: { state.assistantsMayAdd = $0 }))
+            .disabled(forcedOff || !policy.conversationsEnabled)
+        if forcedOff || !policy.conversationsEnabled {
+            managedNote("Set by your organization.")
+        } else if policy.isLocked(key) {
+            managedNote("Allowed by your organization.")
+        }
+        Text("Additions wait for your review in the Conversations tab. Nothing is changed or deleted.")
+            .font(.caption).foregroundStyle(.secondary)
+    }
+
     var body: some View {
         SettingsTab {
             Section("AI assistants (MCP)") {
@@ -1028,6 +1049,7 @@ private struct SystemSettings: View {
                    + "months of conversation into a cloud model by accident.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                addToGriasa
             }
             Section("Permissions") {
                 permissionRow("Microphone", granted: Permissions.microphoneGranted,

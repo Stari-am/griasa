@@ -73,6 +73,9 @@ final class ConversationStore {
             sqlite3_close(db)
             throw Failure.sqlite(why)
         }
+        // Another connection (the tab, the MCP tools, the local endpoint) may be
+        // writing at the same moment; wait a moment rather than fail.
+        sqlite3_busy_timeout(db, 3_000)
         do { try migrate() } catch { sqlite3_close(db); throw error }
     }
 
@@ -527,8 +530,9 @@ final class ConversationStore {
     /// Queues a batch from an assistant or the endpoint for the person to
     /// accept. The chat it names is stored in the clear so `deleteChat` can
     /// remove it; the limits (`ConversationIngest.reviewAdmit`) are the caller's.
+    @discardableResult
     func addReview(entrance: String, payload: Data, messageCount: Int,
-                   source: String, sourceChatID: String, receivedAt: Date) throws {
+                   source: String, sourceChatID: String, receivedAt: Date) throws -> Int64 {
         try locked {
             _ = try run("""
                 INSERT INTO review(received_at, entrance, payload, message_count, source, source_chat_id)
@@ -536,11 +540,57 @@ final class ConversationStore {
                 """, [.real(receivedAt.timeIntervalSince1970), .text(entrance),
                       .blob(payload), .int(Int64(messageCount)),
                       .text(source), .text(sourceChatID)])
+            return sqlite3_last_insert_rowid(db)
         }
     }
 
     func reviewCount() throws -> Int {
         try locked { try query("SELECT COUNT(*) FROM review", []) { Int($0.int(0)) }.first ?? 0 }
+    }
+
+    /// What the review list holds now: batches and their messages, for
+    /// `ConversationIngest.reviewAdmit`.
+    func reviewTotals() throws -> (count: Int, messages: Int) {
+        try locked {
+            try query("SELECT COUNT(*), COALESCE(SUM(message_count), 0) FROM review", []) {
+                (count: Int($0.int(0)), messages: Int($0.int(1)))
+            }.first ?? (0, 0)
+        }
+    }
+
+    struct ReviewRow {
+        var id: Int64
+        var receivedAt: Date
+        var entrance: String
+        var messageCount: Int
+        var source: String
+        var sourceChatID: String
+        var payload: Data
+    }
+
+    /// Waiting batches, newest first.
+    func reviews() throws -> [ReviewRow] {
+        try locked {
+            try query("""
+                SELECT id, received_at, entrance, message_count, source, source_chat_id, payload
+                FROM review ORDER BY received_at DESC, id DESC
+                """, []) { row in
+                ReviewRow(id: row.int(0), receivedAt: Date(timeIntervalSince1970: row.double(1)),
+                          entrance: row.string(2) ?? "", messageCount: Int(row.int(3)),
+                          source: row.string(4) ?? "", sourceChatID: row.string(5) ?? "",
+                          payload: row.blob(6))
+            }
+        }
+    }
+
+    func review(_ id: Int64) throws -> ReviewRow? {
+        try reviews().first { $0.id == id }
+    }
+
+    /// Rejecting a batch, or having taken it in. `secure_delete` overwrites the
+    /// payload's pages as it goes.
+    func deleteReview(_ id: Int64) throws {
+        try locked { _ = try run("DELETE FROM review WHERE id = ?", [.int(id)]) }
     }
 
     // MARK: SQLite plumbing
@@ -553,6 +603,10 @@ final class ConversationStore {
         let stmt: OpaquePointer
         func int(_ i: Int32) -> Int64 { sqlite3_column_int64(stmt, i) }
         func double(_ i: Int32) -> Double { sqlite3_column_double(stmt, i) }
+        func blob(_ i: Int32) -> Data {
+            guard let bytes = sqlite3_column_blob(stmt, i) else { return Data() }
+            return Data(bytes: bytes, count: Int(sqlite3_column_bytes(stmt, i)))
+        }
         func string(_ i: Int32) -> String? {
             guard sqlite3_column_type(stmt, i) != SQLITE_NULL, let c = sqlite3_column_text(stmt, i) else { return nil }
             return String(cString: c)

@@ -56,6 +56,17 @@ struct Commitment: Identifiable, Codable, Equatable {
 
     var hasClosureSuggestion: Bool { !done && suggestedDoneQuote != nil }
 
+    /// Records that something says this promise is finished, with the words that
+    /// say so. Never closes it: `done` is the person's to set. False (and nothing
+    /// changed) when it is already done.
+    @discardableResult
+    mutating func proposeClosure(quote: String, at date: Date = Date()) -> Bool {
+        guard !done else { return false }
+        suggestedDoneQuote = quote
+        suggestedDoneAt = date
+        return true
+    }
+
     init(id: UUID = UUID(), text: String, owner: String, isMine: Bool,
          dueHint: String? = nil, dueDate: Date? = nil, sourceTitle: String,
          sourceEntryID: UUID? = nil, date: Date = Date(), done: Bool = false,

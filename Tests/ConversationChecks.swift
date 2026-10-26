@@ -657,5 +657,55 @@ do {
           saw: "")
 }
 
+    // The import sheet's rules.
+    func exported(_ id: String, count: Int, from base: Date = Date(timeIntervalSince1970: 1_800_000_000),
+                  authors: [String] = ["user1", "user2"]) -> ExportedChat {
+        let msgs = (0..<count).map { i in
+            StoredMessage(sourceMessageID: "\(i)", authorID: authors[i % authors.count], authorName: "N\(i % authors.count)",
+                          sentAt: base.addingTimeInterval(Double(i)), text: "t\(i)", isMine: false, forwardedFrom: nil)
+        }
+        return ExportedChat(ref: ChatRef(source: "telegram", sourceChatID: id, title: "T", type: "personal"),
+                            messageCount: count, lastMessage: msgs.last?.sentAt, messages: msgs)
+    }
+    let known: Set<String> = [ConversationImportRules.key(exported("5", count: 1).ref)]
+    check(ConversationImportRules.preTicked(exported("5", count: 3), known: known)
+          && !ConversationImportRules.preTicked(exported("6", count: 3), known: known)
+          && !ConversationImportRules.preTicked(exported("5", count: 0), known: known),
+          rule: "a chat imported before is pre-ticked, a new or empty one is not",
+          meaning: "topping up is the common case; an empty chat has nothing to import", saw: "")
+    check(ConversationImportRules.window(days: true, amount: 0) == .days(1)
+          && ConversationImportRules.window(days: true, amount: 99_999) == .days(ConversationImportRules.maxDays)
+          && ConversationImportRules.window(days: false, amount: 50) == .messages(50),
+          rule: "a typed window is clamped", meaning: "a stray digit must not ask for ten million days",
+          saw: "")
+    check(ConversationImportRules.resolveMe(exportMe: "user9", remembered: "user1", participants: ["user1"]) == .known("user9")
+          && ConversationImportRules.resolveMe(exportMe: nil, remembered: "user1", participants: ["user1", "user2"]) == .known("user1")
+          && ConversationImportRules.resolveMe(exportMe: nil, remembered: "user3", participants: ["user1", "user2"]) == .ask
+          && ConversationImportRules.resolveMe(exportMe: nil, remembered: nil, participants: ["user1"]) == .ask,
+          rule: "the export's own account wins; a remembered one is used only if it is in the chat; else ask",
+          meaning: "a wrong 'me' would make other people's messages the person's own promises", saw: "")
+    let people = ConversationImportRules.participants(of: [exported("1", count: 5)])
+    check(people.map(\.id) == ["user1", "user2"],
+          rule: "participants are listed most active first", meaning: "the person is usually the one who wrote most",
+          saw: "\(people.map(\.id))")
+    let now0 = Date(timeIntervalSince1970: 1_800_000_000 + 10)
+    let sample = exported("8", count: 10)
+    check(ConversationImportRules.keptCount(sample, window: .messages(4), now: now0)
+            == TelegramExport.limited(sample, to: .messages(4), now: now0).messageCount
+          && ConversationImportRules.keptCount(sample, window: .days(1), now: now0)
+            == TelegramExport.limited(sample, to: .days(1), now: now0).messageCount,
+          rule: "the count shown beside a chat is what the window keeps",
+          meaning: "the sheet must not promise a different number than it imports", saw: "")
+    let big = exported("7", count: ConversationIngest.maxMessages * 2 + 1)
+    let parts = ConversationImportRules.batches(big, myID: "user1", source: "telegram")
+    check(parts.count == 3 && parts.allSatisfy { (try? ConversationIngest.validate([$0]).get()) != nil && $0.messages.count <= ConversationIngest.maxMessages }
+          && parts.reduce(0, { $0 + $1.messages.count }) == big.messageCount,
+          rule: "a long window is cut into batches the ingest limit accepts",
+          meaning: "one oversized request would be refused whole", saw: "\(parts.map(\.messages.count))")
+    let mineFlags = parts[0].messages.prefix(4).map { $0.is_mine ?? false }
+    check(mineFlags == [true, false, true, false],
+          rule: "is_mine follows the chosen account", meaning: "promises are attributed from it",
+          saw: "\(mineFlags)")
+
 return failures
 }

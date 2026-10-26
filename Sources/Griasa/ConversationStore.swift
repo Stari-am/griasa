@@ -382,6 +382,52 @@ final class ConversationStore {
         }
     }
 
+    // MARK: Browsing
+
+    /// Every chat with its last message, newest first; what the hub's list shows.
+    func chatList() throws -> [(id: Int64, ref: ChatRef, last: Date?)] {
+        try locked {
+            try query("""
+                SELECT c.id, c.source, c.source_chat_id, c.title, c.type, MAX(m.sent_at)
+                FROM chats c LEFT JOIN messages m ON m.chat_id = c.id
+                GROUP BY c.id ORDER BY MAX(m.sent_at) DESC, c.id DESC
+                """, []) { row in
+                (id: row.int(0),
+                 ref: ChatRef(source: row.string(1) ?? "", sourceChatID: row.string(2) ?? "",
+                              title: row.string(3) ?? "", type: row.string(4) ?? ""),
+                 last: sqlite3_column_type(row.stmt, 5) == SQLITE_NULL
+                    ? nil : Date(timeIntervalSince1970: row.double(5)))
+            }
+        }
+    }
+
+    /// The chat's days, newest first, with the pipeline's state and summary.
+    /// A day with messages but no row yet reads as `pending`.
+    func days(chat: Int64) throws -> [(day: String, state: DayState, summary: String?, count: Int)] {
+        try locked {
+            try query("""
+                SELECT m.day, COUNT(*), d.state, d.summary FROM messages m
+                LEFT JOIN days d ON d.chat_id = m.chat_id AND d.day = m.day
+                WHERE m.chat_id = ? GROUP BY m.day ORDER BY m.day DESC
+                """, [.int(chat)]) { row in
+                (day: row.string(0) ?? "", state: row.string(2).flatMap { DayState(rawValue: $0) } ?? .pending,
+                 summary: row.string(3), count: Int(row.int(1)))
+            }
+        }
+    }
+
+    /// Who spoke in the chat, other than the person and forwards: one row per
+    /// account id (or per name where a source has no ids).
+    func authors(chat: Int64) throws -> [(id: String?, name: String)] {
+        try locked {
+            try query("""
+                SELECT author_id, MAX(author_name) FROM messages
+                WHERE chat_id = ? AND is_mine = 0 AND forwarded_from IS NULL
+                GROUP BY COALESCE(author_id, author_name) ORDER BY MAX(author_name)
+                """, [.int(chat)]) { (id: $0.string(0), name: $0.string(1) ?? "") }
+        }
+    }
+
     // MARK: Search
 
     /// Messages containing every word of `query`, newest day first. Words are

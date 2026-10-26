@@ -15,6 +15,7 @@ enum HubTab: String, Identifiable {
     case prep
     case newDocument
     case importNotes
+    case conversations
     case typingDiagnostics
     case localModel
 
@@ -34,6 +35,7 @@ enum HubTab: String, Identifiable {
         case .prep: return "📋 Prep"
         case .newDocument: return "📄 New Document"
         case .importNotes: return "📥 Import Notes"
+        case .conversations: return "💬 Conversations"
         case .typingDiagnostics: return "⌨️ Typing Test"
         case .localModel: return "🧠 Local AI"
         }
@@ -85,6 +87,8 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
     /// the panel without making it key — background events (the pre-meeting
     /// brief) must never yank keyboard focus from what the user is typing.
     func open(_ tab: HubTab, activate: Bool = true) {
+        // The tab does not exist when the organization has turned chats off.
+        if tab == .conversations, !ManagedPolicy.live.conversationsEnabled { return }
         if !openTabs.contains(tab) { openTabs.append(tab) }
         selected = tab
         present(activate: activate)
@@ -114,6 +118,7 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
         case .prep: close(.prep)
         case .newDocument: close(.newDocument)
         case .importNotes: close(.importNotes)
+        case .conversations: close(.conversations)
         case .typingDiagnostics: close(.typingDiagnostics)
         case .localModel:
             // Closing the question is an answer to it, like "Not now": without
@@ -273,6 +278,8 @@ struct HubView: View {
             NewDocumentView()
         case .importNotes:
             ImportNotesView()
+        case .conversations:
+            ConversationsView()
         case .typingDiagnostics:
             TypingDiagnosticsView()
         case .localModel:

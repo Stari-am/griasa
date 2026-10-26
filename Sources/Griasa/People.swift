@@ -73,6 +73,13 @@ final class PersonStore: ObservableObject {
         save()
     }
 
+    /// Links a chat account (`Person.handles[source]`) to a person: the id
+    /// outlasts the display name, so later promises from it need no guessing.
+    func setHandle(_ id: String, source: String, for name: String) {
+        guard !id.isEmpty else { return }
+        upsert(name: name) { $0.handles[source] = id }
+    }
+
     func setNotes(_ notes: String, for name: String) {
         upsert(name: name) { $0.notes = notes }
     }

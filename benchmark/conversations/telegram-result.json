@@ -1,0 +1,171 @@
+{
+ "personal_information": {
+  "user_id": 1001,
+  "first_name": "Alex",
+  "last_name": "Doe",
+  "username": "alexdoe",
+  "phone_number": "+0 000 000 0000"
+ },
+ "chats": {
+  "about": "Exported Telegram chats",
+  "list": [
+   {
+    "name": "Launch crew",
+    "type": "private_group",
+    "id": 5550001,
+    "messages": [
+     {
+      "id": 1,
+      "type": "service",
+      "date": "2026-10-19T09:00:00",
+      "date_unixtime": "1792400400",
+      "actor": "Maya Lindqvist",
+      "actor_id": "user2001",
+      "action": "create_group",
+      "title": "Launch crew",
+      "members": [
+       "Maya Lindqvist"
+      ],
+      "text": "",
+      "text_entities": []
+     },
+     {
+      "id": 2,
+      "type": "message",
+      "date": "2026-10-19T09:05:00",
+      "date_unixtime": "1792400700",
+      "from": "Maya Lindqvist",
+      "from_id": "user2001",
+      "text": "Pricing page is ready for review",
+      "text_entities": []
+     },
+     {
+      "id": 3,
+      "type": "message",
+      "date": "2026-10-19T09:07:00",
+      "date_unixtime": "1792400820",
+      "from": "Alex Doe",
+      "from_id": "user1001",
+      "text": [
+       "I'll send you the ",
+       {
+        "type": "bold",
+        "text": "updated"
+       },
+       " deck by ",
+       " Friday"
+      ],
+      "text_entities": [
+       {
+        "type": "plain",
+        "text": "I'll send you the "
+       },
+       {
+        "type": "bold",
+        "text": "updated"
+       },
+       {
+        "type": "plain",
+        "text": " deck by  Friday"
+       }
+      ]
+     },
+     {
+      "id": 4,
+      "type": "message",
+      "date": "2026-10-20T10:30:00",
+      "date_unixtime": "1792492200",
+      "from": "Maya Lindqvist",
+      "from_id": "user2001",
+      "text": "",
+      "text_entities": [],
+      "sticker_emoji": "👍",
+      "media_type": "sticker",
+      "file": "(File not included. Change data exporting settings to download.)"
+     },
+     {
+      "id": 5,
+      "type": "message",
+      "date": "2026-10-20T10:31:00",
+      "date_unixtime": "1792492260",
+      "from": "Maya Lindqvist",
+      "from_id": "user2001",
+      "text": "Here is the venue shot",
+      "text_entities": [],
+      "photo": "(File not included. Change data exporting settings to download.)",
+      "width": 800,
+      "height": 600
+     },
+     {
+      "id": 6,
+      "type": "message",
+      "date": "2026-10-21T08:15:00",
+      "date_unixtime": "1792570500",
+      "from": "Maya Lindqvist",
+      "from_id": "user2001",
+      "text": "Look at this checklist",
+      "text_entities": [],
+      "forwarded_from": "Venue Desk"
+     },
+     {
+      "id": 7,
+      "type": "message",
+      "date": "2026-10-21T23:30:00",
+      "date_unixtime": "1792625400",
+      "from": "Alex Doe",
+      "from_id": "user1001",
+      "text": "Late thought about the schedule",
+      "text_entities": []
+     },
+     {
+      "id": 8,
+      "type": "message",
+      "date": "2026-10-22T00:10:00",
+      "date_unixtime": "1792627800",
+      "from": "Maya Lindqvist",
+      "from_id": "user2001",
+      "text": "Replying after midnight about the schedule",
+      "text_entities": []
+     },
+     {
+      "id": 9,
+      "type": "message",
+      "date": "2026-10-25T12:00:00",
+      "date_unixtime": "1792929600",
+      "from": "Alex Doe",
+      "from_id": "user1001",
+      "text": "I will book the room tomorrow",
+      "text_entities": []
+     }
+    ]
+   },
+   {
+    "name": "Daniel Okafor",
+    "type": "personal_chat",
+    "id": 5550002,
+    "messages": [
+     {
+      "id": 101,
+      "type": "message",
+      "date": "2026-10-24T18:00:00",
+      "date_unixtime": "1792864800",
+      "from": "Daniel Okafor",
+      "from_id": "user3001",
+      "text": "Can you share the budget sheet?",
+      "text_entities": []
+     },
+     {
+      "id": 102,
+      "type": "message",
+      "date": "2026-10-24T18:02:00",
+      "date_unixtime": "1792864920",
+      "from": "Alex Doe",
+      "from_id": "user1001",
+      "text": "Sure, I'll share the budget sheet tonight",
+      "text_entities": []
+     }
+    ]
+   }
+  ]
+ }
+}

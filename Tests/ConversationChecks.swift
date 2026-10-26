@@ -129,5 +129,104 @@ do {
     check(false, rule: "the store runs", meaning: "every store rule depends on it", saw: "\(error)")
 }
 
+// MARK: Telegram export
+
+let fixtures = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("benchmark/conversations", isDirectory: true)
+let fullURL = fixtures.appendingPathComponent("telegram-result.json")
+let singleURL = fixtures.appendingPathComponent("telegram-single-chat.json")
+
+do {
+    let export = try TelegramExport.read(fullURL)
+    check(export.chats.count == 2 && export.me?.id == "user1001" && export.me?.name == "Alex Doe",
+          rule: "the full export yields its chats and who the account is",
+          meaning: "the account's own messages are the person's promises",
+          saw: "\(export.chats.count) chats, me \(String(describing: export.me))")
+    let group = export.chats.first { $0.ref.sourceChatID == "5550001" }!
+    let ids = group.messages.map(\.sourceMessageID)
+    check(ids == ["2", "3", "5", "6", "7", "8", "9"],
+          rule: "sticker and service lines are dropped, the photo's caption is kept",
+          meaning: "only words someone wrote are messages",
+          saw: "\(ids)")
+    check(group.messages.first { $0.sourceMessageID == "3" }?.text == "I'll send you the updated deck by  Friday",
+          rule: "text entities flatten to one string",
+          meaning: "bold and links must not split or lose words",
+          saw: "\(String(describing: group.messages.first { $0.sourceMessageID == "3" }?.text))")
+    check(group.messages.first { $0.sourceMessageID == "6" }?.forwardedFrom == "Venue Desk"
+          && group.messages.first { $0.sourceMessageID == "2" }?.forwardedFrom == nil,
+          rule: "a forward keeps who it is from",
+          meaning: "a forwarded line is never the forwarder's promise",
+          saw: "forwarded_from wrong")
+    check(group.messages.filter(\.isMine).map(\.sourceMessageID) == ["3", "7", "9"],
+          rule: "with personal_information the account's own messages are mine",
+          meaning: "ownership comes from the source, not from a model",
+          saw: "\(group.messages.filter(\.isMine).map(\.sourceMessageID))")
+    check(group.messageCount == 7 && group.lastMessage == group.messages.map(\.sentAt).max(),
+          rule: "the chat's count and last date describe its messages",
+          meaning: "the picker shows them next to each chat",
+          saw: "\(group.messageCount)")
+
+    let now = utc("2026-10-27T00:00:00Z")
+    let week = TelegramExport.limited(group, to: .days(7), now: now)
+    check(week.messages.map(\.sourceMessageID) == ["5", "6", "7", "8", "9"],
+          rule: "limited(.days) keeps only the recent days",
+          meaning: "a long chat is imported a slice at a time",
+          saw: "\(week.messages.map(\.sourceMessageID))")
+    let last3 = TelegramExport.limited(group, to: .messages(3), now: now)
+    check(last3.messages.map(\.sourceMessageID) == ["7", "8", "9"] && last3.messageCount == 3,
+          rule: "limited(.messages) keeps the last N",
+          meaning: "the person can take just the latest part",
+          saw: "\(last3.messages.map(\.sourceMessageID))")
+} catch {
+    check(false, rule: "the full export fixture reads", meaning: "everything below depends on it", saw: "\(error)")
+}
+
+do {
+    let single = try TelegramExport.read(singleURL)
+    check(single.me == nil && single.chats.count == 1 && single.chats[0].messages.allSatisfy { !$0.isMine },
+          rule: "a single-chat export has no 'me'",
+          meaning: "Griasa must ask once who the person is rather than guess",
+          saw: "me \(String(describing: single.me))")
+} catch {
+    check(false, rule: "the single-chat fixture reads", meaning: "it is the other export shape", saw: "\(error)")
+}
+
+do {
+    let data = try Data(contentsOf: fullURL)
+    let cut = tmp.appendingPathComponent("cut.json")
+    try data.prefix(data.count / 2).write(to: cut)
+    do {
+        _ = try TelegramExport.read(cut)
+        check(false, rule: "a truncated export is refused", meaning: "half a chat must not import silently", saw: "no error")
+    } catch let f as TelegramExport.Failure {
+        check(f == .notAnExport, rule: "a truncated export is reported as not an export",
+              meaning: "the person is told what to do", saw: "\(f)")
+    }
+    let other = tmp.appendingPathComponent("other.json")
+    try Data("{\"hello\": 1}".utf8).write(to: other)
+    do {
+        _ = try TelegramExport.read(other)
+        check(false, rule: "other JSON is refused", meaning: "a wrong file must not look like an empty import", saw: "no error")
+    } catch let f as TelegramExport.Failure {
+        check(f == .notAnExport, rule: "other JSON is not an export", meaning: "clear message", saw: "\(f)")
+    }
+    do {
+        _ = try TelegramExport.read(fullURL, fileSize: { _ in (1 << 30) + 1 })
+        check(false, rule: "an export over 1 GB is refused", meaning: "the file is parsed in memory", saw: "no error")
+    } catch let f as TelegramExport.Failure {
+        check(f == .tooLarge && !(f.errorDescription ?? "").isEmpty,
+              rule: "an export over 1 GB is too large, with a readable message",
+              meaning: "the person learns to export less", saw: "\(f)")
+    }
+    do {
+        _ = try TelegramExport.read(tmp.appendingPathComponent("missing.json"))
+        check(false, rule: "a missing file is refused", meaning: "no silent empty import", saw: "no error")
+    } catch let f as TelegramExport.Failure {
+        if case .unreadable = f {} else { check(false, rule: "a missing file is unreadable", meaning: "clear message", saw: "\(f)") }
+    }
+} catch {
+    check(false, rule: "export error cases run", meaning: "fixture setup", saw: "\(error)")
+}
+
 return failures
 }

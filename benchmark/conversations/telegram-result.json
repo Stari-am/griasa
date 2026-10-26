@@ -136,6 +136,17 @@
       "from_id": "user1001",
       "text": "I will book the room tomorrow",
       "text_entities": []
+     },
+     {
+      "id": 10,
+      "type": "message",
+      "date": "2026-10-25T13:00:00",
+      "date_unixtime": "1792933200",
+      "from": "Alex Doe",
+      "from_id": "user1001",
+      "text": "Checklist from the venue desk",
+      "text_entities": [],
+      "forwarded_from": "Venue Desk"
      }
     ]
    },

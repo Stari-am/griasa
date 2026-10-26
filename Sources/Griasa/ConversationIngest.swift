@@ -79,7 +79,8 @@ enum ConversationIngest {
     }
 
     /// A validated batch as the store keeps it. `isMine` is the caller's word if
-    /// given, otherwise "the author is `me`", by id or by name.
+    /// given, otherwise "the author is `me`", by id or by name; a forwarded
+    /// message is never mine.
     static func stored(_ batch: IngestBatch) -> (ChatRef, [StoredMessage]) {
         let ref = ChatRef(source: batch.source, sourceChatID: batch.chat.id,
                           title: batch.chat.title, type: batch.chat.type ?? "unknown")
@@ -92,7 +93,9 @@ enum ConversationIngest {
             guard let sentAt = date(m.at) else { return nil }
             return StoredMessage(sourceMessageID: m.id, authorID: m.author_id, authorName: m.author,
                                  sentAt: sentAt, text: m.text,
-                                 isMine: m.is_mine ?? (same(m.author_id) || same(m.author)),
+                                 // A forward is never the forwarder's promise, whatever the caller says.
+                                 isMine: m.forwarded_from == nil
+                                     && (m.is_mine ?? (same(m.author_id) || same(m.author))),
                                  forwardedFrom: m.forwarded_from)
         }
         return (ref, messages)

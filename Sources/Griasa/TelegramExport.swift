@@ -131,7 +131,9 @@ enum TelegramExport {
         return StoredMessage(sourceMessageID: String(id), authorID: authorID,
                              authorName: m["from"] as? String ?? "Unknown",
                              sentAt: sentAt, text: text,
-                             isMine: myID != nil && authorID == myID,
+                             // Forwarding someone else's words is not saying them, even from the
+                             // account's own chat: never the forwarder's promise.
+                             isMine: forwarded == nil && myID != nil && authorID == myID,
                              forwardedFrom: forwarded)
     }
 

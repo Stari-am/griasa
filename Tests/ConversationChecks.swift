@@ -19,6 +19,16 @@ func check(_ passed: Bool, rule: String, meaning: String, saw: String) {
     """)
 }
 
+/// Runs something that can throw inside a check: an error is a failed rule with
+/// its own line, and the value falls back so the check beneath it reports too.
+func got<T>(_ what: String, _ fallback: T, _ body: () throws -> T) -> T {
+    do { return try body() } catch {
+        failures += 1
+        print("\n    ✗ \(what) threw\n      what happened:  \(error)")
+        return fallback
+    }
+}
+
 let tmp = FileManager.default.temporaryDirectory
     .appendingPathComponent("griasa-conv-\(UUID().uuidString)", isDirectory: true)
 try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
@@ -50,24 +60,24 @@ do {
           rule: "inserting the same messages twice reports new days once",
           meaning: "a re-import must not queue a day for another summary",
           saw: "first \(first), second \(second)")
-    check(try! store.dayState(chat: chat, day: "2026-10-20") == .pending,
+    check(got("dayState", nil) { try store.dayState(chat: chat, day: "2026-10-20") } == .pending,
           rule: "a day with new messages is pending",
           meaning: "the pipeline finds its work from the pending days",
-          saw: "\(String(describing: try! store.dayState(chat: chat, day: "2026-10-20")))")
+          saw: "\(String(describing: got("dayState", nil) { try store.dayState(chat: chat, day: "2026-10-20") }))")
 
     try store.setDay(chat: chat, day: "2026-10-20", state: .done, summary: "gist", processedUpTo: "2")
     try store.setDay(chat: chat, day: "2026-10-20", state: .failed)
-    check(try! store.pendingDays().map(\.day) == ["2026-10-21"],
+    check(got("pendingDays", []) { try store.pendingDays().map(\.day) } == ["2026-10-21"],
           rule: "only pending days are listed as pending",
           meaning: "a done or failed day must not run again by itself",
-          saw: "\(try! store.pendingDays())")
-    check(try! store.dayState(chat: chat, day: "2026-10-20") == .failed
-          && (try! store.daySummary(chat: chat, day: "2026-10-20")) == "gist",
+          saw: "\(got("pendingDays", []) { try store.pendingDays().map(\.day) })")
+    check(got("dayState", nil) { try store.dayState(chat: chat, day: "2026-10-20") } == .failed
+          && (got("daySummary", nil) { try store.daySummary(chat: chat, day: "2026-10-20") }) == "gist",
           rule: "a state change without a summary keeps the summary",
           meaning: "a failed retry must not erase the summary a day already has",
-          saw: "\(String(describing: try! store.daySummary(chat: chat, day: "2026-10-20")))")
+          saw: "\(String(describing: got("daySummary", nil) { try store.daySummary(chat: chat, day: "2026-10-20") }))")
     let late = try store.insert([msg("4", "2026-10-20T12:00:00Z", "late addition")], chat: chat, timeZone: tzUTC)
-    check(late == ["2026-10-20"] && (try! store.dayState(chat: chat, day: "2026-10-20")) == .pending,
+    check(late == ["2026-10-20"] && (got("dayState", nil) { try store.dayState(chat: chat, day: "2026-10-20") }) == .pending,
           rule: "a new message reopens a done day",
           meaning: "the day's summary is redone when it gains messages",
           saw: "\(late)")
@@ -77,7 +87,7 @@ do {
           rule: "search finds a message by a Cyrillic word",
           meaning: "the people using this write in Russian; search that cannot read it is useless",
           saw: "\(hits)")
-    check(try! store.search("\"* OR", limit: 10).isEmpty,
+    check(got("search", false) { try store.search("\"* OR", limit: 10).isEmpty },
           rule: "search operators typed in the box do not break the query",
           meaning: "a person's search is text, not FTS syntax",
           saw: "threw or matched")
@@ -91,7 +101,7 @@ do {
     let store = try ConversationStore(url: url)
     let chat = try store.upsertChat(chatRef, myID: nil)
     _ = try store.insert([msg("1", "2026-10-20T10:00:00Z", "private words")], chat: chat, timeZone: tzUTC)
-    let perms = (try! FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)?.intValue
+    let perms = (got("attributes", nil) { try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber })?.intValue
     check(perms == 0o600,
           rule: "the database file is readable by its owner only",
           meaning: "it holds other people's messages",
@@ -106,27 +116,57 @@ do {
           meaning: "summaries are per calendar day",
           saw: "\(days)")
     let again = try store.insert([a, b], chat: chat, timeZone: tzTokyo)
-    check(again.isEmpty && (try! store.messages(chat: chat, day: "2026-10-20").map(\.sourceMessageID)) == ["1", "a"]
-          && (try! store.messages(chat: chat, day: "2026-10-21").map(\.sourceMessageID)) == ["b"],
+    check(again.isEmpty && (got("messages", []) { try store.messages(chat: chat, day: "2026-10-20").map(\.sourceMessageID) }) == ["1", "a"]
+          && (got("messages", []) { try store.messages(chat: chat, day: "2026-10-21").map(\.sourceMessageID) }) == ["b"],
           rule: "a re-insert under another time zone does not move a message",
           meaning: "travelling or changing the Mac's zone must not reshuffle history",
           saw: "\(again)")
 
     let removed = try store.deleteMessages(olderThan: utc("2026-10-21T00:00:00Z"))
-    check(removed == 2 && (try! store.search("private", limit: 5)).isEmpty,
+    check(removed == 2 && (got("search", [(chat: 0, day: "", messageID: "")]) { try store.search("private", limit: 5) }).isEmpty,
           rule: "retention removes old messages and their search entries",
           meaning: "deleted text must not stay findable",
           saw: "removed \(removed)")
 
     try store.deleteChat(chat)
-    check(try! store.messages(chat: chat, day: "2026-10-21").isEmpty
-          && (try! store.dayState(chat: chat, day: "2026-10-21")) == nil
-          && (try! store.search("midnight", limit: 5)).isEmpty,
+    check(got("messages", false) { try store.messages(chat: chat, day: "2026-10-21").isEmpty }
+          && (got("dayState", .pending) { try store.dayState(chat: chat, day: "2026-10-21") }) == nil
+          && (got("search", [(chat: 0, day: "", messageID: "")]) { try store.search("midnight", limit: 5) }).isEmpty,
           rule: "deleting a chat leaves nothing of it",
           meaning: "'delete' is a promise to the person",
           saw: "messages or days or index remain")
 } catch {
     check(false, rule: "the store runs", meaning: "every store rule depends on it", saw: "\(error)")
+}
+
+do {
+    let url = tmp.appendingPathComponent("purge.sqlite")
+    let store = try ConversationStore(url: url)
+    let chat = try store.upsertChat(chatRef, myID: nil)
+    let other = try store.upsertChat(ChatRef(source: "telegram", sourceChatID: "43", title: "Other", type: "personal_chat"), myID: nil)
+    _ = try store.insert([msg("1", "2026-10-20T10:00:00Z", "zyxwvutsrq quokkaplatypus")], chat: chat, timeZone: tzUTC)
+    _ = try store.insert([msg("2", "2026-10-20T10:00:00Z", "keepme hedgehogword")], chat: other, timeZone: tzUTC)
+    try store.addReview(entrance: "mcp", payload: Data("{}".utf8), messageCount: 1, source: "telegram",
+                        sourceChatID: "42", receivedAt: utc("2026-10-20T10:00:00Z"))
+    try store.addReview(entrance: "mcp", payload: Data("{}".utf8), messageCount: 1, source: "telegram",
+                        sourceChatID: "43", receivedAt: utc("2026-10-20T10:00:00Z"))
+    try store.deleteChat(chat)
+    check(got("reviewCount", -1) { try store.reviewCount() } == 1,
+          rule: "deleting a chat removes its waiting review batches",
+          meaning: "a deleted chat must not come back through the review list", saw: "\(got("reviewCount", -1) { try store.reviewCount() })")
+    let bytes = (try? Data(contentsOf: url)) ?? Data()
+    func has(_ w: String) -> Bool { bytes.range(of: Data(w.utf8)) != nil }
+    check(!has("quokkaplatypus") && !has("zyxwvutsrq") && has("hedgehogword"),
+          rule: "deleted words are gone from the database file, others stay",
+          meaning: "the full-text index must not keep what the person deleted",
+          saw: "deleted word present: \(has("quokkaplatypus")), kept word present: \(has("hedgehogword"))")
+    _ = try store.deleteMessages(olderThan: utc("2026-12-01T00:00:00Z"))
+    let after = (try? Data(contentsOf: url)) ?? Data()
+    check(after.range(of: Data("hedgehogword".utf8)) == nil,
+          rule: "retention deletion also clears the index", meaning: "same promise as deleting a chat",
+          saw: "word still in file")
+} catch {
+    check(false, rule: "the purge checks run", meaning: "deletion must be real", saw: "\(error)")
 }
 
 // MARK: Telegram export
@@ -142,9 +182,12 @@ do {
           rule: "the full export yields its chats and who the account is",
           meaning: "the account's own messages are the person's promises",
           saw: "\(export.chats.count) chats, me \(String(describing: export.me))")
-    let group = export.chats.first { $0.ref.sourceChatID == "5550001" }!
+    guard let group = export.chats.first(where: { $0.ref.sourceChatID == "5550001" }) else {
+        check(false, rule: "the fixture has its group chat", meaning: "the checks below read it", saw: "missing")
+        throw TelegramExport.Failure.notAnExport
+    }
     let ids = group.messages.map(\.sourceMessageID)
-    check(ids == ["2", "3", "5", "6", "7", "8", "9"],
+    check(ids == ["2", "3", "5", "6", "7", "8", "9", "10"],
           rule: "sticker and service lines are dropped, the photo's caption is kept",
           meaning: "only words someone wrote are messages",
           saw: "\(ids)")
@@ -161,19 +204,24 @@ do {
           rule: "with personal_information the account's own messages are mine",
           meaning: "ownership comes from the source, not from a model",
           saw: "\(group.messages.filter(\.isMine).map(\.sourceMessageID))")
-    check(group.messageCount == 7 && group.lastMessage == group.messages.map(\.sentAt).max(),
+    check(group.messages.first { $0.sourceMessageID == "10" }?.isMine == false
+          && group.messages.first { $0.sourceMessageID == "10" }?.forwardedFrom == "Venue Desk",
+          rule: "a message the account itself forwarded is not mine",
+          meaning: "forwarding someone's words is not promising them",
+          saw: "isMine \(String(describing: group.messages.first { $0.sourceMessageID == "10" }?.isMine))")
+    check(group.messageCount == 8 && group.lastMessage == group.messages.map(\.sentAt).max(),
           rule: "the chat's count and last date describe its messages",
           meaning: "the picker shows them next to each chat",
           saw: "\(group.messageCount)")
 
     let now = utc("2026-10-27T00:00:00Z")
     let week = TelegramExport.limited(group, to: .days(7), now: now)
-    check(week.messages.map(\.sourceMessageID) == ["5", "6", "7", "8", "9"],
+    check(week.messages.map(\.sourceMessageID) == ["5", "6", "7", "8", "9", "10"],
           rule: "limited(.days) keeps only the recent days",
           meaning: "a long chat is imported a slice at a time",
           saw: "\(week.messages.map(\.sourceMessageID))")
     let last3 = TelegramExport.limited(group, to: .messages(3), now: now)
-    check(last3.messages.map(\.sourceMessageID) == ["7", "8", "9"] && last3.messageCount == 3,
+    check(last3.messages.map(\.sourceMessageID) == ["8", "9", "10"] && last3.messageCount == 3,
           rule: "limited(.messages) keeps the last N",
           meaning: "the person can take just the latest part",
           saw: "\(last3.messages.map(\.sourceMessageID))")
@@ -269,6 +317,12 @@ do {
 do {
     let byName = ConversationIngest.stored(batch(me: "maya")).1
     let other = ConversationIngest.stored(batch(me: "Alex")).1
+    var forward = batch(me: "Maya")
+    forward.messages[0].forwarded_from = "Someone"
+    forward.messages[0].is_mine = true
+    check(!ConversationIngest.stored(forward).1[0].isMine,
+          rule: "a forwarded message is never mine, even if the caller says so",
+          meaning: "the forwarder did not make the promise", saw: "mine")
     var explicit = batch(me: "Maya")
     explicit.messages[0].is_mine = false
     check(byName[0].isMine && !other[0].isMine && !ConversationIngest.stored(explicit).1[0].isMine,
@@ -280,7 +334,7 @@ do {
 do {
     let store = try freshStore()
     let export = try TelegramExport.read(fullURL)
-    let group = export.chats.first { $0.ref.sourceChatID == "5550001" }!
+    guard let group = export.chats.first(where: { $0.ref.sourceChatID == "5550001" }) else { throw TelegramExport.Failure.notAnExport }
     let chat = try store.upsertChat(group.ref, myID: export.me?.id)
     let firstDays = try store.insert(group.messages, chat: chat, timeZone: tzUTC)
     let resend = IngestBatch(

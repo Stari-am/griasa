@@ -104,7 +104,7 @@ final class ConversationStore {
             CREATE TABLE IF NOT EXISTS review(
               id INTEGER PRIMARY KEY, received_at REAL NOT NULL, entrance TEXT NOT NULL,
               payload BLOB NOT NULL, message_count INTEGER NOT NULL,
-              source TEXT, source_chat_id TEXT);
+              source TEXT NOT NULL, source_chat_id TEXT NOT NULL);
             """)
         // The index is a copy of `messages.text`, kept in step by triggers so no
         // code path can forget it. If this build has no FTS5 the statement
@@ -304,7 +304,7 @@ final class ConversationStore {
                 try? exec("ROLLBACK")
                 throw error
             }
-            try exec("VACUUM")
+            try purge()
         }
     }
 
@@ -325,15 +325,44 @@ final class ConversationStore {
                 try? exec("ROLLBACK")
                 throw error
             }
-            if removed > 0 { try exec("VACUUM") }
+            if removed > 0 { try purge() }
             return removed
         }
+    }
+
+    /// Makes deleted text really leave the file. The FTS5 'delete' trigger only
+    /// writes tombstones and VACUUM keeps index segments, so the index is rebuilt
+    /// from the remaining rows first.
+    private func purge() throws {
+        if hasFullTextSearch { try exec("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')") }
+        try exec("VACUUM")
+    }
+
+    // MARK: Review
+
+    /// Queues a batch from an assistant or the endpoint for the person to
+    /// accept. The chat it names is stored in the clear so `deleteChat` can
+    /// remove it; the limits (`ConversationIngest.reviewAdmit`) are the caller's.
+    func addReview(entrance: String, payload: Data, messageCount: Int,
+                   source: String, sourceChatID: String, receivedAt: Date) throws {
+        try locked {
+            _ = try run("""
+                INSERT INTO review(received_at, entrance, payload, message_count, source, source_chat_id)
+                VALUES (?,?,?,?,?,?)
+                """, [.real(receivedAt.timeIntervalSince1970), .text(entrance),
+                      .blob(payload), .int(Int64(messageCount)),
+                      .text(source), .text(sourceChatID)])
+        }
+    }
+
+    func reviewCount() throws -> Int {
+        try locked { try query("SELECT COUNT(*) FROM review", []) { Int($0.int(0)) }.first ?? 0 }
     }
 
     // MARK: SQLite plumbing
 
     private enum Bind {
-        case text(String), optText(String?), int(Int64), real(Double)
+        case text(String), optText(String?), int(Int64), real(Double), blob(Data)
     }
 
     private struct Row {
@@ -379,6 +408,8 @@ final class ConversationStore {
                 if let s { sqlite3_bind_text(stmt, n, s, -1, transient) } else { sqlite3_bind_null(stmt, n) }
             case .int(let v): sqlite3_bind_int64(stmt, n, v)
             case .real(let v): sqlite3_bind_double(stmt, n, v)
+            case .blob(let d):
+                _ = d.withUnsafeBytes { sqlite3_bind_blob(stmt, n, $0.baseAddress, Int32(d.count), transient) }
             }
         }
         return stmt

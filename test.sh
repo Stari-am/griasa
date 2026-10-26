@@ -49,6 +49,7 @@ swiftc -O \
   Sources/Griasa/LongMeetingMap.swift \
   Sources/Griasa/PromiseOwner.swift \
   Sources/Griasa/CapturedPromise.swift \
+  Sources/Griasa/DueDate.swift \
   Sources/Griasa/BenchmarkScore.swift \
   Sources/Griasa/LanguageGuess.swift \
   Sources/Griasa/MeetingLanguage.swift \

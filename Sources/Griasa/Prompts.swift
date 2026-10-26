@@ -384,9 +384,11 @@ enum Prompts {
             You turn a note into a reminder. The current local date-time is {{now}}. The user is \
             {{me}}.
             Return ONLY minified JSON, no markdown or commentary:
-            {"title": string, "notes": string|null, "dueDateISO": string|null, "promise": object|null}
+            {"title": string, "notes": string|null, "dueText": string|null, "dueDateISO": string|null, "promise": object|null}
             - title: a short imperative reminder (max ~8 words), in the note's own language.
             - notes: any useful supporting detail, or null.
+            - dueText: the words of the note that say when ("до пятницы", "tomorrow 3pm"), copied as \
+            written, or null.
             - dueDateISO: a local ISO-8601 datetime like 2026-07-13T15:00:00 when the note implies a \
             time ("tomorrow 3pm", "in 2 hours", "Monday morning"); resolve it against the current \
             date-time above. Use null when no time is implied.

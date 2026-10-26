@@ -504,6 +504,28 @@ do {
           meaning: "the recap is one line the model splits among people and misattributes — "
                  + "the offer read back under Ivan's name was counted as a second promise",
           saw: "")
+    var dueCalendar = Calendar(identifier: .gregorian)
+    dueCalendar.timeZone = TimeZone(identifier: "Europe/Moscow")!
+    dueCalendar.firstWeekday = 2
+    let monday = dueCalendar.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 12))!
+    func dueDay(_ phrase: String) -> String {
+        guard let r = DueDate.resolve(phrase, from: monday, calendar: dueCalendar) else { return "nil" }
+        let c = dueCalendar.dateComponents([.month, .day, .hour, .minute], from: r.date)
+        return r.hasTime ? "\(c.month!)-\(c.day!) \(c.hour!):\(c.minute!)" : "\(c.month!)-\(c.day!)"
+    }
+    let dueCases: [(String, String)] = [
+        ("до пятницы", "10-30"), ("в пятницу", "10-30"), ("by Friday", "10-30"), ("до п'ятниці", "10-30"),
+        ("завтра в 15:00", "10-27 15:0"), ("tomorrow 3pm", "10-27 15:0"), ("послезавтра", "10-28"),
+        ("в понедельник утром", "11-2 9:0"), ("следующий четверг", "11-5"), ("next Friday", "11-6"),
+        ("через 2 часа", "10-26 14:0"), ("через 3 дня", "10-29"), ("in a week", "11-2"),
+        ("к концу недели", "10-30"), ("до конца месяца", "10-31"), ("в среду", "10-28"),
+        ("сегодня вечером", "10-26 18:0"), ("когда-нибудь", "nil"), ("в середине проекта", "nil"),
+    ]
+    let dueWrong = dueCases.filter { dueDay($0.0) != $0.1 }
+    check(dueWrong.isEmpty,
+          rule: "deadlines in words resolve by rule against the day they were said",
+          meaning: "the small model turned \"до пятницы\" said on Monday the 26th into the next Monday",
+          saw: dueWrong.map { "\($0.0) → \(dueDay($0.0)), expected \($0.1)" }.joined(separator: "; "))
     let captured = "Иван: скину схему до пятницы\nМайя: ок, спасибо"
     let noDate: (String) -> Date? = { _ in nil }
     let theirs = CapturedPromise.from(["owner": "Иван", "task": "Скинуть схему", "due": "до пятницы",

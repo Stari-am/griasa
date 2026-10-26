@@ -326,6 +326,10 @@ check(manifest["manifest_version"] as? String == "0.3" && manifest["name"] as? S
       rule: "the manifest has the fields MCPB 0.3 requires and a node entry point",
       meaning: "a manifest Claude Desktop cannot read is an install that fails with no explanation",
       saw: "\(manifest.keys.sorted())")
+check(manifest["tools_generated"] as? Bool == true,
+      rule: "the manifest says the server can return tools it does not list",
+      meaning: "the listed tools are a snapshot; after an app update the running server has more",
+      saw: "\(String(describing: manifest["tools_generated"]))")
 check((manifest["privacy_policies"] as? [String])?.allSatisfy { $0.hasPrefix("https://") } == true,
       rule: "the manifest links a privacy policy over https",
       meaning: "extension directories and the MCP Registry reject a local server without one",

@@ -58,6 +58,7 @@ swiftc -O \
   Sources/Griasa/StoreRoot.swift \
   Sources/Griasa/ConversationStore.swift \
   Sources/Griasa/TelegramExport.swift \
+  Sources/Griasa/ConversationIngest.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \

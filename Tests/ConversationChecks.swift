@@ -228,5 +228,92 @@ do {
     check(false, rule: "export error cases run", meaning: "fixture setup", saw: "\(error)")
 }
 
+// MARK: Ingest
+
+func batch(source: String = "other", chat: String = "c1", messages: Int = 1,
+           me: String? = nil, author: String = "Maya") -> IngestBatch {
+    IngestBatch(source: source, chat: .init(id: chat, title: "T", type: nil), me: me,
+                messages: (0..<messages).map {
+                    .init(id: "m\($0)", author_id: nil, author: author, at: "2026-10-20T10:00:00Z",
+                          text: "text \($0)", is_mine: nil, forwarded_from: nil)
+                })
+}
+func failure(_ r: Result<[IngestBatch], IngestError>) -> IngestError? {
+    if case .failure(let e) = r { return e }
+    return nil
+}
+
+check(failure(ConversationIngest.validate((0..<51).map { batch(chat: "c\($0)") })) == .tooManyChats,
+      rule: "51 chats in one request are refused", meaning: "the request limit", saw: "accepted")
+check(failure(ConversationIngest.validate((0..<3).map { batch(chat: "c\($0)", messages: 667) })) == .tooManyMessages,
+      rule: "more than 2,000 messages in one request are refused", meaning: "the request limit", saw: "accepted")
+check(failure(ConversationIngest.validate([batch(messages: 2000)])) == nil,
+      rule: "exactly 2,000 messages are accepted", meaning: "the limit is inclusive", saw: "refused")
+check(failure(ConversationIngest.validate([batch(source: "fax")])) == .badSource,
+      rule: "an unknown source is refused", meaning: "sources are a closed list", saw: "accepted")
+do {
+    var b = batch()
+    b.messages[0].at = "yesterday"
+    check(failure(ConversationIngest.validate([b])) == .badDate,
+          rule: "a message date that is not ISO-8601 is refused", meaning: "days are computed from it", saw: "accepted")
+    var blank = batch(messages: 2)
+    blank.messages[1].text = "  \n"
+    if case .success(let ok) = ConversationIngest.validate([blank]) {
+        check(ok[0].messages.count == 1, rule: "a message with no text is skipped, not an error",
+              meaning: "attachments have nothing to summarize", saw: "\(ok[0].messages.count)")
+    } else { check(false, rule: "blank text is skipped", meaning: "not an error", saw: "refused") }
+    b.messages[0].at = "2026-10-20T10:00:00"
+    check(failure(ConversationIngest.validate([b])) == nil,
+          rule: "a date without a zone is accepted", meaning: "chat tools often omit it", saw: "refused")
+}
+do {
+    let byName = ConversationIngest.stored(batch(me: "maya")).1
+    let other = ConversationIngest.stored(batch(me: "Alex")).1
+    var explicit = batch(me: "Maya")
+    explicit.messages[0].is_mine = false
+    check(byName[0].isMine && !other[0].isMine && !ConversationIngest.stored(explicit).1[0].isMine,
+          rule: "is_mine wins; otherwise the author matching `me` is mine",
+          meaning: "promises belong to their author",
+          saw: "\(byName[0].isMine) \(other[0].isMine)")
+}
+
+do {
+    let store = try freshStore()
+    let export = try TelegramExport.read(fullURL)
+    let group = export.chats.first { $0.ref.sourceChatID == "5550001" }!
+    let chat = try store.upsertChat(group.ref, myID: export.me?.id)
+    let firstDays = try store.insert(group.messages, chat: chat, timeZone: tzUTC)
+    let resend = IngestBatch(
+        source: "telegram", chat: .init(id: "5550001", title: "Launch crew", type: "private_group"), me: nil,
+        messages: group.messages.map {
+            .init(id: $0.sourceMessageID, author_id: $0.authorID, author: $0.authorName,
+                  at: ISO8601DateFormatter().string(from: $0.sentAt), text: $0.text,
+                  is_mine: nil, forwarded_from: $0.forwardedFrom)
+        })
+    let added = try ConversationIngest.accept(into: store, batch: resend, timeZone: tzUTC)
+    check(!firstDays.isEmpty && added.isEmpty,
+          rule: "an assistant re-sending an imported chat adds no new days",
+          meaning: "the same message must never be summarized twice",
+          saw: "\(added.count) days")
+    let fresh = batch(source: "telegram", chat: "5550001", messages: 1)
+    let more = try ConversationIngest.accept(into: store, batch: fresh, timeZone: tzUTC)
+    check(more.count == 1 && more[0].0 == chat,
+          rule: "a new message in a known chat lands in that chat",
+          meaning: "one chat, one row", saw: "\(more)")
+} catch {
+    check(false, rule: "ingest against the fixture runs", meaning: "idempotence across entrances", saw: "\(error)")
+}
+
+check(ConversationIngest.reviewAdmit(count: 199, messages: 0, newMessages: 1)
+      && !ConversationIngest.reviewAdmit(count: 200, messages: 0, newMessages: 1),
+      rule: "the review list holds at most 200 batches", meaning: "the 201st is refused", saw: "wrong")
+check(ConversationIngest.reviewAdmit(count: 1, messages: 19_999, newMessages: 1)
+      && !ConversationIngest.reviewAdmit(count: 1, messages: 20_000, newMessages: 1),
+      rule: "the review list holds at most 20,000 messages", meaning: "the 20,001st is refused", saw: "wrong")
+let received = utc("2026-10-01T00:00:00Z")
+check(!ConversationIngest.expired(receivedAt: received, now: received.addingTimeInterval(14 * 86_400))
+      && ConversationIngest.expired(receivedAt: received, now: received.addingTimeInterval(14 * 86_400 + 1)),
+      rule: "a review batch expires after 14 days", meaning: "stale batches do not pile up", saw: "wrong")
+
 return failures
 }

@@ -522,6 +522,26 @@ do {
           meaning: "Remind me only offers what was really written; an invented quote would put a promise "
                  + "nobody made into the list with one click",
           saw: "\(String(describing: theirs)) \(String(describing: mineCaptured)) \(String(describing: invented))")
+    let followDate = Date(timeIntervalSince1970: 1_793_000_000)
+    let followPromises = [FollowUp.Promise(owner: "Aik", isMine: true, task: "Подготовить оффер", due: "пт"),
+                          FollowUp.Promise(owner: "Иван", isMine: false, task: "Скинуть схему", due: nil),
+                          FollowUp.Promise(owner: "Майя", isMine: false, task: "Шаблоны статуса", due: "ср")]
+    let everyone = FollowUp.meeting(title: "Синк", date: followDate, summary: "Обсудили поиск.",
+                                    promises: followPromises, to: ["ivan@x.io"], language: "ru", footer: true)
+    let toIvan = FollowUp.forPerson("Иван", title: "Синк", date: followDate, promises: followPromises,
+                                    to: [], language: "ru", footer: false)
+    let longDraft = FollowUp.Draft(subject: "S", body: String(repeating: "x", count: 2000), to: ["a@b.c"])
+    check(everyone.subject.hasPrefix("Итоги: Синк") && everyone.body.contains("- Я: Подготовить оффер — пт")
+          && everyone.body.contains("- Иван: Скинуть схему") && everyone.body.contains(FollowUp.siteURL)
+          && toIvan.body.contains("Скинуть схему") && !toIvan.body.contains("Шаблоны статуса")
+          && toIvan.body.contains("Подготовить оффер") && !toIvan.body.contains(FollowUp.siteURL)
+          && FollowUp.mailto(everyone).bodyIncluded && !FollowUp.mailto(longDraft).bodyIncluded
+          && FollowUp.mailto(longDraft).url.absoluteString.hasPrefix("mailto:a@b.c?subject=S"),
+          rule: "a follow-up lists everyone's promises, a personal one only theirs and the user's, "
+              + "the footer only when on, and a body too long for a mailto link is left out of it",
+          meaning: "a wrong recipient section sends Maya's tasks to Ivan; a 2,000-character link "
+                 + "is cut or refused by mail apps",
+          saw: everyone.body + " | " + toIvan.body)
     check(PromiseOwner.sameName("Аня", "Anya") && PromiseOwner.sameName("Ваня", "Vanya")
           && PromiseOwner.sameName("Даня", "Danya") && PromiseOwner.sameName("Мария", "Maria")
           && PromiseOwner.sameName("Юля", "Julia") && !PromiseOwner.sameName("Аня", "Ваня"),

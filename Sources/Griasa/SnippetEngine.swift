@@ -3,6 +3,7 @@ import AppKit
 /// Resolves the dynamic placeholders of a snippet template at insert time:
 /// {date} {date+3d} {time} {time+2h} {clipboard} {meetlink} {slot}
 /// {slots:3} {commitments} {commitments:mine} {commitments:theirs}
+/// {last-meeting} {last-meeting:promises} {last-meeting:Name} {promises:Name}
 /// {ai: prompt}. Placeholders nest one level, so an {ai:} prompt can pull in
 /// live context: {ai: Summarize in 3 bullets: {clipboard}}. Unknown braces
 /// pass through untouched — they might be intentional text.
@@ -99,6 +100,9 @@ enum SnippetEngine {
             }
             return slots.map(FreeSlotFinder.format).joined(separator: " / ")
         }
+        if token == "last-meeting" || token.hasPrefix("last-meeting:") || token.hasPrefix("promises:") {
+            return try await MainActor.run { try followUpText(token) }
+        }
         if token == "commitments" || token.hasPrefix("commitments:") {
             let scope = token == "commitments" ? "all" : String(token.dropFirst("commitments:".count))
             let lines = await MainActor.run { () -> [String] in
@@ -164,5 +168,39 @@ enum SnippetEngine {
     private static func offset(_ token: String, prefix: String, unit: String) -> Int? {
         guard token.hasPrefix(prefix), token.hasSuffix(unit) else { return nil }
         return Int(token.dropFirst(prefix.count).dropLast(unit.count))
+    }
+
+    /// {last-meeting}: the newest meeting's summary and who does what.
+    /// {last-meeting:promises}: only the promises from it.
+    /// {last-meeting:Вася}: what Вася promised in the newest meeting with him.
+    /// {promises:Вася}: everything Вася still owes, from any meeting.
+    @MainActor
+    private static func followUpText(_ token: String) throws -> String {
+        let argument = token.split(separator: ":", maxSplits: 1).dropFirst().first
+            .map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
+        if token.hasPrefix("promises:") {
+            let items = FollowUpActions.openPromises(of: argument)
+            guard !items.isEmpty else { throw RenderError(message: "{promises:\(argument)}: nothing open for \(argument).") }
+            return FollowUp.list(items, language: LanguageGuess.byScript(argument) ?? "en", withOwner: false)
+        }
+        let person = (argument.isEmpty || argument == "promises") ? nil : argument
+        guard let entry = FollowUpActions.lastMeeting(with: person) else {
+            throw RenderError(message: "{\(token)}: no recorded meeting\(person.map { " with \($0)" } ?? "") yet.")
+        }
+        let language = FollowUpActions.language(of: entry)
+        let promises = FollowUpActions.promises(of: entry)
+        if let person {
+            let theirs = promises.filter { !$0.isMine && PromiseOwner.sameName($0.owner, person) }
+            guard !theirs.isEmpty else { throw RenderError(message: "{\(token)}: \(person) promised nothing in «\(entry.title)».") }
+            return FollowUp.list(theirs, language: language, withOwner: false)
+        }
+        if argument == "promises" {
+            guard !promises.isEmpty else { throw RenderError(message: "{last-meeting:promises}: no open promises from «\(entry.title)».") }
+            return FollowUp.list(promises, language: language)
+        }
+        return FollowUp.meeting(title: entry.title, date: entry.date,
+                                summary: MeetingPrepWatcher.summarySection(of: entry.text),
+                                promises: promises, to: [], language: language, footer: false).body
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

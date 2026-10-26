@@ -707,5 +707,40 @@ do {
           rule: "is_mine follows the chosen account", meaning: "promises are attributed from it",
           saw: "\(mineFlags)")
 
+// MARK: Retention
+
+do {
+    let store = try freshStore()
+    let now = utc("2026-10-26T12:00:00Z")
+    let chat = try store.upsertChat(chatRef, myID: nil)
+    // 31 days and 1 day before `now`.
+    _ = try store.insert([msg("old", "2026-09-25T10:00:00Z", "an old hedgehog line"),
+                          msg("new", "2026-10-25T10:00:00Z", "a recent line")], chat: chat, timeZone: tzUTC)
+    try store.setDay(chat: chat, day: "2026-09-25", state: .done, summary: "Old day summary", processedUpTo: nil)
+    try store.addReview(entrance: "mcp", payload: Data("{}".utf8), messageCount: 1, source: "other",
+                        sourceChatID: "a", receivedAt: utc("2026-10-10T12:00:00Z"))   // 16 days
+    try store.addReview(entrance: "mcp", payload: Data("{}".utf8), messageCount: 1, source: "other",
+                        sourceChatID: "b", receivedAt: utc("2026-10-20T12:00:00Z"))   // 6 days
+
+    let kept = try ConversationRetention.run(store: store, retentionDays: nil, now: now)
+    check(kept.messages == 0 && kept.reviews == 1 && got("messages", 0, { try store.messages(chat: chat, day: "2026-09-25").count }) == 1,
+          rule: "with no retention limit messages stay; a review batch older than 14 days still expires",
+          meaning: "an unanswered batch must not wait for ever", saw: "\(kept)")
+
+    let out = try ConversationRetention.run(store: store, retentionDays: 30, now: now)
+    check(out.messages == 1
+            && got("old", -1, { try store.messages(chat: chat, day: "2026-09-25").count }) == 0
+            && got("new", -1, { try store.messages(chat: chat, day: "2026-10-25").count }) == 1,
+          rule: "retention of 30 days removes a 31-day-old message and keeps a recent one",
+          meaning: "the limit an organisation set", saw: "\(out)")
+    check(got("summary", nil, { try store.daySummary(chat: chat, day: "2026-09-25") }) == "Old day summary",
+          rule: "retention keeps day summaries", meaning: "what was learned stays when the raw text goes",
+          saw: "\(String(describing: got("summary", nil, { try store.daySummary(chat: chat, day: "2026-09-25") })))")
+    check(got("search", [(chat: 0, day: "", messageID: "")], { try store.search("hedgehog", limit: 5) }).isEmpty,
+          rule: "retention removes the message from search too", meaning: "no copy left in the index", saw: "found")
+} catch {
+    check(false, rule: "the retention checks run", meaning: "fixture setup", saw: "\(error)")
+}
+
 return failures
 }

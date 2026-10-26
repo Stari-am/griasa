@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+**Let assistants add to Griasa, behind a switch.** Settings → System has a new
+*Let assistants add to Griasa* switch, off by default and closed by the
+organization's `conversationIngestEnabled` key when it says no. With it on, the
+MCP server lists two more tools: `add_conversation` offers a chat, and
+`propose_close_commitment` suggests that a promise is done, with the sentence
+that says so, in *Looks done*. A local `POST /conversations` endpoint with its
+own keychain token (Copy and Rotate in Settings; local origins only, 2 MB, 30
+requests a minute) takes the same batches. Whatever arrives waits in a review
+list in the Conversations tab until you accept it, and unanswered batches expire
+after 14 days. Nothing can be changed or deleted this way, and no promise is
+closed without you.
+
+**Retention for chats.** When an organization sets `conversationRetentionDays`,
+stored chat messages older than that are deleted at launch and once a day;
+summaries and promises are kept. The three conversation keys now show as locked
+in Settings when a profile sets them.
+
 ## 1.0.21 — 2026-10-25
 
 **Promises read back at the end of a meeting are no longer counted twice.**

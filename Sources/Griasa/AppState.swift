@@ -172,6 +172,13 @@ final class AppState: ObservableObject {
         Task { @MainActor in await LocalModelSetup.shared.refresh() }
         // Chat days a quit cut off, or that waited for a model.
         ConversationProcessor.shared.resume()
+        // Retention: raw chat text past an organisation's limit, and review
+        // batches nobody answered. At launch, then daily for an app that is
+        // rarely quit.
+        ConversationRetention.runLive()
+        Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { _ in
+            Task { @MainActor in ConversationRetention.runLive() }
+        }
         // Straight into the session, with no per-partial main-actor hop: those
         // hops had no FIFO guarantee, and a transposed pair left Griasa's model
         // of the field describing something that wasn't there.

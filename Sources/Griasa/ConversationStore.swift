@@ -520,6 +520,9 @@ final class ConversationStore {
     /// Makes deleted text really leave the file. The FTS5 'delete' trigger only
     /// writes tombstones and VACUUM keeps index segments, so the index is rebuilt
     /// from the remaining rows first.
+    /// Rebuilds the index and VACUUMs after text was deleted by other means.
+    func compact() throws { try locked { try purge() } }
+
     private func purge() throws {
         if hasFullTextSearch { try exec("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')") }
         try exec("VACUUM")
@@ -591,6 +594,15 @@ final class ConversationStore {
     /// payload's pages as it goes.
     func deleteReview(_ id: Int64) throws {
         try locked { _ = try run("DELETE FROM review WHERE id = ?", [.int(id)]) }
+    }
+
+    /// Batches nobody answered within `ConversationIngest.reviewLifetime`.
+    @discardableResult
+    func expireReviews(now: Date) throws -> Int {
+        try locked {
+            let cutoff = now.addingTimeInterval(-ConversationIngest.reviewLifetime).timeIntervalSince1970
+            return try run("DELETE FROM review WHERE received_at < ?", [.real(cutoff)])
+        }
     }
 
     // MARK: SQLite plumbing

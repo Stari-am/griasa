@@ -50,7 +50,7 @@ enum MCPTools {
     static let renamed = ["next_meeting_brief": "get_next_meeting_brief"]
 
     static var readOnly: [Tool] { [commitments, person, searchMeetings, meeting,
-                                   transcript, brief, upcoming, people, projects] }
+                                   transcript, brief, upcoming, followUp, people, projects] }
 
     // MARK: - Schemas
 
@@ -247,6 +247,28 @@ enum MCPTools {
                     "you_promised_them": brief.youPromised.map(describe),
                     "they_promised_you": brief.theyPromised.map(describe)]
         }
+    }
+
+    static let followUp = Tool(
+        name: "draft_followup",
+        title: "Follow-up draft",
+        summary: "A follow-up email for one meeting, written from Griasa's notes: the summary "
+               + "and who promised what for all participants, or, with person, only what that "
+               + "person and the user promised. Returns subject, body, the addresses Griasa "
+               + "knows and a mailto link. Griasa sends nothing: hand the link to the user or "
+               + "send the draft with the user's own mail tool after they confirm. Meeting id "
+               + "from search_meetings.",
+        schema: object([
+            "id": string("Meeting id from search_meetings."),
+            "person": string("Only this participant's promises and the user's, addressed to them."),
+        ], required: ["id"]),
+        output: result(["found": "boolean"])
+    ) { params in
+        guard let entry = entry(for: params) else { return ["found": false] }
+        let draft = params["person"]?.stringValue.map { FollowUpActions.personDraft(entry, person: $0) }
+            ?? FollowUpActions.meetingDraft(entry)
+        return ["found": true, "subject": draft.subject, "body": draft.body, "to": draft.to,
+                "mailto": FollowUp.mailto(draft).url.absoluteString]
     }
 
     static let upcoming = Tool(

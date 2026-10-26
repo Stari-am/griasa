@@ -207,6 +207,9 @@ private struct DetailPane: View {
                     Label("Find commitments", systemImage: "checklist")
                 }
             }
+            if entry.kind == .meeting {
+                shareMenu
+            }
             if isWorking {
                 ProgressView().controlSize(.small)
             } else if !aiStatus.isEmpty {
@@ -219,6 +222,28 @@ private struct DetailPane: View {
         }
         .disabled(isWorking)
         .padding(.top, 2)
+    }
+
+    /// Follow-up drafts for the mail app: everyone, or one person's promises.
+    /// Griasa only opens the draft; sending is the person's.
+    private var shareMenu: some View {
+        Menu {
+            Button("Email participants…") { FollowUpActions.open(FollowUpActions.meetingDraft(entry)) }
+            let names = entry.participants ?? []
+            if !names.isEmpty {
+                Menu("Send promises to") {
+                    ForEach(names, id: \.self) { name in
+                        Button(name) { FollowUpActions.open(FollowUpActions.personDraft(entry, person: name)) }
+                    }
+                }
+            }
+            Divider()
+            Toggle("Add \"made with Griasa\" line", isOn: Binding(
+                get: { FollowUpActions.footer }, set: { FollowUpActions.footer = $0 }))
+        } label: {
+            Label("Share", systemImage: "envelope")
+        }
+        .fixedSize()
     }
 
     private func run(_ action: @escaping () async -> String) {

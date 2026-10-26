@@ -48,6 +48,7 @@ swiftc -O \
   Sources/Griasa/QuoteMatch.swift \
   Sources/Griasa/LongMeetingMap.swift \
   Sources/Griasa/PromiseOwner.swift \
+  Sources/Griasa/FollowUp.swift \
   Sources/Griasa/CapturedPromise.swift \
   Sources/Griasa/BenchmarkScore.swift \
   Sources/Griasa/LanguageGuess.swift \

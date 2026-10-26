@@ -61,6 +61,7 @@ swiftc -O \
   Sources/Griasa/ConversationIngest.swift \
   Sources/Griasa/ChatIdentity.swift \
   Sources/Griasa/ChatDayText.swift \
+  Sources/Griasa/ConversationModelGate.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \

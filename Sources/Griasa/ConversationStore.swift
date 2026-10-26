@@ -320,6 +320,17 @@ final class ConversationStore {
         }
     }
 
+    /// The try failed because there was no model to ask, which is nobody's
+    /// fault: back to `pending` with the attempt given back.
+    func releaseWithoutCounting(chat: Int64, day: String) throws {
+        try locked {
+            _ = try run("""
+                UPDATE days SET state = 'pending', attempts = MAX(attempts - 1, 0)
+                WHERE chat_id = ? AND day = ? AND state = 'processing'
+                """, [.int(chat), .text(day)])
+        }
+    }
+
     /// Ends a successful try: summary and mark saved, day `done` — but only if
     /// it is still `processing`. A message imported meanwhile put the day back to
     /// `pending`; then nothing is written and the next pass reads it all again.

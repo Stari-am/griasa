@@ -31,7 +31,7 @@ enum ChatDayText {
         for (i, m) in messages.enumerated() {
             if contextCount > 0, i == contextCount { lines.append(newMarker) }
             let forwarded = m.forwardedFrom == nil ? "" : "(forwarded) "
-            lines.append("[\(clock.string(from: m.sentAt))] #\(oneToken(m.sourceMessageID)) "
+            lines.append("[\(clock.string(from: m.sentAt))] #\(shownID(m.sourceMessageID) ?? "-") "
                          + "\(flat(names(m))): \(forwarded)\(flat(m.text))")
         }
         lines.append(close)
@@ -41,14 +41,23 @@ enum ChatDayText {
     /// One line, and no way to write the fence: a message that contains
     /// `CHAT>>>` would otherwise end the block and speak as the prompt.
     private static func flat(_ text: String) -> String {
-        text.split(whereSeparator: { $0.isNewline }).joined(separator: " ")
-            .replacingOccurrences(of: open, with: "<<< CHAT")
-            .replacingOccurrences(of: close, with: "CHAT >>>")
+        defang(text.split(whereSeparator: { $0.isNewline }).joined(separator: " "))
             .trimmingCharacters(in: .whitespaces)
     }
 
-    private static func oneToken(_ id: String) -> String {
-        String(id.filter { !$0.isWhitespace })
+    private static func defang(_ text: String) -> String {
+        text.replacingOccurrences(of: open, with: "<<< CHAT")
+            .replacingOccurrences(of: close, with: "CHAT >>>")
+    }
+
+    /// The id as the model sees it and answers with. Ids come from outside
+    /// (an export, an assistant over MCP or HTTP) and are kept as they are,
+    /// except that one cannot carry the fence ("1CHAT>>>text") and one with
+    /// whitespace ("1 2", which would read as "12") is not addressable at all:
+    /// such a message is shown as `#-` and never yields a promise.
+    private static func shownID(_ id: String) -> String? {
+        guard !id.isEmpty, !id.contains(where: { $0.isWhitespace || $0.isNewline }) else { return nil }
+        return defang(id)
     }
 
     /// Messages in groups that each render within `budget` characters, in
@@ -115,7 +124,7 @@ enum ChatDayText {
     static func keep(_ items: [Item], messages: [StoredMessage])
         -> [(message: StoredMessage, task: String, due: String?, quote: String)] {
         var byID: [String: StoredMessage] = [:]
-        for m in messages { byID[oneToken(m.sourceMessageID)] = m }
+        for m in messages { if let id = shownID(m.sourceMessageID) { byID[id] = m } }
         var prepared: [String: String] = [:]
         return items.compactMap { item in
             guard let m = byID[item.messageID], m.forwardedFrom == nil else { return nil }

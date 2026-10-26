@@ -37,6 +37,14 @@ final class ConversationProcessor: ObservableObject {
 
     private struct Unreadable: Error {}
 
+    /// Whether there is a model to ask now; see `ConversationModelGate`.
+    private static var modelReady: Bool {
+        let config = LLMConfig.current()
+        return ConversationModelGate.mayRun(providerIsLocal: config.provider == .custom,
+                                            providerIsConfigured: config.isConfigured,
+                                            localEngineReady: LocalModelSetup.shared.isReady)
+    }
+
     private func openStore() -> ConversationStore? {
         if store == nil { store = try? ConversationStore.live() }
         return store
@@ -58,7 +66,7 @@ final class ConversationProcessor: ObservableObject {
     /// Puts days a quit or a crash cut off back in line and queues everything
     /// waiting. Safe to call whenever: it does nothing while the queue runs.
     func resume() {
-        guard ManagedPolicy.live.conversationsEnabled, let store = openStore() else { return }
+        guard ManagedPolicy.live.conversationsEnabled, Self.modelReady, let store = openStore() else { return }
         if !running { _ = try? store.resetInterrupted() }
         guard let waiting = try? store.pendingDays(), !waiting.isEmpty else { return }
         enqueue(waiting.map { ($0.chat, $0.day) })
@@ -74,7 +82,7 @@ final class ConversationProcessor: ObservableObject {
 
     private func drain() async {
         var failures = 0
-        while !cancelled, !queue.isEmpty, ManagedPolicy.live.conversationsEnabled,
+        while !cancelled, !queue.isEmpty, ManagedPolicy.live.conversationsEnabled, Self.modelReady,
               failures < Self.stopAfterFailures {
             let next = queue.removeFirst()
             switch await process(chat: next.chat, day: next.day) {
@@ -145,6 +153,12 @@ final class ConversationProcessor: ObservableObject {
                   chat, day, fresh.count, promises.proposed, added, promises.proposed - promises.kept.count)
             return .finished
         } catch {
+            // The model went away mid-day: nothing was wrong with the day.
+            if !Self.modelReady {
+                try? store.releaseWithoutCounting(chat: chat, day: day)
+                NSLog("Griasa: conversations — chat %lld day %@ waits for a model", chat, day)
+                return .retry
+            }
             let state = (try? store.releaseAfterFailure(chat: chat, day: day)) ?? .pending
             NSLog("Griasa: conversations — chat %lld day %@ failed (%@), now %@",
                   chat, day, error is Unreadable ? "unreadable reply" : "model error", state.rawValue)

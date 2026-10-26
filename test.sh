@@ -55,6 +55,8 @@ swiftc -O \
   Sources/Griasa/MeetingLanguage.swift \
   Sources/Griasa/Prompts.swift \
   Sources/Griasa/GrammarPrompt.swift \
+  Sources/Griasa/StoreRoot.swift \
+  Sources/Griasa/ConversationStore.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
@@ -86,6 +88,7 @@ swiftc -O \
   Tests/LongMeetingChecks.swift \
   Tests/BenchmarkChecks.swift \
   Tests/GrammarChecks.swift \
+  Tests/ConversationChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

@@ -50,7 +50,7 @@ enum MCPTools {
     static let renamed = ["next_meeting_brief": "get_next_meeting_brief"]
 
     static var readOnly: [Tool] { [commitments, person, searchMeetings, meeting,
-                                   transcript, brief, people, projects] }
+                                   transcript, brief, upcoming, people, projects] }
 
     // MARK: - Schemas
 
@@ -247,6 +247,42 @@ enum MCPTools {
                     "you_promised_them": brief.youPromised.map(describe),
                     "they_promised_you": brief.theyPromised.map(describe)]
         }
+    }
+
+    static let upcoming = Tool(
+        name: "list_upcoming_meetings",
+        title: "Upcoming meetings",
+        summary: "The user's calendar meetings in the next days, soonest first, each with its "
+               + "attendees and the open promises between the user and them: what the user "
+               + "promised them and what they promised the user. Use for \"what's my week\", "
+               + "\"what do I owe the people I'm meeting\". Only events with other people or a "
+               + "call link; all-day events are left out. Needs calendar access; returns "
+               + "available=false with a reason without it. For the very next call in detail, "
+               + "get_next_meeting_brief.",
+        schema: object([
+            "days": integer("How many days ahead to look. Default 7, at most 14."),
+            "limit": integer("Most meetings to return. Default 20."),
+        ]),
+        output: result(["available": "boolean"])
+    ) { params in
+        let days = min(max(params["days"]?.intValue ?? 7, 1), 14)
+        let limit = min(max(params["limit"]?.intValue ?? 20, 1), 50)
+        guard let briefs = MeetingPrepWatcher.shared.upcomingBriefs(days: days, limit: limit) else {
+            return ["available": false,
+                    "reason": "Griasa has no calendar access (System Settings → Privacy & Security → Calendars)."]
+        }
+        let iso = ISO8601DateFormatter()
+        return ["available": true,
+                "meetings": briefs.map { brief in
+                    ["title": brief.title,
+                     "starts": iso.string(from: brief.start),
+                     "ends": iso.string(from: brief.end),
+                     "call_link": brief.videoURL?.absoluteString ?? "",
+                     "attendees": brief.attendees.map { attendee in
+                         ["name": attendee.name, "recognised_as": attendee.knownName ?? ""] },
+                     "you_promised_them": brief.youPromised.map(describe),
+                     "they_promised_you": brief.theyPromised.map(describe)] as [String: Any]
+                }]
     }
 
     static let people = Tool(

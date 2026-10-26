@@ -40,7 +40,7 @@ enum MCPEndpoint {
     static let instructions = """
         Griasa holds the user's recorded meetings, the promises made in them, and \
         what is known about each colleague. Start with list_commitments or \
-        next_meeting_brief for "what is open" and "what is next"; use search_meetings \
+        get_next_meeting_brief for "what is open" and "what is next"; use search_meetings \
         and get_meeting for what a meeting decided; ask for get_transcript only when \
         a summary is not enough, since it returns everything that was said. All \
         tools are read-only.

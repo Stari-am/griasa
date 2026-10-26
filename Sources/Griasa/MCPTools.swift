@@ -40,8 +40,14 @@ enum MCPTools {
 
     /// Runs one tool by name; nil when there is none.
     static func invoke(_ name: String, _ arguments: [String: JSONValue]) -> [String: Any]? {
-        readOnly.first { $0.name == name }?.run(arguments)
+        let current = renamed[name] ?? name
+        return readOnly.first { $0.name == current }?.run(arguments)
     }
+
+    /// Names a tool used to have. Not listed, still answered: a Claude Desktop
+    /// extension installed before the rename keeps calling the old name until it
+    /// is added again.
+    static let renamed = ["next_meeting_brief": "get_next_meeting_brief"]
 
     static var readOnly: [Tool] { [commitments, person, searchMeetings, meeting,
                                    transcript, brief, people, projects] }
@@ -204,7 +210,7 @@ enum MCPTools {
     }
 
     static let brief = Tool(
-        name: "next_meeting_brief",
+        name: "get_next_meeting_brief",
         title: "Next meeting brief",
         summary: "Prep for the user's next calendar meeting: attendees, what each side "
                + "promised the other, and what was discussed last time. Built from the "

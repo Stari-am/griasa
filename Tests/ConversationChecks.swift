@@ -369,5 +369,49 @@ check(!ConversationIngest.expired(receivedAt: received, now: received.addingTime
       && ConversationIngest.expired(receivedAt: received, now: received.addingTimeInterval(14 * 86_400 + 1)),
       rule: "a review batch expires after 14 days", meaning: "stale batches do not pile up", saw: "wrong")
 
+// Who an author is. An id the person linked wins over any name; names are the
+// fallback and an unclear one is reported, never guessed.
+do {
+    let ivan = (name: "Иван Петров", handles: ["telegram": "user42"])
+    let sidorov = (name: "Иван Сидоров", handles: [String: String]())
+    let renamed = ChatIdentity.person(forAuthorID: "user42", name: "Ваня Б.", source: "telegram", people: [ivan])
+    check(renamed == .linked("Иван Петров"),
+          rule: "a linked account id finds the person even after a display-name change",
+          meaning: "people rename themselves in chats; the id is what stays the same",
+          saw: "\(renamed)")
+
+    let wrongSource = ChatIdentity.person(forAuthorID: "user42", name: "Zed", source: "signal", people: [ivan])
+    check(wrongSource == .unknown,
+          rule: "an id linked for one source does not match another",
+          meaning: "ids from different services are unrelated numbers",
+          saw: "\(wrongSource)")
+
+    let idBeatsName = ChatIdentity.person(forAuthorID: "user42", name: "Иван Сидоров", source: "telegram",
+                                          people: [sidorov, ivan])
+    check(idBeatsName == .linked("Иван Петров"),
+          rule: "the id wins over a name that fits somebody else",
+          meaning: "a link the person made is stronger than a guess from spelling",
+          saw: "\(idBeatsName)")
+
+    let both = ChatIdentity.person(forAuthorID: nil, name: "Иван", source: "telegram", people: [ivan, sidorov])
+    check(both == .ambiguous(["Иван Петров", "Иван Сидоров"]),
+          rule: "a first name shared by two people is ambiguous",
+          meaning: "attributing a promise to the wrong Ivan is worse than asking",
+          saw: "\(both)")
+
+    let vanya = ChatIdentity.person(forAuthorID: nil, name: "Ваня", source: "telegram",
+                                    people: [(name: "Vanya Petrov", handles: [:])])
+    check(vanya == .byName("Vanya Petrov"),
+          rule: "Latin and Cyrillic spellings of a name match without an id",
+          meaning: "the same person is written in both scripts across chats and meetings",
+          saw: "\(vanya)")
+
+    let nobody = ChatIdentity.person(forAuthorID: nil, name: "Мария", source: "telegram", people: [ivan])
+    check(nobody == .unknown,
+          rule: "an author nobody matches is unknown",
+          meaning: "an unknown author must not be forced onto the nearest person",
+          saw: "\(nobody)")
+}
+
 return failures
 }

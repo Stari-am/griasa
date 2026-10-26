@@ -46,6 +46,14 @@ struct Commitment: Identifiable, Codable, Equatable {
     var sourceQuote: String?
     var sourceAt: String?
 
+    /// Where a promise taken from a chat came from: the chat, the day, and the
+    /// message. Optional for the same reason as the two above — promises from
+    /// meetings and ones added by hand have none, and neither do files saved
+    /// before conversations existed.
+    var sourceChatID: String?
+    var sourceChatDay: String?
+    var sourceMessageID: String?
+
     var hasClosureSuggestion: Bool { !done && suggestedDoneQuote != nil }
 
     init(id: UUID = UUID(), text: String, owner: String, isMine: Bool,
@@ -53,7 +61,9 @@ struct Commitment: Identifiable, Codable, Equatable {
          sourceEntryID: UUID? = nil, date: Date = Date(), done: Bool = false,
          doneAt: Date? = nil, suggestedDoneQuote: String? = nil,
          suggestedDoneAt: Date? = nil, reviewedAt: Date? = nil,
-         sourceQuote: String? = nil, sourceAt: String? = nil) {
+         sourceQuote: String? = nil, sourceAt: String? = nil,
+         sourceChatID: String? = nil, sourceChatDay: String? = nil,
+         sourceMessageID: String? = nil) {
         self.id = id
         self.text = text
         self.owner = owner
@@ -70,6 +80,9 @@ struct Commitment: Identifiable, Codable, Equatable {
         self.reviewedAt = reviewedAt
         self.sourceQuote = sourceQuote
         self.sourceAt = sourceAt
+        self.sourceChatID = sourceChatID
+        self.sourceChatDay = sourceChatDay
+        self.sourceMessageID = sourceMessageID
     }
 
     init(from decoder: Decoder) throws {
@@ -90,5 +103,8 @@ struct Commitment: Identifiable, Codable, Equatable {
         reviewedAt = try container.decodeIfPresent(Date.self, forKey: .reviewedAt)
         sourceQuote = try container.decodeIfPresent(String.self, forKey: .sourceQuote)
         sourceAt = try container.decodeIfPresent(String.self, forKey: .sourceAt)
+        sourceChatID = try container.decodeIfPresent(String.self, forKey: .sourceChatID)
+        sourceChatDay = try container.decodeIfPresent(String.self, forKey: .sourceChatDay)
+        sourceMessageID = try container.decodeIfPresent(String.self, forKey: .sourceMessageID)
     }
 }

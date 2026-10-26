@@ -87,6 +87,27 @@ do {
           saw: "open \(openHasIt), closed \(item.hasClosureSuggestion)")
 }
 
+// The chat source fields are optional and must not cost anyone their file: a
+// record written before conversations existed has none of the three keys.
+do {
+    let old = #"[{"text":"Send the deck","owner":"Petrov","isMine":false,"sourceTitle":"Sync"}]"#
+    let items = try? decoder.decode([Commitment].self, from: Data(old.utf8))
+    check(items?.count == 1 && items?.first?.sourceChatID == nil
+          && items?.first?.sourceChatDay == nil && items?.first?.sourceMessageID == nil,
+          rule: "a record saved before chat sources existed still decodes",
+          meaning: "the promises file is one array; a decoder that throws on a missing key loses every promise",
+          saw: items == nil ? "decoding threw" : "decoded \(items!.count)")
+
+    let item = Commitment(text: "Send the deck", owner: "Petrov", isMine: false, sourceTitle: "Chat",
+                          sourceChatID: "chat7", sourceChatDay: "2026-10-20", sourceMessageID: "m91")
+    let back = (try? encoder.encode(item)).flatMap { try? decoder.decode(Commitment.self, from: $0) }
+    check(back?.sourceChatID == "chat7" && back?.sourceChatDay == "2026-10-20"
+          && back?.sourceMessageID == "m91",
+          rule: "a promise keeps its chat, day and message through save and load",
+          meaning: "they are how the person gets from a promise back to the words it came from",
+          saw: "\(String(describing: back?.sourceChatID)), \(String(describing: back?.sourceChatDay)), \(String(describing: back?.sourceMessageID))")
+}
+
 // The real file, because a synthetic case proves the decoder handles the shape
 // somebody imagined, and this one proves it handles the shape on disk.
 do {

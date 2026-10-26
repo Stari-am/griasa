@@ -194,7 +194,21 @@ final class MeetingPrepWatcher: ObservableObject {
 
     // MARK: - Brief assembly
 
-    private func buildBrief(for event: EKEvent) -> PrepBrief {
+    /// Briefs for the meetings in the next `days` days, soonest first — the same
+    /// brief the Prep tab shows, for the MCP week view. Nil without calendar access.
+    func upcomingBriefs(days: Int, limit: Int) -> [PrepBrief]? {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return nil }
+        let now = Date()
+        let end = now.addingTimeInterval(TimeInterval(days) * 24 * 3600)
+        return upcomingEvents(from: now, to: end)
+            .filter(isMeeting)
+            .prefix(limit)
+            .map { buildBrief(for: $0, learnAddresses: false) }
+    }
+
+    /// `learnAddresses` is off for a request from an assistant: reading the week
+    /// ahead should not change who Griasa thinks an address belongs to.
+    private func buildBrief(for event: EKEvent, learnAddresses: Bool = true) -> PrepBrief {
         // The address is read as well as the name. EKParticipant.url is a
         // mailto: URL, which the previous version discarded — and it is the only
         // identifier in a calendar invite that means the same thing in a tracker
@@ -219,7 +233,7 @@ final class MeetingPrepWatcher: ObservableObject {
                 // Learn the address, so the next invite resolves by fact rather
                 // than by a comparison of names. Safe because an ambiguous name
                 // no longer matches at all.
-                PersonStore.shared.addEmail(rawEmail, for: known)
+                if learnAddresses { PersonStore.shared.addEmail(rawEmail, for: known) }
             }
             let person = known.flatMap { PersonStore.shared.person(named: $0) }
             let notesLine = person?.notes

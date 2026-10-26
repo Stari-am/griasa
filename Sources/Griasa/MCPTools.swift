@@ -66,13 +66,15 @@ enum MCPTools {
     static let commitments = Tool(
         name: "list_commitments",
         title: "Open promises",
-        summary: "Open promises from recorded meetings: 'mine' (what the user owes) and "
-               + "'waiting_on_others' (what others owe the user). Use for \"what do I owe\", "
-               + "\"what is overdue\", \"what is Anna still waiting on\".",
+        summary: "Open promises from recorded meetings, newest first, in two lists: 'mine' "
+               + "(what the user owes) and 'waiting_on_others' (what others owe the user); "
+               + "finished ones are left out. Use for \"what do I owe\", \"what is overdue\", "
+               + "\"what is Anna still waiting on\". For one colleague's whole picture use "
+               + "get_person; to get a name's exact spelling first, list_people.",
         schema: object([
-            "person": string("Only promises owned by this person (exact name, case-insensitive)."),
+            "person": string("Only promises owned by this person: the exact name as list_people returns it, case-insensitive. Omit for everyone."),
             "overdue_only": boolean("Only promises past their due date."),
-            "limit": integer("Most items per list. Default 50."),
+            "limit": integer("Most items in each of the two lists. Default 50; older promises past the limit are left out."),
         ]),
         output: result(["mine": "array", "waiting_on_others": "array"])
     ) { params in
@@ -205,8 +207,10 @@ enum MCPTools {
         name: "next_meeting_brief",
         title: "Next meeting brief",
         summary: "Prep for the user's next calendar meeting: attendees, what each side "
-               + "promised the other, and what was discussed last time. Returns "
-               + "available=false when no meeting is coming up.",
+               + "promised the other, and what was discussed last time. Built from the "
+               + "calendar and recorded meetings; returns available=false with a reason when "
+               + "no meeting is coming up. Use before a call; for a meeting that already "
+               + "happened use search_meetings and get_meeting.",
         schema: noArguments,
         output: result(["available": "boolean"])
     ) { _ in
@@ -244,7 +248,10 @@ enum MCPTools {
     static let projects = Tool(
         name: "list_projects",
         title: "Projects",
-        summary: "The projects the user files recordings and notes under: id and name.",
+        summary: "List every project the user files recordings and notes under, with id and "
+               + "name, in the order the user keeps them in Settings; unfiled items sit in an "
+               + "Inbox that is not listed. Use to answer what the user is working on or to match a meeting to "
+               + "a project; to find the meetings themselves use search_meetings.",
         schema: noArguments,
         output: result(["projects": "array"])
     ) { _ in

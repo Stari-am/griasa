@@ -8,6 +8,8 @@ enum RemindChoice {
     case fromText
     /// Open the date-picker window.
     case custom
+    /// No reminder: only offer the promise in the text for the Commitments list.
+    case promiseOnly
 }
 
 /// Small menu shown at the mouse cursor after text is captured, mirroring
@@ -38,6 +40,8 @@ final class RemindMenu: NSObject {
         menu.addItem(.separator())
         add("From the text (Claude detects the time)", .fromText)
         add("Custom…", .custom)
+        menu.addItem(.separator())
+        add("Track as a promise only", .promiseOnly)
 
         NSApp.activate(ignoringOtherApps: true)
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)

@@ -381,14 +381,21 @@ enum Prompts {
 
         case .reminderParse:
             return """
-            You turn a note into a reminder. The current local date-time is {{now}}.
+            You turn a note into a reminder. The current local date-time is {{now}}. The user is \
+            {{me}}.
             Return ONLY minified JSON, no markdown or commentary:
-            {"title": string, "notes": string|null, "dueDateISO": string|null}
+            {"title": string, "notes": string|null, "dueDateISO": string|null, "promise": object|null}
             - title: a short imperative reminder (max ~8 words), in the note's own language.
             - notes: any useful supporting detail, or null.
             - dueDateISO: a local ISO-8601 datetime like 2026-07-13T15:00:00 when the note implies a \
             time ("tomorrow 3pm", "in 2 hours", "Monday morning"); resolve it against the current \
             date-time above. Use null when no time is implied.
+            - promise: when the note shows someone committing to do something ("I'll send it by \
+            Friday", "Иван: скину схему завтра"), {"owner": who committed — "me" if it is the user, \
+            otherwise their name as written, "task": what they will do, in the note's language, \
+            "due": the deadline in their words or null, "dueDateISO": that deadline resolved like \
+            dueDateISO or null, "quote": the exact words of the commitment copied from the note}. \
+            A request nobody accepted, a wish, or a plan without an owner is not a promise: use null.
             """
 
         case .chatReply:

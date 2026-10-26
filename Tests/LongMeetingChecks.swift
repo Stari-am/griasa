@@ -504,6 +504,24 @@ do {
           meaning: "the recap is one line the model splits among people and misattributes — "
                  + "the offer read back under Ivan's name was counted as a second promise",
           saw: "")
+    let captured = "Иван: скину схему до пятницы\nМайя: ок, спасибо"
+    let noDate: (String) -> Date? = { _ in nil }
+    let theirs = CapturedPromise.from(["owner": "Иван", "task": "Скинуть схему", "due": "до пятницы",
+                                       "quote": "скину схему до пятницы"],
+                                      capturedText: captured, myName: "Aik", parseDate: noDate)
+    let mineCaptured = CapturedPromise.from(["owner": "me", "task": "Send the deck", "quote": "I'll send the deck"],
+                                            capturedText: "Sure, I'll send the deck tonight", myName: "Aik", parseDate: noDate)
+    let invented = CapturedPromise.from(["owner": "Иван", "task": "Скинуть схему", "quote": "скину схему сегодня вечером"],
+                                        capturedText: captured, myName: "Aik", parseDate: noDate)
+    check(theirs?.owner == "Иван" && theirs?.isMine == false && theirs?.dueHint == "до пятницы"
+          && mineCaptured?.isMine == true && mineCaptured?.owner == "Aik"
+          && invented == nil
+          && CapturedPromise.from(nil, capturedText: captured, myName: "Aik", parseDate: noDate) == nil,
+          rule: "a promise found in captured text keeps its owner, is mine when the model says me, "
+              + "and is dropped when its quote is not in the text",
+          meaning: "Remind me only offers what was really written; an invented quote would put a promise "
+                 + "nobody made into the list with one click",
+          saw: "\(String(describing: theirs)) \(String(describing: mineCaptured)) \(String(describing: invented))")
     check(PromiseOwner.sameName("Аня", "Anya") && PromiseOwner.sameName("Ваня", "Vanya")
           && PromiseOwner.sameName("Даня", "Danya") && PromiseOwner.sameName("Мария", "Maria")
           && PromiseOwner.sameName("Юля", "Julia") && !PromiseOwner.sameName("Аня", "Ваня"),

@@ -77,6 +77,35 @@ struct ManagedPolicy {
         return false
     }
 
+    /// Conversations — chat history the person chooses to bring in — are off
+    /// for the whole organisation when a profile says `false`. Absent means on:
+    /// the feature still needs the person's own consent before it reads anything.
+    static let conversationsEnabledKey = "conversationsEnabled"
+    static let conversationIngestEnabledKey = "conversationIngestEnabled"
+    static let conversationRetentionDaysKey = "conversationRetentionDays"
+
+    var conversationsEnabled: Bool { flag(Self.conversationsEnabledKey) ?? true }
+
+    /// Whether an organisation lets the person bring chats in at all. Absent
+    /// means the person's own switch decides, so this is true — it never turns
+    /// ingestion on by itself, it only fails to close it. Present and not a
+    /// clear yes is no, like every other policy switch.
+    var conversationIngestAllowed: Bool { flag(Self.conversationIngestEnabledKey) ?? true }
+
+    /// Days to keep stored messages, when an organisation sets one. Only a
+    /// positive whole number counts: a string, zero, a negative or a fraction
+    /// is nil, which leaves the person's own retention in force rather than
+    /// guessing at what a mistyped profile meant. (A Boolean is an NSNumber
+    /// too, and "keep for true days" is not a policy.)
+    var conversationRetentionDays: Int? {
+        guard let raw = value(Self.conversationRetentionDaysKey),
+              let number = raw as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue == number.doubleValue.rounded(),
+              number.doubleValue >= 1, number.doubleValue < Double(Int32.max) else { return nil }
+        return number.intValue
+    }
+
     /// Whether any cloud provider at all is still allowed — the difference
     /// between "only on-device AI" and "some providers are off".
     var anyCloudAllowed: Bool {

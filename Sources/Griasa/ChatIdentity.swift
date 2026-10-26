@@ -23,6 +23,21 @@ enum ChatIdentity {
         case unknown
     }
 
+    /// Promises already taken from a chat that belong to an author the person
+    /// has just linked: not the person's own, from that chat, and from a message
+    /// the account wrote (`authoredMessageIDs`). Linking moves them to the
+    /// person's name, so earlier promises do not stay under the display name
+    /// the author happened to have.
+    static func promisesToMove(
+        _ promises: [(id: UUID, chatID: String?, isMine: Bool, messageID: String?)],
+        chat: Int64, authoredMessageIDs: Set<String>) -> [UUID] {
+        promises.compactMap { p in
+            guard !p.isMine, p.chatID == String(chat),
+                  let message = p.messageID, authoredMessageIDs.contains(message) else { return nil }
+            return p.id
+        }
+    }
+
     static func person(forAuthorID id: String?, name: String, source: String,
                        people: [(name: String, handles: [String: String])]) -> Match {
         if let id, !id.isEmpty,

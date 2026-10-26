@@ -28,6 +28,14 @@ final class ConversationProcessor: ObservableObject {
     /// spending every day's attempts on it. `resume()` starts again.
     private static let stopAfterFailures = 2
 
+    /// True after the person pressed Cancel, until the next import or an
+    /// explicit Resume: opening the tab must not quietly start the work again.
+    @Published private(set) var cancelledByUser = false
+    /// Whether the queue is working now; retention waits for it to finish.
+    var isRunning: Bool { running }
+    /// Set while retention rewrites the database file; nothing starts then.
+    var maintenance = false
+
     private var store: ConversationStore?
     private var queue: [(chat: Int64, day: String)] = []
     private var running = false
@@ -50,7 +58,13 @@ final class ConversationProcessor: ObservableObject {
         return store
     }
 
+    /// An import or an accepted batch: new work, which ends a Cancel.
     func enqueue(_ days: [(Int64, String)]) {
+        cancelledByUser = false
+        enqueueDays(days)
+    }
+
+    private func enqueueDays(_ days: [(Int64, String)]) {
         for (chat, day) in days where !queue.contains(where: { $0.chat == chat && $0.day == day }) {
             queue.append((chat, day))
             total += 1
@@ -64,17 +78,28 @@ final class ConversationProcessor: ObservableObject {
     }
 
     /// Puts days a quit or a crash cut off back in line and queues everything
-    /// waiting. Safe to call whenever: it does nothing while the queue runs.
-    func resume() {
-        guard ManagedPolicy.live.conversationsEnabled, Self.modelReady, let store = openStore() else { return }
+    /// waiting. Safe to call whenever: it does nothing while the queue runs, or
+    /// after a Cancel (until `explicit`, the Resume button).
+    func resume(explicit: Bool = false) {
+        if explicit { cancelledByUser = false }
+        guard !cancelledByUser, !maintenance,
+              ManagedPolicy.live.conversationsEnabled, Self.modelReady, let store = openStore() else { return }
         if !running { _ = try? store.resetInterrupted() }
         guard let waiting = try? store.pendingDays(), !waiting.isEmpty else { return }
-        enqueue(waiting.map { ($0.chat, $0.day) })
+        enqueueDays(waiting.map { ($0.chat, $0.day) })
+    }
+
+    /// The person's Retry on a failed day: attempts start over.
+    func retry(chat: Int64, day: String) {
+        guard let store = openStore() else { return }
+        _ = try? store.resetFailed(chat: chat, day: day)
+        resume(explicit: true)
     }
 
     /// Stops after the day in hand; the rest stay `pending` for `resume()`.
     func cancel() {
         cancelled = true
+        cancelledByUser = true
         queue.removeAll()
     }
 
@@ -94,6 +119,9 @@ final class ConversationProcessor: ObservableObject {
             progress = (done, total)
         }
         queue.removeAll()
+        // A release that met a locked database leaves a day `processing`; nothing
+        // is working now, so put it back (or to `failed` if its tries are used up).
+        _ = try? store?.resetInterrupted()
         running = false
         done = 0
         total = 0
@@ -153,6 +181,14 @@ final class ConversationProcessor: ObservableObject {
                   chat, day, fresh.count, promises.proposed, added, promises.proposed - promises.kept.count)
             return .finished
         } catch {
+            // Another connection held the database (retention, an import): not the
+            // day's fault, so the attempt is given back. If even that is refused,
+            // the day stays `processing` until `resetInterrupted` puts it back.
+            if ConversationStore.isBusy(error) {
+                try? store.releaseWithoutCounting(chat: chat, day: day)
+                NSLog("Griasa: conversations — chat %lld day %@ waits for the database", chat, day)
+                return .retry
+            }
             // The model went away mid-day: nothing was wrong with the day.
             if !Self.modelReady {
                 try? store.releaseWithoutCounting(chat: chat, day: day)
@@ -202,5 +238,36 @@ final class ConversationProcessor: ObservableObject {
             kept += ChatDayText.keep(items, messages: group)
         }
         return (kept, proposed)
+    }
+}
+
+// Lives here, not in ConversationRetention.swift, because it needs the queue and
+// that file is Foundation-only for test.sh.
+extension ConversationRetention {
+    /// At launch and once a day, off the main thread: rebuilding the index and a
+    /// VACUUM on a large database are not instant.
+    ///
+    /// It never overlaps the queue: it is skipped while days are being read (the
+    /// next daily run catches up), and the queue is held off while it works and
+    /// started again after (`thenResume`, at launch), so neither stalls on the
+    /// other's lock. Its connection waits up to 30 s for a lock rather than 3.
+    @MainActor
+    static func runLive(now: Date = Date(), thenResume: Bool = false) {
+        let processor = ConversationProcessor.shared
+        guard !processor.isRunning, !processor.maintenance else { return }
+        processor.maintenance = true
+        let days = ManagedPolicy.live.conversationRetentionDays
+        Task.detached(priority: .utility) {
+            if let store = try? ConversationStore.live(busyTimeout: 30_000),
+               let outcome = try? run(store: store, retentionDays: days, now: now),
+               outcome.messages > 0 || outcome.reviews > 0 {
+                NSLog("Griasa: conversation retention removed %d message(s) and %d waiting batch(es)",
+                      outcome.messages, outcome.reviews)
+            }
+            await MainActor.run {
+                processor.maintenance = false
+                if thenResume { processor.resume() }
+            }
+        }
     }
 }

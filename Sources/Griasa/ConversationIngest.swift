@@ -104,11 +104,26 @@ enum ConversationIngest {
     /// Stores a validated batch; returns (chat id, day) for each day with new
     /// messages. Messages already stored add nothing, so offering the same chat
     /// again (a re-import, an assistant re-sending) costs no model work.
-    static func accept(into store: ConversationStore, batch: IngestBatch,
-                       timeZone: TimeZone) throws -> [(Int64, String)] {
-        let (ref, messages) = stored(batch)
+    ///
+    /// `retentionDays` is `ManagedPolicy.conversationRetentionDays`: messages
+    /// older than that are not stored at all, or the next retention pass would
+    /// delete them again right after the model had been asked about them. nil
+    /// keeps every message.
+    static func accept(into store: ConversationStore, batch: IngestBatch, timeZone: TimeZone,
+                       retentionDays: Int? = nil, now: Date = Date()) throws -> [(Int64, String)] {
+        var (ref, messages) = stored(batch)
+        if let cutoff = retentionCutoff(retentionDays: retentionDays, now: now) {
+            messages = messages.filter { $0.sentAt >= cutoff }
+        }
         let chat = try store.upsertChat(ref, myID: batch.me)
         return try store.insert(messages, chat: chat, timeZone: timeZone).map { (chat, $0) }
+    }
+
+    /// Messages sent before this moment are past the retention limit; nil when
+    /// there is no limit.
+    static func retentionCutoff(retentionDays: Int?, now: Date) -> Date? {
+        guard let days = retentionDays, days > 0 else { return nil }
+        return now.addingTimeInterval(-Double(days) * 86_400)
     }
 
     /// Whether the review list has room for a batch of `newMessages`, given

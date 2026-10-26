@@ -195,7 +195,8 @@ struct ConversationImportView: View {
                         switch ConversationIngest.validate([batch]) {
                         case .failure(let why): throw why
                         case .success(let ok):
-                            for b in ok { days += try ConversationIngest.accept(into: store, batch: b, timeZone: .current) }
+                            for b in ok { days += try ConversationIngest.accept(into: store, batch: b, timeZone: .current,
+                                                                  retentionDays: ManagedPolicy.live.conversationRetentionDays) }
                         }
                         messages += batch.messages.count
                         await Task.yield()

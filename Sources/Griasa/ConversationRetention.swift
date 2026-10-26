@@ -25,7 +25,7 @@ enum ConversationRetention {
         if let days = retentionDays, days > 0 {
             // `deleteMessages` also drops review batches older than the cutoff.
             let before = try store.reviewCount()
-            removed = try store.deleteMessages(olderThan: now.addingTimeInterval(-Double(days) * 86_400))
+            removed = try store.deleteMessages(olderThan: ConversationIngest.retentionCutoff(retentionDays: days, now: now) ?? now)
             expired += before - (try store.reviewCount())
         }
         let swept = try store.expireReviews(now: now)
@@ -33,19 +33,5 @@ enum ConversationRetention {
         // Expired batches hold message text too; make it leave the file.
         if swept > 0 && removed == 0 { try store.compact() }
         return Outcome(messages: removed, reviews: expired)
-    }
-
-    /// At launch and once a day, off the main thread: a VACUUM on a large
-    /// database is not instant.
-    static func runLive(now: Date = Date()) {
-        let days = ManagedPolicy.live.conversationRetentionDays
-        Task.detached(priority: .utility) {
-            guard let store = try? ConversationStore.live() else { return }
-            if let outcome = try? run(store: store, retentionDays: days, now: now),
-               outcome.messages > 0 || outcome.reviews > 0 {
-                NSLog("Griasa: conversation retention removed %d message(s) and %d waiting batch(es)",
-                      outcome.messages, outcome.reviews)
-            }
-        }
     }
 }

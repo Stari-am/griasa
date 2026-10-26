@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+**Conversations.** A new tab imports chat history (today a Telegram Desktop
+export: only the chats you tick, and the period you pick) into a local database
+that only your account can read. Griasa reads each day with the model you
+already use: a short summary, and the promises made in it, owned by the exact
+author the export names (a chat account you link to a person moves their earlier
+promises to that person). Search covers every message, *Delete chat* erases a
+chat, its summaries and its search index, and a day that could not be read can
+be retried. What an assistant or the local `POST /conversations` endpoint offers
+is review-gated: it waits, unread, until you accept or reject it, at most 14
+days. An organization can set `conversationsEnabled`, `conversationIngestEnabled`
+and `conversationRetentionDays` (messages and waiting batches older than that are
+removed; summaries and promises stay), and forcing `mcpEnabled` off closes the
+add door too.
+
 **Let assistants add to Griasa, behind a switch.** Settings → System has a new
 *Let assistants add to Griasa* switch, off by default and closed by the
 organization's `conversationIngestEnabled` key when it says no. With it on, the

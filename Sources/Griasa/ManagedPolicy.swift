@@ -94,10 +94,15 @@ struct ManagedPolicy {
     /// clear yes is no, like every other policy switch.
     var conversationIngestAllowed: Bool { flag(Self.conversationIngestEnabledKey) ?? true }
 
+    /// An organisation that has forced `mcpEnabled` off has closed the local
+    /// assistant door; the add side shares that listener, so it is closed too.
+    /// Forced on, or not forced, leaves it to the person's own switches.
+    var mcpForcedOff: Bool { isLocked("mcpEnabled") && !(flag("mcpEnabled") ?? false) }
+
     /// Days to keep stored messages, when an organisation sets one. Only a
     /// positive whole number counts: a string, zero, a negative or a fraction
-    /// is nil, which leaves the person's own retention in force rather than
-    /// guessing at what a mistyped profile meant. (A Boolean is an NSNumber
+    /// is nil, which means messages are kept (there is no personal retention
+    /// setting) rather than guessing at what a mistyped profile meant. (A Boolean is an NSNumber
     /// too, and "keep for true days" is not a policy.)
     var conversationRetentionDays: Int? {
         guard let raw = value(Self.conversationRetentionDaysKey),

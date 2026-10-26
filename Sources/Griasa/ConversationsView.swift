@@ -51,6 +51,11 @@ final class ConversationsModel: ObservableObject {
     @Published var reviews: [(id: Int64, title: String, source: String, entrance: String,
                               count: Int, received: Date)] = []
     @Published var error: String?
+    /// A chat is being deleted off the main thread.
+    @Published var deleting = false
+    /// Something asked for a chat that is no longer there (a promise's link to a
+    /// deleted chat): the tab says so instead of showing another chat unexplained.
+    @Published var showDeleted = false
 
     private(set) var store: ConversationStore?
 
@@ -81,6 +86,7 @@ final class ConversationsModel: ObservableObject {
     }
 
     func select(_ chat: Int64?) {
+        showDeleted = false
         selected = chat
         results = []
         do { try loadSelected() } catch { self.error = error.localizedDescription }
@@ -102,12 +108,35 @@ final class ConversationsModel: ObservableObject {
         (try? store?.messages(chat: chat, day: day)) ?? []
     }
 
+    /// Off the main thread: it rebuilds the index and VACUUMs, which is not
+    /// instant on a large database. The promises taken from the chat stay: they
+    /// are the person's list now.
     func delete(_ chat: Int64) {
-        do {
-            try store?.deleteChat(chat)
-            // The promises taken from it stay: they are the person's list now.
+        guard let store, !deleting else { return }
+        deleting = true
+        Task {
+            let failure: String? = await Task.detached(priority: .userInitiated) {
+                do { try store.deleteChat(chat); return nil } catch { return error.localizedDescription }
+            }.value
+            deleting = false
+            if let failure { error = failure }
             reload()
-        } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    /// Links a chat account to a person, and moves the promises already taken
+    /// from that account's messages to the person's name (the spec: they move
+    /// when the link is made, not only later ones).
+    func link(authorID: String, source: String, chat: Int64, to person: String) {
+        PersonStore.shared.setHandle(authorID, source: source, for: person)
+        if let store, let authored = try? store.messageIDs(chat: chat, authorID: authorID) {
+            let ids = ChatIdentity.promisesToMove(
+                CommitmentStore.shared.commitments.map {
+                    (id: $0.id, chatID: $0.sourceChatID, isMine: $0.isMine, messageID: $0.sourceMessageID)
+                }, chat: chat, authoredMessageIDs: authored)
+            CommitmentStore.shared.reassign(ids: ids, owner: person)
+        }
+        reload()
     }
 
     /// Takes a waiting batch in: the same path an import takes (validate, store,
@@ -122,7 +151,8 @@ final class ConversationsModel: ObservableObject {
             case .failure(let why): error = why.localizedDescription
             case .success(let ok):
                 var days: [(Int64, String)] = []
-                for b in ok { days += try ConversationIngest.accept(into: store, batch: b, timeZone: .current) }
+                for b in ok { days += try ConversationIngest.accept(into: store, batch: b, timeZone: .current,
+                                                  retentionDays: ManagedPolicy.live.conversationRetentionDays) }
                 try store.deleteReview(id)
                 ConversationProcessor.shared.enqueue(days)
             }
@@ -164,10 +194,20 @@ struct ConversationsView: View {
         VStack(spacing: 0) {
             toolbar
             if let progress = processor.progress { progressBar(progress) }
+            else if processor.cancelledByUser {
+                HStack(spacing: 8) {
+                    Text("Reading was cancelled. Days not yet read are waiting.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Resume") { processor.resume(explicit: true) }.controlSize(.small)
+                }
+                .padding(.horizontal, 10).padding(.bottom, 8)
+            }
             Divider()
             if model.chats.isEmpty {
                 EmptyStateView(icon: "bubble.left.and.bubble.right", title: "No chats yet",
-                               message: "Import a Telegram export and Griasa reads each day: a short summary, and the promises people made in it. Nothing leaves your Mac except what the AI provider you chose sees.")
+                               message: model.showDeleted
+                                   ? "This chat was deleted. Promises already taken from it stay on your list."
+                                   : "Import a Telegram export and Griasa reads each day: a short summary, and the promises people made in it. Nothing leaves your Mac except what the AI provider you chose sees.")
             } else {
                 HStack(spacing: 0) {
                     chatList.frame(width: 210)
@@ -195,7 +235,13 @@ struct ConversationsView: View {
     private func apply(_ target: ConversationsNavigator.Target?) {
         guard let target else { return }
         model.reload()
-        model.select(target.chat)
+        if model.chats.contains(where: { $0.id == target.chat }) {
+            model.select(target.chat)
+        } else {
+            // Deleted since the promise was taken: say so, rather than a blank header.
+            model.select(model.selected)
+            model.showDeleted = true
+        }
         query = ""
         if let day = target.day { expanded.insert(day); scrollTo = day }
         nav.target = nil
@@ -297,7 +343,7 @@ struct ConversationsView: View {
                     .controlSize(.small)
                 }
             }
-            Text("Nothing is read or kept until you accept. Unanswered batches expire after 14 days.")
+            Text("Batches wait in this Mac's database, unread, until you accept or reject them, for at most 14 days.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
     }
@@ -312,6 +358,11 @@ struct ConversationsView: View {
                     if !model.results.isEmpty {
                         searchResults
                     } else if let chat = model.selected {
+                        if model.showDeleted {
+                            Label("This chat was deleted. Promises already taken from it stay on your list.",
+                                  systemImage: "trash")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                         header(chat)
                         whoIsThis(chat)
                         ForEach(model.days, id: \.day) { day in
@@ -355,8 +406,9 @@ struct ConversationsView: View {
         HStack {
             Text(model.title(of: chat)).font(.headline)
             Spacer()
+            if model.deleting { ProgressView().controlSize(.small) }
             Button("Delete chat…", role: .destructive) { confirmDelete = true }
-                .controlSize(.small)
+                .controlSize(.small).disabled(model.deleting)
         }
     }
 
@@ -384,8 +436,7 @@ struct ConversationsView: View {
                             Menu("Link to…") {
                                 ForEach(author.options, id: \.self) { person in
                                     Button(person) {
-                                        PersonStore.shared.setHandle(author.id, source: source, for: person)
-                                        model.reload()
+                                        model.link(authorID: author.id, source: source, chat: chat, to: person)
                                     }
                                 }
                             }
@@ -431,7 +482,11 @@ private struct DayBlock: View {
                 } else if day.state == .pending || day.state == .processing {
                     Text("Waiting to be read").foregroundStyle(.secondary)
                 } else if day.state == .failed {
-                    Text("Could not be read; it will be tried again.").foregroundStyle(.secondary)
+                    HStack {
+                        Text("Could not be read after \(ConversationStore.maxAttempts) tries.").foregroundStyle(.secondary)
+                        Button("Retry") { ConversationProcessor.shared.retry(chat: chat, day: day.day) }
+                            .controlSize(.small)
+                    }
                 }
                 ForEach(promises) { item in
                     Label(item.isMine ? item.text : "\(item.owner): \(item.text)",

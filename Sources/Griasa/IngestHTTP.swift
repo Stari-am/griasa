@@ -52,7 +52,7 @@ enum IngestHTTP {
     /// token should be added to it, so a stranger cannot use up the limit.
     static func admit(method: String, path: String, headers: [String: String], bodySize: Int,
                       token: String, recent: [Date], now: Date,
-                      switchOn: Bool = true) -> Admission {
+                      switchOn: Bool) -> Admission {
         guard switchOn, path == Self.path else { return .notFound }
         guard method == "POST" else { return .methodNotAllowed }
         if let origin = headers["origin"], !origin.isEmpty, !isLocalOrigin(origin) {

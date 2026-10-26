@@ -170,12 +170,12 @@ final class AppState: ObservableObject {
         installHotkey()
         setupWhisper()
         Task { @MainActor in await LocalModelSetup.shared.refresh() }
-        // Chat days a quit cut off, or that waited for a model.
-        ConversationProcessor.shared.resume()
-        // Retention: raw chat text past an organisation's limit, and review
-        // batches nobody answered. At launch, then daily for an app that is
+        // Retention first: raw chat text past an organisation's limit, and review
+        // batches nobody answered. It rewrites the database file, so the queue
+        // for chat days a quit cut off, or that waited for a model, starts after
+        // it (`thenResume`), not alongside. Then daily for an app that is
         // rarely quit.
-        ConversationRetention.runLive()
+        ConversationRetention.runLive(thenResume: true)
         Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { _ in
             Task { @MainActor in ConversationRetention.runLive() }
         }

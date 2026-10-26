@@ -128,6 +128,21 @@ final class CommitmentStore: ObservableObject {
         return touched
     }
 
+    /// Moves the given promises to `owner` — a chat author just linked to a
+    /// person. Only `owner` changes. Returns how many were reassigned.
+    @discardableResult
+    func reassign(ids: [UUID], owner: String) -> Int {
+        let wanted = Set(ids)
+        var touched = 0
+        for index in commitments.indices
+        where wanted.contains(commitments[index].id) && commitments[index].owner != owner {
+            commitments[index].owner = owner
+            touched += 1
+        }
+        if touched > 0 { save() }
+        return touched
+    }
+
     private static func normalize(_ text: String) -> String {
         text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ".", with: "")

@@ -994,16 +994,18 @@ private struct SystemSettings: View {
         let policy = ManagedPolicy.live
         let key = ManagedPolicy.conversationIngestEnabledKey
         let forcedOff = policy.isLocked(key) && !policy.conversationIngestAllowed
+        // Closed by an organisation: the switch reads off, whatever was saved.
+        let closed = forcedOff || !policy.conversationsEnabled || policy.mcpForcedOff
         Toggle("Let assistants add to Griasa",
-               isOn: Binding(get: { state.assistantsMayAdd && !forcedOff },
+               isOn: Binding(get: { state.assistantsMayAdd && !closed },
                              set: { state.assistantsMayAdd = $0; tokenCopied = false }))
-            .disabled(forcedOff || !policy.conversationsEnabled)
-        if forcedOff || !policy.conversationsEnabled {
+            .disabled(closed)
+        if closed {
             managedNote("Set by your organization.")
         } else if policy.isLocked(key) {
             managedNote("Allowed by your organization.")
         }
-        Text("Additions wait for your review in the Conversations tab. Nothing is changed or deleted.")
+        Text("Added chats wait for your review in the Conversations tab. A proposal that a promise is done lands in Looks done, for you to confirm. Nothing is changed or deleted.")
             .font(.caption).foregroundStyle(.secondary)
         if AssistantWrites.isOpen(userSwitch: state.assistantsMayAdd, policy: policy) {
             if mcp.isRunning {

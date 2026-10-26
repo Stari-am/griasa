@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 
 // Checks for conversations: the SQLite store's idempotence and privacy rules,
 // the Telegram export parser, and the ingest limits. Fixtures under
@@ -740,6 +741,128 @@ do {
           rule: "retention removes the message from search too", meaning: "no copy left in the index", saw: "found")
 } catch {
     check(false, rule: "the retention checks run", meaning: "fixture setup", saw: "\(error)")
+}
+
+// MARK: Final review fixes
+
+do {
+    // A deleted chat's id is never reused.
+    let store = try freshStore()
+    let a = try store.upsertChat(chatRef, myID: nil)
+    _ = try store.insert([msg("1", "2026-10-20T10:00:00Z", "hello")], chat: a, timeZone: tzUTC)
+    try store.deleteChat(a)
+    let b = try store.upsertChat(ChatRef(source: "telegram", sourceChatID: "43", title: "Other", type: "private_group"), myID: nil)
+    check(b != a, rule: "a new chat never gets a deleted chat's id",
+          meaning: "promises, links and dedup entries are keyed by the id", saw: "reused \(a)")
+} catch {
+    check(false, rule: "the final-review checks run", meaning: "fixture setup", saw: "\(error)")
+}
+do {
+    // Retention removes messages but the summarized day still lists; the chat keeps a date.
+    let store = try freshStore()
+    let chat = try store.upsertChat(chatRef, myID: nil)
+    _ = try store.insert([msg("old", "2026-09-25T10:00:00Z", "old line"),
+                          msg("new", "2026-10-25T10:00:00Z", "new line")], chat: chat, timeZone: tzUTC)
+    try store.setDay(chat: chat, day: "2026-09-25", state: .done, summary: "Old gist", processedUpTo: nil)
+    try store.setDay(chat: chat, day: "2026-10-25", state: .done, summary: "New gist", processedUpTo: nil)
+    _ = try ConversationRetention.run(store: store, retentionDays: 30, now: utc("2026-10-26T12:00:00Z"))
+    let days = got("days", []) { try store.days(chat: chat) }
+    check(days.map(\.day) == ["2026-10-25", "2026-09-25"] && days[1].summary == "Old gist" && days[1].count == 0
+            && days[0].count == 1,
+          rule: "a day whose messages retention removed still lists with its summary",
+          meaning: "what was learned must stay visible", saw: "\(days.map { "\($0.day):\($0.count)" })")
+    _ = try ConversationRetention.run(store: store, retentionDays: 1, now: utc("2026-12-01T12:00:00Z"))
+    let list = got("chatList", []) { try store.chatList() }
+    check(list.count == 1 && list[0].last != nil,
+          rule: "a chat with no messages left keeps a last date from its newest day",
+          meaning: "the list must still sort it", saw: "\(list.map { String(describing: $0.last) })")
+} catch {
+    check(false, rule: "the final-review checks run", meaning: "fixture setup", saw: "\(error)")
+}
+do {
+    // Import and review-accept honour the retention limit.
+    let store = try freshStore()
+    let now = utc("2026-10-26T12:00:00Z")
+    var b = IngestBatch(source: "other", chat: .init(id: "r", title: "R", type: nil), me: nil, messages: [
+        .init(id: "1", author_id: nil, author: "A", at: "2026-08-01T10:00:00Z", text: "ancient", is_mine: nil, forwarded_from: nil),
+        .init(id: "2", author_id: nil, author: "A", at: "2026-10-25T10:00:00Z", text: "recent", is_mine: nil, forwarded_from: nil)])
+    let limited = got("accept", []) { try ConversationIngest.accept(into: store, batch: b, timeZone: tzUTC, retentionDays: 30, now: now) }
+    check(limited.map(\.1) == ["2026-10-25"],
+          rule: "accepting a batch drops messages older than the retention limit",
+          meaning: "they would be deleted at the next pass after being sent to a model", saw: "\(limited.map(\.1))")
+    b.chat.id = "r2"
+    let all = got("accept", []) { try ConversationIngest.accept(into: store, batch: b, timeZone: tzUTC, retentionDays: nil, now: now) }
+    check(all.count == 2, rule: "with no limit every message is stored", meaning: "nil keeps all", saw: "\(all.count)")
+} catch {
+    check(false, rule: "the final-review checks run", meaning: "fixture setup", saw: "\(error)")
+}
+do {
+    // Linking an author moves that author's earlier promises.
+    let mine = UUID(), theirs = UUID(), other = UUID(), elsewhere = UUID(), noMessage = UUID()
+    let ids = ChatIdentity.promisesToMove([
+        (id: mine, chatID: "7", isMine: true, messageID: "m1"),
+        (id: theirs, chatID: "7", isMine: false, messageID: "m1"),
+        (id: other, chatID: "7", isMine: false, messageID: "m2"),
+        (id: elsewhere, chatID: "8", isMine: false, messageID: "m1"),
+        (id: noMessage, chatID: "7", isMine: false, messageID: nil)], chat: 7, authoredMessageIDs: ["m1"])
+    check(ids == [theirs], rule: "linking moves only the linked author's promises from that chat, never the person's own",
+          meaning: "attributing a promise to the wrong person is worse than asking", saw: "\(ids.count)")
+    let store = try freshStore()
+    let chat = try store.upsertChat(chatRef, myID: nil)
+    var fwd = msg("f", "2026-10-20T10:00:00Z", "fwd"); fwd.forwardedFrom = "Z"
+    var mineMsg = msg("me", "2026-10-20T10:01:00Z", "mine"); mineMsg.isMine = true
+    _ = try store.insert([msg("a", "2026-10-20T10:02:00Z", "hi"), fwd, mineMsg], chat: chat, timeZone: tzUTC)
+    check(got("messageIDs", []) { Array(try store.messageIDs(chat: chat, authorID: "user1")) } == ["a"],
+          rule: "an author's message ids exclude forwards and the person's own",
+          meaning: "only what that account really wrote moves", saw: "")
+} catch {
+    check(false, rule: "the final-review checks run", meaning: "fixture setup", saw: "\(error)")
+}
+do {
+    // A locked database is busy, not a failed day; a failed day can be retried.
+    let url = tmp.appendingPathComponent("busy.sqlite")
+    let store = try ConversationStore(url: url, busyTimeout: 50)
+    let chat = try store.upsertChat(chatRef, myID: nil)
+    _ = try store.insert([msg("1", "2026-10-20T10:00:00Z", "x")], chat: chat, timeZone: tzUTC)
+    var other: OpaquePointer?
+    sqlite3_open(url.path, &other)
+    sqlite3_exec(other, "BEGIN EXCLUSIVE", nil, nil, nil)
+    var busy = false
+    do { try store.setDay(chat: chat, day: "2026-10-20", state: .done) } catch { busy = ConversationStore.isBusy(error) }
+    sqlite3_exec(other, "ROLLBACK", nil, nil, nil)
+    sqlite3_close(other)
+    check(busy, rule: "a statement refused by another connection's lock is recognised as busy",
+          meaning: "the processor must not count it against the day", saw: "not busy")
+    check(!ConversationStore.isBusy(ConversationStore.Failure.sqlite("no such table")),
+          rule: "other database errors are not busy", meaning: "real failures still count", saw: "busy")
+
+    // Day stuck in processing is reset by resetInterrupted; failed can be retried.
+    _ = try store.beginAttempt(chat: chat, day: "2026-10-20")
+    _ = try store.resetInterrupted()
+    check(dayOf(store, chat) == .pending, rule: "a day left processing by a refused release goes back to pending",
+          meaning: "it must not stay processing for ever", saw: "\(String(describing: dayOf(store, chat)))")
+    for _ in 0..<ConversationStore.maxAttempts {
+        _ = try store.beginAttempt(chat: chat, day: "2026-10-20")
+        _ = try store.releaseAfterFailure(chat: chat, day: "2026-10-20")
+    }
+    check(dayOf(store, chat) == .failed, rule: "three failures leave a day failed", meaning: "precondition of Retry", saw: "")
+    let reset = try store.resetFailed(chat: chat, day: "2026-10-20")
+    check(reset && dayOf(store, chat) == .pending && attempt(store, chat) == 1,
+          rule: "Retry makes a failed day pending with its attempts started over",
+          meaning: "the person's retry gets a full set of tries", saw: "\(reset)")
+} catch {
+    check(false, rule: "the final-review checks run", meaning: "fixture setup", saw: "\(error)")
+}
+do {
+    // MDM: forcing mcpEnabled off closes the add door; forcing it on does not open it.
+    func pol(_ values: [String: Any]) -> ManagedPolicy { ManagedPolicy(isForced: { values[$0] != nil }, value: { values[$0] }) }
+    check(!AssistantWrites.isOpen(userSwitch: true, policy: pol(["mcpEnabled": false]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["mcpEnabled": "nope"]))
+            && AssistantWrites.isOpen(userSwitch: true, policy: pol(["mcpEnabled": true]))
+            && AssistantWrites.isOpen(userSwitch: true, policy: pol([:]))
+            && !AssistantWrites.isOpen(userSwitch: false, policy: pol(["mcpEnabled": true])),
+          rule: "mcpEnabled forced off closes the add door; forced on leaves it to the person",
+          meaning: "the add side shares the listener the organisation turned off", saw: "")
 }
 
 return failures

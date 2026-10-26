@@ -55,7 +55,9 @@ final class ConversationStore {
     /// False when this SQLite was built without FTS5; search then scans with LIKE.
     private(set) var hasFullTextSearch = false
 
-    init(url: URL) throws {
+    /// `busyTimeout` is how long a statement waits for another connection's
+    /// write; housekeeping passes a longer one than the interactive default.
+    init(url: URL, busyTimeout: Int32 = 3_000) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Created with its permissions rather than chmod-ed afterwards, so the
@@ -75,14 +77,21 @@ final class ConversationStore {
         }
         // Another connection (the tab, the MCP tools, the local endpoint) may be
         // writing at the same moment; wait a moment rather than fail.
-        sqlite3_busy_timeout(db, 3_000)
+        sqlite3_busy_timeout(db, busyTimeout)
         do { try migrate() } catch { sqlite3_close(db); throw error }
     }
 
     deinit { sqlite3_close(db) }
 
-    static func live() throws -> ConversationStore {
-        try ConversationStore(url: StoreRoot.file("conversations.sqlite"))
+    static func live(busyTimeout: Int32 = 3_000) throws -> ConversationStore {
+        try ConversationStore(url: StoreRoot.file("conversations.sqlite"), busyTimeout: busyTimeout)
+    }
+
+    /// Whether an error is another connection holding the database. Nothing is
+    /// wrong with the work then; it is tried again later.
+    static func isBusy(_ error: Error) -> Bool {
+        guard case Failure.sqlite(let why) = error else { return false }
+        return why.contains("database is locked") || why.contains("database table is locked")
     }
 
     // MARK: Schema
@@ -91,8 +100,10 @@ final class ConversationStore {
         try exec("PRAGMA foreign_keys = ON")
         try exec("PRAGMA secure_delete = ON")
         try exec("""
+            -- AUTOINCREMENT: a deleted chat's id is never handed to a new one, or
+            -- the new chat would inherit its promises, links and dedup entries.
             CREATE TABLE IF NOT EXISTS chats(
-              id INTEGER PRIMARY KEY, source TEXT NOT NULL, source_chat_id TEXT NOT NULL,
+              id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT NOT NULL, source_chat_id TEXT NOT NULL,
               title TEXT NOT NULL, type TEXT NOT NULL, my_id TEXT,
               UNIQUE(source, source_chat_id));
             CREATE TABLE IF NOT EXISTS messages(
@@ -334,6 +345,16 @@ final class ConversationStore {
         }
     }
 
+    /// The person asked for another go at a day that failed: pending, with the
+    /// attempts started over. Returns whether a failed day was found.
+    @discardableResult
+    func resetFailed(chat: Int64, day: String) throws -> Bool {
+        try locked {
+            try run("UPDATE days SET state = 'pending', attempts = 0 WHERE chat_id = ? AND day = ? AND state = 'failed'",
+                    [.int(chat), .text(day)]) > 0
+        }
+    }
+
     /// Ends a successful try: summary and mark saved, day `done` — but only if
     /// it is still `processing`. A message imported meanwhile put the day back to
     /// `pending`; then nothing is written and the next pass reads it all again.
@@ -388,34 +409,70 @@ final class ConversationStore {
     // MARK: Browsing
 
     /// Every chat with its last message, newest first; what the hub's list shows.
+    /// A chat whose messages retention has removed still has its summarized
+    /// days, so its last date falls back to the newest of those.
     func chatList() throws -> [(id: Int64, ref: ChatRef, last: Date?)] {
-        try locked {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.calendar = Calendar(identifier: .gregorian)
+        format.dateFormat = "yyyy-MM-dd"
+        let rows = try locked {
             try query("""
-                SELECT c.id, c.source, c.source_chat_id, c.title, c.type, MAX(m.sent_at)
-                FROM chats c LEFT JOIN messages m ON m.chat_id = c.id
-                GROUP BY c.id ORDER BY MAX(m.sent_at) DESC, c.id DESC
-                """, []) { row in
-                (id: row.int(0),
-                 ref: ChatRef(source: row.string(1) ?? "", sourceChatID: row.string(2) ?? "",
-                              title: row.string(3) ?? "", type: row.string(4) ?? ""),
-                 last: sqlite3_column_type(row.stmt, 5) == SQLITE_NULL
-                    ? nil : Date(timeIntervalSince1970: row.double(5)))
+                SELECT c.id, c.source, c.source_chat_id, c.title, c.type,
+                  (SELECT MAX(sent_at) FROM messages WHERE chat_id = c.id),
+                  (SELECT MAX(day) FROM days WHERE chat_id = c.id)
+                FROM chats c
+                """, []) { row -> (id: Int64, ref: ChatRef, last: Date?) in
+                var last: Date?
+                if sqlite3_column_type(row.stmt, 5) != SQLITE_NULL {
+                    last = Date(timeIntervalSince1970: row.double(5))
+                } else if let key = row.string(6) {
+                    last = format.date(from: key)
+                }
+                return (id: row.int(0),
+                        ref: ChatRef(source: row.string(1) ?? "", sourceChatID: row.string(2) ?? "",
+                                     title: row.string(3) ?? "", type: row.string(4) ?? ""),
+                        last: last)
+            }
+        }
+        return rows.sorted {
+            switch ($0.last, $1.last) {
+            case let (a?, b?) where a != b: return a > b
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return $0.id > $1.id
             }
         }
     }
 
     /// The chat's days, newest first, with the pipeline's state and summary.
-    /// A day with messages but no row yet reads as `pending`.
+    /// Driven by the days kept as well as the days with messages: retention
+    /// removes messages but keeps summaries, and those days must still list. A
+    /// day with messages but no row yet reads as `pending`.
     func days(chat: Int64) throws -> [(day: String, state: DayState, summary: String?, count: Int)] {
         try locked {
             try query("""
-                SELECT m.day, COUNT(*), d.state, d.summary FROM messages m
-                LEFT JOIN days d ON d.chat_id = m.chat_id AND d.day = m.day
-                WHERE m.chat_id = ? GROUP BY m.day ORDER BY m.day DESC
-                """, [.int(chat)]) { row in
+                SELECT k.day, (SELECT COUNT(*) FROM messages m WHERE m.chat_id = ? AND m.day = k.day),
+                  d.state, d.summary
+                FROM (SELECT day FROM days WHERE chat_id = ?
+                      UNION SELECT day FROM messages WHERE chat_id = ?) k
+                LEFT JOIN days d ON d.chat_id = ? AND d.day = k.day
+                ORDER BY k.day DESC
+                """, [.int(chat), .int(chat), .int(chat), .int(chat)]) { row in
                 (day: row.string(0) ?? "", state: row.string(2).flatMap { DayState(rawValue: $0) } ?? .pending,
                  summary: row.string(3), count: Int(row.int(1)))
             }
+        }
+    }
+
+    /// The messenger ids of the messages one account wrote in the chat (not the
+    /// person's own, not forwards), for moving that account's earlier promises.
+    func messageIDs(chat: Int64, authorID: String) throws -> Set<String> {
+        try locked {
+            Set(try query("""
+                SELECT source_message_id FROM messages
+                WHERE chat_id = ? AND author_id = ? AND is_mine = 0 AND forwarded_from IS NULL
+                """, [.int(chat), .text(authorID)]) { $0.string(0) ?? "" })
         }
     }
 
@@ -486,12 +543,13 @@ final class ConversationStore {
                             [.text(ref.source), .text(ref.id)])
                 }
                 try run("DELETE FROM chats WHERE id = ?", [.int(chat)])
+                try rebuildIndex()
                 try exec("COMMIT")
             } catch {
                 try? exec("ROLLBACK")
                 throw error
             }
-            try purge()
+            vacuum()
         }
     }
 
@@ -507,26 +565,37 @@ final class ConversationStore {
             do {
                 removed = try run("DELETE FROM messages WHERE sent_at < ?", [.real(cutoff)])
                 try run("DELETE FROM review WHERE received_at < ?", [.real(cutoff)])
+                if removed > 0 { try rebuildIndex() }
                 try exec("COMMIT")
             } catch {
                 try? exec("ROLLBACK")
                 throw error
             }
-            if removed > 0 { try purge() }
+            if removed > 0 { vacuum() }
             return removed
         }
     }
 
     /// Makes deleted text really leave the file. The FTS5 'delete' trigger only
-    /// writes tombstones and VACUUM keeps index segments, so the index is rebuilt
-    /// from the remaining rows first.
-    /// Rebuilds the index and VACUUMs after text was deleted by other means.
-    func compact() throws { try locked { try purge() } }
-
-    private func purge() throws {
-        if hasFullTextSearch { try exec("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')") }
-        try exec("VACUUM")
+    /// writes tombstones, so the index is rebuilt from the remaining rows — inside
+    /// the caller's transaction, so the delete and the rebuild stand or fall
+    /// together. Rebuilds the index and VACUUMs after text was deleted by other
+    /// means.
+    func compact() throws {
+        try locked {
+            try exec("BEGIN")
+            do { try rebuildIndex(); try exec("COMMIT") } catch { try? exec("ROLLBACK"); throw error }
+            vacuum()
+        }
     }
+
+    private func rebuildIndex() throws {
+        if hasFullTextSearch { try exec("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')") }
+    }
+
+    /// Best effort: `secure_delete` already zeroes freed pages, so a VACUUM that
+    /// cannot get the lock only leaves free space, not text.
+    private func vacuum() { try? exec("VACUUM") }
 
     // MARK: Review
 

@@ -140,7 +140,7 @@ final class MCPServer: ObservableObject {
     func start() {
         guard listener == nil else { return }
         lastError = nil
-        if token.isEmpty { token = Self.loadOrCreateToken(at: configURL) }
+        ensureReadToken()
         bind(from: Self.preferredPort, attemptsLeft: 12)
     }
 
@@ -168,7 +168,9 @@ final class MCPServer: ObservableObject {
                     case .ready:
                         self.port = candidate
                         self.isRunning = true
-                        self.writeConfiguration()
+                        // The read side's file (url + token) is only for a client
+                        // that may read; ingest alone has nothing to put in it.
+                        if self.readSideOn { self.writeConfiguration() }
                     case .failed(let error):
                         self.listener?.cancel()
                         self.listener = nil
@@ -203,6 +205,19 @@ final class MCPServer: ObservableObject {
         listener?.cancel()
         listener = nil
         isRunning = false
+    }
+
+    /// Whether assistants may read: the person's switch, or the organisation's
+    /// value when it is forced (UserDefaults returns the managed value).
+    private var readSideOn: Bool { UserDefaults.standard.bool(forKey: "mcpEnabled") }
+
+    /// The read token and mcp.json exist only while the read side is on. With
+    /// only the add side on, no token for reading is created or written. Safe to
+    /// call again after the switch changes while the listener runs.
+    private func ensureReadToken() {
+        guard readSideOn, token.isEmpty else { return }
+        token = Self.loadOrCreateToken(at: configURL)
+        if isRunning { writeConfiguration() }
     }
 
     func rotateToken() {
@@ -279,10 +294,11 @@ final class MCPServer: ObservableObject {
         }
         // The server may be up only for the ingest route; reading stays off
         // unless the person turned it on.
-        guard UserDefaults.standard.bool(forKey: "mcpEnabled") else {
+        guard readSideOn else {
             send(status: 404, reason: "not found", on: connection)
             return
         }
+        ensureReadToken()
         let gate = MCPGate(token: token, port: port)
         if case .refuse(let status, let reason) = gate.verdict(for: request) {
             send(status: status, reason: reason, on: connection)
@@ -305,10 +321,13 @@ final class MCPServer: ObservableObject {
     /// happens. Logs carry counts, never what was in the chat.
     private func answerIngest(_ request: HTTPRequest.Parsed, on connection: NWConnection) {
         let now = Date()
+        // The token is read (or made) only for a door that is open; a closed one
+        // answers as if nothing were here and touches no secret.
+        let switchOn = AssistantWrites.isOpenNow
         let verdict = IngestHTTP.admit(
             method: request.method, path: request.path, headers: request.headers,
-            bodySize: request.body.count, token: ingestToken(), recent: ingestRecent, now: now,
-            switchOn: AssistantWrites.isOpenNow)
+            bodySize: request.body.count, token: switchOn ? ingestToken() : "",
+            recent: ingestRecent, now: now, switchOn: switchOn)
         guard verdict == .accept else {
             send(status: verdict.status, reason: verdict.reason, on: connection)
             return
@@ -366,8 +385,9 @@ final class MCPServer: ObservableObject {
     /// Runs while the read side or the add side is switched on, and stops when
     /// neither is. Called when either switch changes and at launch.
     func reconcile() {
-        let wanted = UserDefaults.standard.bool(forKey: "mcpEnabled") || AssistantWrites.isOpenNow
+        let wanted = readSideOn || AssistantWrites.isOpenNow
         wanted ? start() : stop()
+        if wanted { ensureReadToken() }
     }
 
     private static var appVersion: String {

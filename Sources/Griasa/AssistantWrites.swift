@@ -25,10 +25,13 @@ enum AssistantWrites {
     static let maxQuote = 500
 
     /// Whether assistants may add anything now: the person's own switch, and
-    /// neither organisation key closing the door. Both MCP tools and the HTTP
-    /// route ask this one question, so they cannot disagree.
+    /// no organisation key closing the door. That includes `mcpEnabled` forced
+    /// off: the add side runs on the same local listener, so an organisation
+    /// that turned assistants off has turned this off too. Both MCP tools and the
+    /// HTTP route ask this one question, so they cannot disagree.
     static func isOpen(userSwitch: Bool, policy: ManagedPolicy) -> Bool {
         userSwitch && policy.conversationsEnabled && policy.conversationIngestAllowed
+            && !policy.mcpForcedOff
     }
 
     static var isOpenNow: Bool {

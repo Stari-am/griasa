@@ -140,7 +140,7 @@ final class MCPServer: ObservableObject {
     func start() {
         guard listener == nil else { return }
         lastError = nil
-        if token.isEmpty { token = Self.loadOrCreateToken(at: configURL) }
+        ensureReadToken()
         bind(from: Self.preferredPort, attemptsLeft: 12)
     }
 
@@ -168,7 +168,9 @@ final class MCPServer: ObservableObject {
                     case .ready:
                         self.port = candidate
                         self.isRunning = true
-                        self.writeConfiguration()
+                        // The read side's file (url + token) is only for a client
+                        // that may read; ingest alone has nothing to put in it.
+                        if self.readSideOn { self.writeConfiguration() }
                     case .failed(let error):
                         self.listener?.cancel()
                         self.listener = nil
@@ -205,6 +207,19 @@ final class MCPServer: ObservableObject {
         isRunning = false
     }
 
+    /// Whether assistants may read: the person's switch, or the organisation's
+    /// value when it is forced (UserDefaults returns the managed value).
+    private var readSideOn: Bool { UserDefaults.standard.bool(forKey: "mcpEnabled") }
+
+    /// The read token and mcp.json exist only while the read side is on. With
+    /// only the add side on, no token for reading is created or written. Safe to
+    /// call again after the switch changes while the listener runs.
+    private func ensureReadToken() {
+        guard readSideOn, token.isEmpty else { return }
+        token = Self.loadOrCreateToken(at: configURL)
+        if isRunning { writeConfiguration() }
+    }
+
     func rotateToken() {
         token = Self.newToken()
         writeConfiguration()
@@ -238,7 +253,7 @@ final class MCPServer: ObservableObject {
                 if let chunk, !chunk.isEmpty { buffer.append(chunk) }
 
                 while true {
-                    switch HTTPRequest.parse(buffer) {
+                    switch HTTPRequest.parse(buffer, limit: { self.bodyLimit(for: $0) }) {
                     case .incomplete:
                         if isComplete { connection.cancel(); return }
                         self.receive(on: connection, buffer: buffer)
@@ -266,7 +281,24 @@ final class MCPServer: ObservableObject {
         }
     }
 
+    /// `/conversations` takes a bigger body than `/mcp`, but only while its
+    /// switch is on; otherwise it is held to the same limit as everything else.
+    private func bodyLimit(for path: String) -> Int {
+        path == IngestHTTP.path && AssistantWrites.isOpenNow ? IngestHTTP.maxBody : HTTPRequest.maxBody
+    }
+
     private func answer(_ request: HTTPRequest.Parsed, on connection: NWConnection) {
+        if request.path == IngestHTTP.path {
+            answerIngest(request, on: connection)
+            return
+        }
+        // The server may be up only for the ingest route; reading stays off
+        // unless the person turned it on.
+        guard readSideOn else {
+            send(status: 404, reason: "not found", on: connection)
+            return
+        }
+        ensureReadToken()
         let gate = MCPGate(token: token, port: port)
         if case .refuse(let status, let reason) = gate.verdict(for: request) {
             send(status: status, reason: reason, on: connection)
@@ -274,7 +306,7 @@ final class MCPServer: ObservableObject {
         }
         let environment = MCPEndpoint.Environment(
             serverVersion: Self.appVersion,
-            tools: MCPTools.listings,
+            tools: MCPTools.liveListings,
             invoke: { MCPTools.invoke($0, $1) })
         let reply = MCPEndpoint.handle(body: request.body, headers: request.headers,
                                        environment: environment)
@@ -283,6 +315,79 @@ final class MCPServer: ObservableObject {
         } else {
             send(status: reply.status, reason: "", on: connection)
         }
+    }
+
+    /// `POST /conversations`: the batch goes to the review list and nothing else
+    /// happens. Logs carry counts, never what was in the chat.
+    private func answerIngest(_ request: HTTPRequest.Parsed, on connection: NWConnection) {
+        let now = Date()
+        // The token is read (or made) only for a door that is open; a closed one
+        // answers as if nothing were here and touches no secret.
+        let switchOn = AssistantWrites.isOpenNow
+        let verdict = IngestHTTP.admit(
+            method: request.method, path: request.path, headers: request.headers,
+            bodySize: request.body.count, token: switchOn ? ingestToken() : "",
+            recent: ingestRecent, now: now, switchOn: switchOn)
+        guard verdict == .accept else {
+            send(status: verdict.status, reason: verdict.reason, on: connection)
+            return
+        }
+        ingestRecent = ingestRecent.filter { now.timeIntervalSince($0) < IngestHTTP.rateWindow } + [now]
+
+        switch IngestHTTP.decode(request.body) {
+        case .failure(let problem):
+            send(status: 400, reason: problem.message, on: connection)
+        case .success(let batches):
+            guard let store = MCPTools.conversationStore() else {
+                send(status: 503, reason: "conversations are not available", on: connection)
+                return
+            }
+            switch AssistantWrites.queue(batches, entrance: "http", store: store, now: now) {
+            case .success(let ids):
+                NSLog("Griasa: %d conversation batch(es) waiting for review (http)", ids.count)
+                let body = (try? JSONSerialization.data(withJSONObject: [
+                    "queued": true, "review_ids": ids.map { Int($0) }])) ?? Data("{}".utf8)
+                send(body: body, status: 202, on: connection)
+                NotificationCenter.default.post(name: .conversationReviewChanged, object: nil)
+            case .failure(let why):
+                send(status: why == .full ? 409 : (why == .storage ? 500 : 400),
+                     reason: why.message, on: connection)
+            }
+        }
+    }
+
+    // MARK: - Ingest token
+
+    private var ingestTokenCache: String?
+    private var ingestRecent: [Date] = []
+
+    /// The endpoint's own bearer token, made on first use. Kept in the keychain
+    /// and read back from memory afterwards; never written to mcp.json.
+    func ingestToken() -> String {
+        if let ingestTokenCache { return ingestTokenCache }
+        var token = Secrets.value(IngestHTTP.tokenName)
+        if token.isEmpty {
+            token = Self.newToken()
+            Secrets.set(IngestHTTP.tokenName, token)
+        }
+        ingestTokenCache = token
+        return token
+    }
+
+    func rotateIngestToken() {
+        let token = Self.newToken()
+        Secrets.set(IngestHTTP.tokenName, token)
+        ingestTokenCache = token
+    }
+
+    var ingestEndpoint: String { "http://127.0.0.1:\(port)\(IngestHTTP.path)" }
+
+    /// Runs while the read side or the add side is switched on, and stops when
+    /// neither is. Called when either switch changes and at launch.
+    func reconcile() {
+        let wanted = readSideOn || AssistantWrites.isOpenNow
+        wanted ? start() : stop()
+        if wanted { ensureReadToken() }
     }
 
     private static var appVersion: String {
@@ -322,8 +427,12 @@ final class MCPServer: ObservableObject {
         case 404: return "Not Found"
         case 405: return "Method Not Allowed"
         case 411: return "Length Required"
+        case 409: return "Conflict"
         case 413: return "Payload Too Large"
+        case 429: return "Too Many Requests"
         case 431: return "Request Header Fields Too Large"
+        case 500: return "Internal Server Error"
+        case 503: return "Service Unavailable"
         default: return "Error"
         }
     }

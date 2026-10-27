@@ -47,7 +47,9 @@ struct ManagedPolicy {
                                "customSmartModel", "mcpEnabled", allowCloudAIKey,
                                RecordingNotice.enabledKey, RecordingNotice.textKey,
                                "audioRetentionDays",
-                               "localModelID", "localModelAutoDownload", "localEnginePreferred"]
+                               "localModelID", "localModelAutoDownload", "localEnginePreferred",
+                               conversationsEnabledKey, conversationIngestEnabledKey,
+                               conversationRetentionDaysKey]
         + providerKeys.values.sorted()
 
     /// The providers that stay on this Mac. A custom endpoint counts even when
@@ -75,6 +77,40 @@ struct ManagedPolicy {
             return ["true", "yes", "1"].contains(text)
         }
         return false
+    }
+
+    /// Conversations — chat history the person chooses to bring in — are off
+    /// for the whole organisation when a profile says `false`. Absent means on:
+    /// the feature still needs the person's own consent before it reads anything.
+    static let conversationsEnabledKey = "conversationsEnabled"
+    static let conversationIngestEnabledKey = "conversationIngestEnabled"
+    static let conversationRetentionDaysKey = "conversationRetentionDays"
+
+    var conversationsEnabled: Bool { flag(Self.conversationsEnabledKey) ?? true }
+
+    /// Whether an organisation lets the person bring chats in at all. Absent
+    /// means the person's own switch decides, so this is true — it never turns
+    /// ingestion on by itself, it only fails to close it. Present and not a
+    /// clear yes is no, like every other policy switch.
+    var conversationIngestAllowed: Bool { flag(Self.conversationIngestEnabledKey) ?? true }
+
+    /// An organisation that has forced `mcpEnabled` off has closed the local
+    /// assistant door; the add side shares that listener, so it is closed too.
+    /// Forced on, or not forced, leaves it to the person's own switches.
+    var mcpForcedOff: Bool { isLocked("mcpEnabled") && !(flag("mcpEnabled") ?? false) }
+
+    /// Days to keep stored messages, when an organisation sets one. Only a
+    /// positive whole number counts: a string, zero, a negative or a fraction
+    /// is nil, which means messages are kept (there is no personal retention
+    /// setting) rather than guessing at what a mistyped profile meant. (A Boolean is an NSNumber
+    /// too, and "keep for true days" is not a policy.)
+    var conversationRetentionDays: Int? {
+        guard let raw = value(Self.conversationRetentionDaysKey),
+              let number = raw as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue == number.doubleValue.rounded(),
+              number.doubleValue >= 1, number.doubleValue < Double(Int32.max) else { return nil }
+        return number.intValue
     }
 
     /// Whether any cloud provider at all is still allowed — the difference

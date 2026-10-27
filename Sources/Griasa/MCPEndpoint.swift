@@ -42,8 +42,10 @@ enum MCPEndpoint {
         what is known about each colleague. Start with list_commitments or \
         get_next_meeting_brief for "what is open" and "what is next"; use search_meetings \
         and get_meeting for what a meeting decided; ask for get_transcript only when \
-        a summary is not enough, since it returns everything that was said. All \
-        tools are read-only.
+        a summary is not enough, since it returns everything that was said. These \
+        tools only read. If the user has allowed it, add_conversation offers a chat \
+        for their review and propose_close_commitment suggests that a promise is \
+        done; neither reads, changes or deletes anything, and the user decides.
         """
 
     struct Environment {

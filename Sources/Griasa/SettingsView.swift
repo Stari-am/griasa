@@ -983,8 +983,52 @@ private struct SnippetsSettings: View {
 
 private struct SystemSettings: View {
     @ObservedObject var state: AppState
+    @State private var tokenCopied = false
     @ObservedObject private var mcp = MCPServer.shared
     @ObservedObject private var stats = UsageStats.shared
+    /// "Let assistants add to Griasa": the one switch for both MCP write tools
+    /// and the local HTTP endpoint. An organisation can only close it; when its
+    /// profile says no the switch is locked off, and when it says yes the
+    /// person still decides.
+    @ViewBuilder private var addToGriasa: some View {
+        let policy = ManagedPolicy.live
+        let key = ManagedPolicy.conversationIngestEnabledKey
+        let forcedOff = policy.isLocked(key) && !policy.conversationIngestAllowed
+        // Closed by an organisation: the switch reads off, whatever was saved.
+        let closed = forcedOff || !policy.conversationsEnabled || policy.mcpForcedOff
+        Toggle("Let assistants add to Griasa",
+               isOn: Binding(get: { state.assistantsMayAdd && !closed },
+                             set: { state.assistantsMayAdd = $0; tokenCopied = false }))
+            .disabled(closed)
+        if closed {
+            managedNote("Set by your organization.")
+        } else if policy.isLocked(key) {
+            managedNote("Allowed by your organization.")
+        }
+        Text("Added chats wait for your review in the Conversations tab. A proposal that a promise is done lands in Looks done, for you to confirm. Nothing is changed or deleted.")
+            .font(.caption).foregroundStyle(.secondary)
+        if AssistantWrites.isOpen(userSwitch: state.assistantsMayAdd, policy: policy) {
+            if mcp.isRunning {
+                LabeledContent("Conversations endpoint", value: mcp.ingestEndpoint).font(.caption)
+                HStack {
+                    Button(tokenCopied ? "Copied" : "Copy token") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(mcp.ingestToken(), forType: .string)
+                        tokenCopied = true
+                    }
+                    Button("Rotate token") { mcp.rotateIngestToken(); tokenCopied = false }
+                        .help("Invalidates the token already handed out")
+                }
+                Text("POST a chat as JSON with the header Authorization: Bearer <token>. The token is kept in your keychain and is separate from the assistant token above.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if let error = mcp.lastError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            } else {
+                Text("Starting…").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
     var body: some View {
         SettingsTab {
             Section("AI assistants (MCP)") {
@@ -1028,6 +1072,7 @@ private struct SystemSettings: View {
                    + "months of conversation into a cloud model by accident.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                addToGriasa
             }
             Section("Permissions") {
                 permissionRow("Microphone", granted: Permissions.microphoneGranted,

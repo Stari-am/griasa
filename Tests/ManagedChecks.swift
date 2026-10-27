@@ -131,5 +131,35 @@ check(["localModelID", "localModelAutoDownload", "localEnginePreferred"].allSati
       meaning: "an organisation that pins the model or pre-approves the download must see those settings as managed",
       saw: "\(ManagedPolicy.lockableKeys)")
 
+// Conversations. Absent is the unmanaged install and must change nothing; the
+// ingest switch is only ever a veto, never an enabler.
+let convKeys = [ManagedPolicy.conversationsEnabledKey: \ManagedPolicy.conversationsEnabled,
+                ManagedPolicy.conversationIngestEnabledKey: \ManagedPolicy.conversationIngestAllowed]
+for (key, path) in convKeys {
+    let cases: [(label: String, values: [String: Any], expected: Bool)] = [
+        ("absent", [:], true), ("true", [key: true], true), ("false", [key: false], false),
+        ("the string \"false\"", [key: "false"], false), ("the string \"true\"", [key: "true"], true),
+        ("garbage", [key: ["no"]], false),
+    ]
+    for c in cases {
+        let got = policy(values: c.values)[keyPath: path]
+        check(got == c.expected,
+              rule: "\(key) \(c.label) reads as \(c.expected)",
+              meaning: "absent must leave conversations as they were; a profile that says no, even mistyped, must not fail open",
+              saw: "\(got)")
+    }
+}
+let retentionCases: [(String, Any?, Int?)] = [
+    ("30", 30, 30), ("the string \"30\"", "30", nil), ("0", 0, nil), ("-5", -5, nil),
+    ("30.5", 30.5, nil), ("true", true, nil), ("absent", nil, nil),
+]
+for (label, raw, expected) in retentionCases {
+    let days = policy(values: raw.map { [ManagedPolicy.conversationRetentionDaysKey: $0] } ?? [:]).conversationRetentionDays
+    check(days == expected,
+          rule: "conversationRetentionDays \(label) reads as \(expected.map(String.init) ?? "nil")",
+          meaning: "only a positive whole number is a retention period; anything else must not delete a person's history early or at random",
+          saw: "\(days.map(String.init) ?? "nil")")
+}
+
 return failures
 }

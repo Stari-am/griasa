@@ -290,6 +290,201 @@ do {
           saw: "\(String(describing: MCPEndpoint.decodeHeaderValue("=?base64?!!!?=")))")
 }
 
+// MARK: Assistants adding (Tasks 8 and 9)
+
+do {
+    let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("griasa-assist-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+    let store = try ConversationStore(url: tmpDir.appendingPathComponent("c.sqlite"))
+    var promises = [Commitment(text: "Send the deck", owner: "Maya", isMine: true, sourceTitle: "Chat"),
+                    Commitment(text: "Book venue", owner: "Maya", isMine: true, sourceTitle: "Chat")]
+    promises[1].done = true
+    let context = AssistantWrites.Context(
+        store: { store },
+        commitment: { id in promises.first { $0.id == id } },
+        propose: { id, quote in
+            if let i = promises.firstIndex(where: { $0.id == id }) { promises[i].proposeClosure(quote: quote) }
+        })
+    func environment(open: Bool) -> MCPEndpoint.Environment {
+        MCPEndpoint.Environment(serverVersion: "t", tools: [tool] + AssistantWrites.listings(open: open),
+                                invoke: { name, args in
+            AssistantWrites.invoke(name, args, open: open, context: context) })
+    }
+    func call(_ env: MCPEndpoint.Environment, _ method: String, _ params: [String: Any] = [:]) -> [String: Any] {
+        let body = try! JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": 1, "method": method, "params": params])
+        return json(MCPEndpoint.handle(body: body, headers: [:], environment: env).body)
+    }
+    func names(_ env: MCPEndpoint.Environment) -> [String] {
+        ((call(env, "tools/list")["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? [])
+            .compactMap { $0["name"] as? String }
+    }
+    let batchArguments: [String: Any] = [
+        "source": "telegram", "chat": ["id": "c9", "title": "Crew"], "me": "Maya",
+        "messages": [["id": "1", "author": "Maya", "at": "2026-10-20T10:00:00Z", "text": "I'll send the deck Friday"]],
+    ]
+
+    let off = environment(open: false), on = environment(open: true)
+    check(names(off) == ["list_people"],
+          rule: "with the switch off, tools/list has neither write tool",
+          meaning: "the MCP server stays read-only unless the person opens it", saw: "\(names(off))")
+    let refused = call(off, "tools/call", ["name": "add_conversation", "arguments": batchArguments])
+    check((refused["error"] as? [String: Any])?["code"] as? Int == -32602
+            && ((try? store.reviewCount()) ?? -1) == 0,
+          rule: "with the switch off, add_conversation is an unknown tool and stores nothing",
+          meaning: "a closed switch must not be a polite refusal that still wrote", saw: "\(refused)")
+
+    check(Set(names(on)) == ["list_people", "add_conversation", "propose_close_commitment"],
+          rule: "with the switch on, both write tools are listed",
+          meaning: "an assistant can only use what it is shown", saw: "\(names(on))")
+    let listed = ((call(on, "tools/list")["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? [])
+        .filter { ($0["name"] as? String) != "list_people" }
+    check(listed.count == 2 && listed.allSatisfy {
+            let a = $0["annotations"] as? [String: Any]
+            return a?["readOnlyHint"] as? Bool == false && a?["destructiveHint"] as? Bool == false
+                && a?["idempotentHint"] as? Bool == true
+          },
+          rule: "write tools say they write, and that they do not destroy",
+          meaning: "clients show the right confirmation from the annotations", saw: "\(listed.map { $0["annotations"] ?? "" })")
+
+    let added = call(on, "tools/call", ["name": "add_conversation", "arguments": batchArguments])
+    let addedResult = (added["result"] as? [String: Any])
+    let queued = addedResult?["structuredContent"] as? [String: Any]
+    check(addedResult?["isError"] as? Bool == false && queued?["queued"] as? Bool == true
+            && queued?["review_id"] is Int
+            && ((try? store.reviewCount()) ?? -1) == 1
+            && ((try? store.chatList().count) ?? -1) == 0
+            && ((try? store.pendingDays().count) ?? -1) == 0,
+          rule: "add_conversation queues a review item and processes nothing",
+          meaning: "an assistant's text cannot become messages, days or promises without the person's yes",
+          saw: "\(added) reviews \((try? store.reviewCount()) ?? -1), chats \((try? store.chatList().count) ?? -1)")
+    var wrong = batchArguments
+    wrong["source"] = "fax"
+    let bad = (call(on, "tools/call", ["name": "add_conversation", "arguments": wrong])["result"] as? [String: Any])
+    check(bad?["isError"] as? Bool == true && ((try? store.reviewCount()) ?? -1) == 1,
+          rule: "an invalid batch is an error result and adds nothing", meaning: "the model can read the reason and retry",
+          saw: "\(String(describing: bad))")
+
+    let open = promises[0]
+    let proposed = (call(on, "tools/call", ["name": "propose_close_commitment",
+        "arguments": ["id": open.id.uuidString, "quote_or_reason": "Sent it on Tuesday"]])["result"] as? [String: Any])
+    let suggested: Bool = promises[0].suggestedDoneQuote == "Sent it on Tuesday" && promises[0].suggestedDoneAt != nil
+    let notDone: Bool = promises[0].done == false && promises[0].hasClosureSuggestion
+    check(proposed?["isError"] as? Bool == false && notDone && suggested,
+          rule: "propose_close_commitment sets the suggestion and never done",
+          meaning: "only the person closes a promise", saw: "done \(promises[0].done), quote \(promises[0].suggestedDoneQuote ?? "nil")")
+    let unknown = (call(on, "tools/call", ["name": "propose_close_commitment",
+        "arguments": ["id": UUID().uuidString, "quote_or_reason": "x"]])["result"] as? [String: Any])
+    let finished = (call(on, "tools/call", ["name": "propose_close_commitment",
+        "arguments": ["id": promises[1].id.uuidString, "quote_or_reason": "x"]])["result"] as? [String: Any])
+    let unknownFailed: Bool = unknown?["isError"] as? Bool == true
+    let finishedFailed: Bool = finished?["isError"] as? Bool == true
+    check(unknownFailed && finishedFailed && promises[1].suggestedDoneQuote == nil,
+          rule: "an unknown or already-done promise id is an error result",
+          meaning: "a wrong id must not look like a success", saw: "\(String(describing: unknown)) \(String(describing: finished))")
+
+    // The switch's own rule.
+    func pol(_ values: [String: Any]) -> ManagedPolicy { ManagedPolicy(isForced: { values[$0] != nil }, value: { values[$0] }) }
+    check(AssistantWrites.isOpen(userSwitch: true, policy: pol([:]))
+            && !AssistantWrites.isOpen(userSwitch: false, policy: pol([:]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["conversationIngestEnabled": false]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["conversationIngestEnabled": "maybe"]))
+            && !AssistantWrites.isOpen(userSwitch: true, policy: pol(["conversationsEnabled": false]))
+            && !AssistantWrites.isOpen(userSwitch: false, policy: pol(["conversationIngestEnabled": true])),
+          rule: "assistants may add only when the person turned it on and no organisation key closes it",
+          meaning: "the MDM key is a veto, never an enabler", saw: "")
+
+    // A full review list refuses rather than dropping older batches.
+    let full = try ConversationStore(url: tmpDir.appendingPathComponent("full.sqlite"))
+    for i in 0..<ConversationIngest.maxReviewBatches {
+        try full.addReview(entrance: "http", payload: Data("{}".utf8), messageCount: 1, source: "other",
+                           sourceChatID: "c\(i)", receivedAt: Date())
+    }
+    let one = IngestBatch(source: "other", chat: .init(id: "x", title: "t", type: nil), me: nil,
+                          messages: [.init(id: "1", author_id: nil, author: "A", at: "2026-10-20T10:00:00Z",
+                                           text: "hi", is_mine: nil, forwarded_from: nil)])
+    check(AssistantWrites.queue([one], entrance: "http", store: full, now: Date()) == .failure(.full),
+          rule: "a full review list refuses new batches", meaning: "the limits are real", saw: "accepted")
+
+    // The review id round trip the tab relies on.
+    if let row = try store.reviews().first,
+       let back = try? JSONDecoder().decode(IngestBatch.self, from: row.payload) {
+        check(row.entrance == "mcp" && back.chat.id == "c9" && back.messages.count == 1 && row.messageCount == 1,
+              rule: "a waiting batch keeps its chat and messages", meaning: "accepting reads it back",
+              saw: "\(row.entrance) \(back.chat.id)")
+        try store.deleteReview(row.id)
+        check(((try? store.reviewCount()) ?? -1) == 0, rule: "rejecting removes the batch", meaning: "nothing is kept", saw: "left")
+    } else {
+        check(false, rule: "the queued batch can be read back", meaning: "accept depends on it", saw: "no row")
+    }
+} catch {
+    check(false, rule: "the assistant-write checks run", meaning: "fixture setup", saw: "\(error)")
+}
+
+do {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let good = "secret-token"
+    func admit(_ method: String = "POST", path: String = "/conversations", headers: [String: String] = [:],
+               size: Int = 100, token: String = good, recent: [Date] = [], on: Bool = true) -> IngestHTTP.Admission {
+        var h = ["authorization": "Bearer \(good)", "host": "127.0.0.1:8179"]
+        for (k, v) in headers { h[k] = v }
+        return IngestHTTP.admit(method: method, path: path, headers: h, bodySize: size, token: token,
+                                recent: recent, now: now, switchOn: on)
+    }
+    check(admit() == .accept, rule: "a well-formed local request with the token is accepted", meaning: "the happy path", saw: "\(admit())")
+    check(admit(headers: ["authorization": "Bearer nope"]) == .unauthorized
+            && admit(headers: ["authorization": ""]) == .unauthorized
+            && admit(token: "") == .unauthorized,
+          rule: "a wrong, missing or never-created token is unauthorized", meaning: "the token is the door",
+          saw: "\(admit(headers: ["authorization": "Bearer nope"]))")
+    check(admit(headers: ["origin": "https://evil.example"]) == .forbiddenOrigin
+            && admit(headers: ["origin": "http://127.0.0.1.evil.example"]) == .forbiddenOrigin
+            && admit(headers: ["host": "evil.example"]) == .forbiddenOrigin,
+          rule: "another origin, or another host name, is refused", meaning: "a web page must not reach this endpoint",
+          saw: "\(admit(headers: ["origin": "https://evil.example"]))")
+    check(admit(headers: ["origin": "http://127.0.0.1:3000"]) == .accept
+            && admit(headers: ["origin": "http://localhost"]) == .accept,
+          rule: "a local origin, or none, is allowed", meaning: "local tools may send one", saw: "refused")
+    check(admit(size: IngestHTTP.maxBody) == .accept && admit(size: IngestHTTP.maxBody + 1) == .tooLarge
+            && IngestHTTP.maxBody == 2 * 1_048_576,
+          rule: "2 MB is the most; 2 MB + 1 is too large", meaning: "the body limit", saw: "\(admit(size: IngestHTTP.maxBody + 1))")
+    let thirty = (0..<30).map { now.addingTimeInterval(-Double($0)) }
+    let stale = (0..<30).map { now.addingTimeInterval(-61 - Double($0)) }
+    check(admit(recent: Array(thirty.prefix(29))) == .accept && admit(recent: thirty) == .rateLimited
+            && admit(recent: stale) == .accept,
+          rule: "the 31st request within 60 seconds is rate limited; older ones do not count",
+          meaning: "30 a minute", saw: "\(admit(recent: thirty))")
+    check(admit("GET") == .methodNotAllowed, rule: "GET is not allowed", meaning: "only POST", saw: "\(admit("GET"))")
+    check(admit(on: false) == .notFound && admit(path: "/other") == .notFound,
+          rule: "the route is not found while the switch is off, or on another path",
+          meaning: "a closed door looks like no door", saw: "\(admit(on: false))")
+
+    switch IngestHTTP.decode(Data(#"{"source":"other","chat":{"id":"1","title":"t"},"messages":[]}"#.utf8)) {
+    case .success(let b): check(b.count == 1, rule: "one object is one batch", meaning: "body shape", saw: "\(b.count)")
+    case .failure(let f): check(false, rule: "one object is one batch", meaning: "body shape", saw: f.message)
+    }
+    switch IngestHTTP.decode(Data(#"[{"source":"other","chat":{"id":"1","title":"t"},"messages":[]},{"source":"slack","chat":{"id":"2","title":"u"},"messages":[]}]"#.utf8)) {
+    case .success(let b): check(b.count == 2, rule: "an array is several batches", meaning: "body shape", saw: "\(b.count)")
+    case .failure(let f): check(false, rule: "an array is several batches", meaning: "body shape", saw: f.message)
+    }
+    if case .failure(let f) = IngestHTTP.decode(Data(#"{"source":"other","chat":{"id":"1","title":"t"},"messages":[{"id":"1","author":"A","at":"x","text":"PRIVATE-WORDS"}]}"#.utf8)) {
+        check(false, rule: "decode keeps text out of errors", meaning: "never log content", saw: f.message)
+    }
+    if case .failure(let f) = IngestHTTP.decode(Data(#"{"chat":{"id":"1"},"messages":"PRIVATE-WORDS"}"#.utf8)) {
+        check(!f.message.contains("PRIVATE-WORDS"), rule: "a shape error never repeats the message text",
+              meaning: "errors reach logs and clients", saw: f.message)
+    }
+
+    // The route's larger body limit does not widen the MCP route's.
+    var raw = Data("POST /conversations HTTP/1.1\r\nContent-Length: \(IngestHTTP.maxBody)\r\n\r\n".utf8)
+    var raw2 = Data("POST /mcp HTTP/1.1\r\nContent-Length: \(IngestHTTP.maxBody)\r\n\r\n".utf8)
+    let limit: (String) -> Int = { $0 == IngestHTTP.path ? IngestHTTP.maxBody : HTTPRequest.maxBody }
+    if case .refuse = HTTPRequest.parse(raw, limit: limit) { check(false, rule: "the ingest route reads up to 2 MB", meaning: "chats are big", saw: "refused") }
+    if case .refuse(let status, _) = HTTPRequest.parse(raw2, limit: limit) {
+        check(status == 413, rule: "the MCP route keeps its 1 MB limit", meaning: "only /conversations is widened", saw: "\(status)")
+    } else { check(false, rule: "the MCP route keeps its 1 MB limit", meaning: "only /conversations is widened", saw: "accepted") }
+    raw.removeAll(); raw2.removeAll()
+}
+
 return failures
 }
 

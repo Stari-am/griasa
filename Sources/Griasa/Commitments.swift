@@ -50,9 +50,7 @@ final class CommitmentStore: ObservableObject {
     /// sentence that says so. Does not close it: see `acceptSuggestion`.
     func suggestClosure(_ id: UUID, quote: String) {
         guard let index = commitments.firstIndex(where: { $0.id == id }),
-              !commitments[index].done else { return }
-        commitments[index].suggestedDoneQuote = quote
-        commitments[index].suggestedDoneAt = Date()
+              commitments[index].proposeClosure(quote: quote) else { return }
         save()
     }
 
@@ -124,6 +122,21 @@ final class CommitmentStore: ObservableObject {
         for index in commitments.indices
         where commitments[index].owner.caseInsensitiveCompare(oldName) == .orderedSame {
             commitments[index].owner = newName
+            touched += 1
+        }
+        if touched > 0 { save() }
+        return touched
+    }
+
+    /// Moves the given promises to `owner` — a chat author just linked to a
+    /// person. Only `owner` changes. Returns how many were reassigned.
+    @discardableResult
+    func reassign(ids: [UUID], owner: String) -> Int {
+        let wanted = Set(ids)
+        var touched = 0
+        for index in commitments.indices
+        where wanted.contains(commitments[index].id) && commitments[index].owner != owner {
+            commitments[index].owner = owner
             touched += 1
         }
         if touched > 0 { save() }

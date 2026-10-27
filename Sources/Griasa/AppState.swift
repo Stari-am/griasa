@@ -69,7 +69,14 @@ final class AppState: ObservableObject {
     /// Lets an AI assistant already running on this Mac read Griasa over MCP.
     /// Off by default: it opens a door, so switching it on has to be a decision.
     @AppStorage("mcpEnabled") var mcpEnabled: Bool = false {
-        didSet { mcpEnabled ? MCPServer.shared.start() : MCPServer.shared.stop() }
+        didSet { MCPServer.shared.reconcile() }
+    }
+
+    /// Lets those assistants also *add* — chats for review, a proposal that a
+    /// promise is done — and opens the local HTTP endpoint. Off by default, and
+    /// closed whatever this says when an organisation forbids it.
+    @AppStorage(AssistantWrites.switchKey) var assistantsMayAdd: Bool = false {
+        didSet { MCPServer.shared.reconcile() }
     }
 
     /// Optional second home for finished meeting transcripts, so a coding agent
@@ -163,6 +170,15 @@ final class AppState: ObservableObject {
         installHotkey()
         setupWhisper()
         Task { @MainActor in await LocalModelSetup.shared.refresh() }
+        // Retention first: raw chat text past an organisation's limit, and review
+        // batches nobody answered. It rewrites the database file, so the queue
+        // for chat days a quit cut off, or that waited for a model, starts after
+        // it (`thenResume`), not alongside. Then daily for an app that is
+        // rarely quit.
+        ConversationRetention.runLive(thenResume: true)
+        Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { _ in
+            Task { @MainActor in ConversationRetention.runLive() }
+        }
         // Straight into the session, with no per-partial main-actor hop: those
         // hops had no FIFO guarantee, and a transposed pair left Griasa's model
         // of the field describing something that wasn't there.
@@ -172,7 +188,7 @@ final class AppState: ObservableObject {
             onCapture: { action in Task { @MainActor in CaptureController.run(action) } })
         SnippetExpander.shared.start()
         MeetingPrepWatcher.shared.start()
-        if mcpEnabled { MCPServer.shared.start() }
+        MCPServer.shared.reconcile()
         if autoRecordOnLaunch {
             Task { await startRecording() }
         }

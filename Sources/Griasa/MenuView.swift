@@ -270,6 +270,12 @@ struct MenuView: View {
                     MenuBarPanel.dismiss()
                     HubController.shared.open(.importNotes)
                 }
+                if ManagedPolicy.live.conversationsEnabled {
+                    Button("💬  Import Chats…") {
+                        MenuBarPanel.dismiss()
+                        ConversationsNavigator.shared.startImport()
+                    }
+                }
             }
 
             if let error = state.lastError {

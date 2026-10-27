@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+**Conversations.** A new tab imports chat history (today a Telegram Desktop
+export: only the chats you tick, and the period you pick) into a local database
+that only your account can read. Griasa reads each day with the model you
+already use: a short summary, and the promises made in it, owned by the exact
+author the export names (a chat account you link to a person moves their earlier
+promises to that person). Search covers every message, *Delete chat* erases a
+chat, its summaries and its search index, and a day that could not be read can
+be retried. What an assistant or the local `POST /conversations` endpoint offers
+is review-gated: it waits, unread, until you accept or reject it, at most 14
+days. An organization can set `conversationsEnabled`, `conversationIngestEnabled`
+and `conversationRetentionDays` (messages and waiting batches older than that are
+removed; summaries and promises stay), and forcing `mcpEnabled` off closes the
+add door too.
+
+**Let assistants add to Griasa, behind a switch.** Settings → System has a new
+*Let assistants add to Griasa* switch, off by default and closed by the
+organization's `conversationIngestEnabled` key when it says no. With it on, the
+MCP server lists two more tools: `add_conversation` offers a chat, and
+`propose_close_commitment` suggests that a promise is done, with the sentence
+that says so, in *Looks done*. A local `POST /conversations` endpoint with its
+own keychain token (Copy and Rotate in Settings; local origins only, 2 MB, 30
+requests a minute) takes the same batches. Whatever arrives waits in a review
+list in the Conversations tab until you accept it, and unanswered batches expire
+after 14 days. Nothing can be changed or deleted this way, and no promise is
+closed without you.
+
+**Retention for chats.** When an organization sets `conversationRetentionDays`,
+stored chat messages older than that are deleted at launch and once a day;
+summaries and promises are kept. The three conversation keys now show as locked
+in Settings when a profile sets them.
+
 ## 1.0.22 — 2026-10-26
 
 **Remind me notices promises.** Select "Иван: скину схему до пятницы" in a chat and

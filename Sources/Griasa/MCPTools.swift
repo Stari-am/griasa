@@ -36,12 +36,42 @@ enum MCPTools {
         }
     }
 
+    /// The read tools. What the Claude Desktop extension is built from, so it
+    /// never carries a tool that depends on a switch.
     static var listings: [[String: Any]] { readOnly.map(\.listing) }
+
+    /// What `tools/list` answers now: the read tools, plus the two that add
+    /// when — and only when — the person's switch is on and no organisation key
+    /// forbids it. Asked on every request, so turning the switch off removes
+    /// them at once.
+    static var liveListings: [[String: Any]] {
+        listings + AssistantWrites.listings(open: AssistantWrites.isOpenNow)
+    }
 
     /// Runs one tool by name; nil when there is none.
     static func invoke(_ name: String, _ arguments: [String: JSONValue]) -> [String: Any]? {
         let current = renamed[name] ?? name
-        return readOnly.first { $0.name == current }?.run(arguments)
+        if let tool = readOnly.first(where: { $0.name == current }) { return tool.run(arguments) }
+        let written = AssistantWrites.invoke(name, arguments, open: AssistantWrites.isOpenNow, context: writeContext)
+        if name == AssistantWrites.addToolName, written?["queued"] as? Bool == true {
+            NotificationCenter.default.post(name: .conversationReviewChanged, object: nil)
+        }
+        return written
+    }
+
+    private static var openedStore: ConversationStore?
+
+    /// One connection for the additions, opened when first needed.
+    static func conversationStore() -> ConversationStore? {
+        if openedStore == nil { openedStore = try? ConversationStore.live() }
+        return openedStore
+    }
+
+    private static var writeContext: AssistantWrites.Context {
+        AssistantWrites.Context(
+            store: { conversationStore() },
+            commitment: { id in CommitmentStore.shared.commitments.first { $0.id == id } },
+            propose: { id, quote in CommitmentStore.shared.suggestClosure(id, quote: quote) })
     }
 
     /// Names a tool used to have. Not listed, still answered: a Claude Desktop

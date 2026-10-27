@@ -333,7 +333,20 @@ private struct CommitmentRow: View {
         let ownerPart = showOwner && !item.isMine ? "\(item.owner) · " : ""
         let sourcePart = item.sourceTitle.isEmpty ? "Added by hand" : "«\(item.sourceTitle)»"
         let when = item.date.formatted(.relative(presentation: .named))
-        if let entryID = item.sourceEntryID,
+        if let chatID = item.sourceChatID.flatMap({ Int64($0) }) {
+            let label = "\(ownerPart)from chat · \(item.sourceTitle) · \(when)"
+            if ManagedPolicy.live.conversationsEnabled {
+                Button {
+                    ConversationsNavigator.shared.show(chat: chatID, day: item.sourceChatDay)
+                } label: {
+                    Text(label).font(.caption).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open this day of the chat")
+            } else {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+        } else if let entryID = item.sourceEntryID,
            let path = HistoryStore.shared.entries.first(where: { $0.id == entryID })?.filePath {
             Button {
                 NSWorkspace.shared.open(URL(fileURLWithPath: path))

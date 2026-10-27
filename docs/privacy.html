@@ -29,7 +29,7 @@
 <body>
 <p class="quiet"><a href="./">Griasa</a></p>
 <h1>Privacy Policy</h1>
-<p class="quiet">Applies to the Griasa app for macOS and its Claude Desktop extension. Last updated 23 October 2026.</p>
+<p class="quiet">Applies to the Griasa app for macOS and its Claude Desktop extension. Last updated 26 October 2026.</p>
 
 <p>Griasa is open-source software that runs on your Mac. There is no Griasa server and no account. The developer receives none of your recordings, transcripts, notes or usage data. This page describes what the software itself does with your data.</p>
 
@@ -39,16 +39,21 @@
 <h2>How it is used and where it is stored</h2>
 <p>Everything is stored in files on your Mac, in <code>~/Library/Application Support/Griasa</code> and the recording folder you choose. Speech is transcribed on the Mac. Notes and promises are made by a local model on the Mac unless you select a cloud provider in Settings. API keys you enter are stored in the macOS keychain.</p>
 
+<h2>Conversations</h2>
+<p>If you bring chats in, Griasa keeps, for each chat you choose and the period you choose, the messages (their text, who wrote them and when), the chat's title and a short summary of each day. Promises found in a chat join your list of promises, with the sentence they came from. At the moment this means a Telegram Desktop export file that you select: only the chats you tick are used, and attachment files in the export are never opened or copied. Messages, titles and summaries are stored on your Mac in a database file, <code>conversations.sqlite</code>, in the folder above, readable only by your account. Summaries and promises are made by the same model as everything else: a local model unless you selected a cloud provider, in which case the text of a chat day is sent to that provider when it is read.</p>
+<p>Chats can also be offered by an AI assistant or by another program on your Mac, through the MCP tools or a local HTTP endpoint, but only if you switch on "Let assistants add to Griasa" in Settings. It is off by default. The endpoint answers on <code>127.0.0.1</code> only, with its own token kept in your keychain. Whatever arrives waits in a review list in the Conversations tab, held, unread, in the same database file until you accept or reject it: nothing is turned into messages, summarized or turned into promises until you accept it, rejecting it deletes it, and a batch you leave unanswered is deleted after 14 days.</p>
+
 <h2>Sharing with third parties</h2>
 <ul>
   <li><b>Cloud AI providers, only if you choose one.</b> If you select Anthropic, OpenAI, Google Gemini or a command-line tool such as Claude Code or Codex, the text of a transcript or note is sent to that provider when it is processed, under that provider's own terms. Audio is never sent.</li>
-  <li><b>AI assistants you connect.</b> The MCP endpoint and the Claude Desktop extension are off until you switch them on. They are local and read-only, and need a token stored on your Mac. Whatever an assistant reads, it may send to its own model provider under that provider's terms.</li>
+  <li><b>AI assistants you connect.</b> The MCP endpoint and the Claude Desktop extension are off until you switch them on. They are local and need a token stored on your Mac, and they only read. If you also switch on "Let assistants add to Griasa" (off by default), an assistant can offer a chat for your review and suggest that a promise is done; it still cannot change or delete anything, and nothing it offers is used until you accept it (see Conversations above). Whatever an assistant reads, it may send to its own model provider under that provider's terms.</li>
   <li><b>Downloads.</b> Griasa downloads speech and language models from Hugging Face and checks GitHub for new releases. These requests carry no personal data.</li>
 </ul>
 <p>Nothing is sold, and nothing is shared with the developer.</p>
 
 <h2>Retention and deletion</h2>
 <p>Data stays until you delete it. Old audio can be deleted automatically after a period you choose (Settings → Meetings → Recordings on disk); transcripts and notes are kept. Deleting a meeting in the app removes it from the history and its project files; its recording folder can be deleted in Finder. Removing the folder above, the recording folder and the app removes everything.</p>
+<p>Chat messages are kept until you delete them. <i>Delete chat</i> in the Conversations tab removes that chat's messages, its day summaries and any of its batches waiting for review from the database file, and clears the freed space; promises already taken from it stay in your list. An organization can also set a limit in days: messages older than that, and batches waiting for review that are older than that, are deleted, checked when Griasa starts and once a day, while summaries and promises are kept. Chats imported or accepted after that are cut at the same limit: messages older than it are not stored. A value that is not a positive whole number is ignored, and messages are then kept.</p>
 
 <h2>Organizations</h2>
 <p>Administrators can restrict Griasa with configuration profiles, for example to on-device AI only or with MCP switched off. See the <a href="https://github.com/Stari-am/griasa/blob/main/Support/mdm/README.md">MDM guide</a>.</p>

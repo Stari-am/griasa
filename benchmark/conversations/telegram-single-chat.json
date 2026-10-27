@@ -1,0 +1,27 @@
+{
+ "name": "Daniel Okafor",
+ "type": "personal_chat",
+ "id": 5550002,
+ "messages": [
+  {
+   "id": 101,
+   "type": "message",
+   "date": "2026-10-24T18:00:00",
+   "date_unixtime": "1792864800",
+   "from": "Daniel Okafor",
+   "from_id": "user3001",
+   "text": "Can you share the budget sheet?",
+   "text_entities": []
+  },
+  {
+   "id": 102,
+   "type": "message",
+   "date": "2026-10-24T18:02:00",
+   "date_unixtime": "1792864920",
+   "from": "Alex Doe",
+   "from_id": "user1001",
+   "text": "Sure, I'll share the budget sheet tonight",
+   "text_entities": []
+  }
+ ]
+}

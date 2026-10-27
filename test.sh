@@ -56,6 +56,17 @@ swiftc -O \
   Sources/Griasa/MeetingLanguage.swift \
   Sources/Griasa/Prompts.swift \
   Sources/Griasa/GrammarPrompt.swift \
+  Sources/Griasa/StoreRoot.swift \
+  Sources/Griasa/ConversationStore.swift \
+  Sources/Griasa/TelegramExport.swift \
+  Sources/Griasa/ConversationIngest.swift \
+  Sources/Griasa/ChatIdentity.swift \
+  Sources/Griasa/ChatDayText.swift \
+  Sources/Griasa/ConversationModelGate.swift \
+  Sources/Griasa/ConversationImportRules.swift \
+  Sources/Griasa/AssistantWrites.swift \
+  Sources/Griasa/IngestHTTP.swift \
+  Sources/Griasa/ConversationRetention.swift \
   Tests/StabilizerChecks.swift \
   Tests/SilenceChecks.swift \
   Tests/IdentityChecks.swift \
@@ -87,6 +98,7 @@ swiftc -O \
   Tests/LongMeetingChecks.swift \
   Tests/BenchmarkChecks.swift \
   Tests/GrammarChecks.swift \
+  Tests/ConversationChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

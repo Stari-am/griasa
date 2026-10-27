@@ -33,6 +33,41 @@ stored chat messages older than that are deleted at launch and once a day;
 summaries and promises are kept. The three conversation keys now show as locked
 in Settings when a profile sets them.
 
+## 1.0.22 — 2026-10-26
+
+**Remind me notices promises.** Select "Иван: скину схему до пятницы" in a chat and
+press ⌃⌥⌘R: next to the reminder, Griasa offers to track it as Ivan's promise, with a
+Mine/Theirs switch to fix who owes it. A new menu item, *Track as a promise only*,
+records the promise without a reminder. Nothing is added until you press the button,
+and a promise is offered only when its words are really in what you selected.
+
+**"До пятницы" means this Friday.** Deadlines in words are now worked out by Griasa
+itself, not by the AI's date arithmetic, which turned "by Friday" said on a Monday
+into the following Monday. Weekdays in Russian, Ukrainian and English, tomorrow,
+the end of the week or month, "через 2 часа", "next Friday" and times of day are
+resolved against the day they were said — for reminders, for Remind me promises and
+for promises from meetings.
+
+**Send the follow-up.** A meeting in History has a *Share* menu: *Email
+participants* opens a draft in your mail app with the summary and who does what,
+addressed to the participants Griasa has emails for; *Send promises to* writes one
+person only their promises and yours. Griasa sends nothing — you do. A line saying
+the notes were made with Griasa is added by default and can be switched off in the
+same menu.
+
+**Snippets that remember the last meeting.** `{last-meeting}` pastes the newest
+meeting's summary and who does what, `{last-meeting:promises}` just the promises,
+`{last-meeting:Name}` what that person promised in your last meeting with them, and
+`{promises:Name}` everything they still owe.
+
+**More for your assistant (MCP).** *list_upcoming_meetings* gives the week ahead with
+what you and each attendee owe each other. *draft_followup* writes the follow-up
+email for a meeting or for one person; Griasa still sends nothing. *search_meetings*
+and *list_commitments* take a project, so *list_projects* leads somewhere.
+*next_meeting_brief* is now *get_next_meeting_brief* (the old name keeps working for
+extensions installed earlier), and every tool says more plainly what it returns and
+when to use another one instead.
+
 ## 1.0.21 — 2026-10-25
 
 **Promises read back at the end of a meeting are no longer counted twice.**

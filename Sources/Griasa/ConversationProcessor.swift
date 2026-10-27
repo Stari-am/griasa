@@ -170,6 +170,8 @@ final class ConversationProcessor: ObservableObject {
                 seen.append(PromiseDuplicate.entry(text: kept.task, owner: owner, quote: kept.quote))
                 let commitment = Commitment(
                     text: kept.task, owner: owner, isMine: m.isMine, dueHint: kept.due,
+                    // The words are resolved against when that message was sent.
+                    dueDate: DueDate.best(spoken: kept.due, model: nil, said: m.sentAt),
                     sourceTitle: title, sourceEntryID: nil, date: m.sentAt,
                     sourceQuote: kept.quote, sourceChatID: String(chat), sourceChatDay: day,
                     sourceMessageID: m.sourceMessageID)

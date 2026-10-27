@@ -52,6 +52,11 @@ enum CaptureAI {
         if let iso = obj["dueDateISO"] as? String, !iso.isEmpty {
             due = parseDate(iso)
         }
+        // The words decide when they can: the model's own arithmetic is the weak part.
+        if let spoken = obj["dueText"] as? String, let resolved = DueDate.resolve(spoken, from: Date()) {
+            due = resolved.hasTime ? resolved.date
+                : Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: resolved.date)
+        }
         return ParsedReminder(title: title, notes: notes, due: due, promise: promise)
     }
 

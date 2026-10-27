@@ -310,7 +310,9 @@ enum CommitmentExtractor {
                 seen.append(PromiseDuplicate.entry(text: action.text, owner: action.owner, quote: action.quote))
                 found.commitments.append(Commitment(
                     text: action.text, owner: action.owner, isMine: action.isMine,
-                    dueHint: action.dueHint, dueDate: action.dueDate.flatMap { dateParser.date(from: $0) },
+                    dueHint: action.dueHint,
+                    dueDate: DueDate.best(spoken: action.dueHint, model: action.dueDate.flatMap { dateParser.date(from: $0) },
+                                          said: meetingDate),
                     sourceTitle: sourceTitle, sourceEntryID: sourceEntryID, date: meetingDate,
                     sourceQuote: action.quote.isEmpty ? nil : action.quote, sourceAt: action.at))
             }
@@ -392,7 +394,8 @@ enum CommitmentExtractor {
                     owner: who.owner,
                     isMine: who.isMine,
                     dueHint: item.dueHint,
-                    dueDate: item.due.flatMap { dateParser.date(from: $0) },
+                    dueDate: DueDate.best(spoken: item.dueHint, model: item.due.flatMap { dateParser.date(from: $0) },
+                                          said: meetingDate),
                     sourceTitle: sourceTitle,
                     sourceEntryID: sourceEntryID,
                     date: meetingDate,

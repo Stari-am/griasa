@@ -14,7 +14,7 @@ struct CapturedPromise: Equatable {
     /// From the parser's `promise` object. Nil when there is none, when the task
     /// is empty, or when the quoted words are not in what was captured — the same
     /// rule meeting promises follow, so a promise the model made up is never offered.
-    static func from(_ object: Any?, capturedText: String, myName: String,
+    static func from(_ object: Any?, capturedText: String, myName: String, now: Date = Date(),
                      parseDate: (String) -> Date?) -> CapturedPromise? {
         guard let fields = object as? [String: Any],
               let task = (fields["task"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -30,7 +30,8 @@ struct CapturedPromise: Equatable {
         let iso = fields["dueDateISO"] as? String
         return CapturedPromise(task: task, owner: owner, isMine: mine,
                                dueHint: hint?.isEmpty == false ? hint : nil,
-                               dueDate: iso.flatMap { $0.isEmpty ? nil : parseDate($0) },
+                               dueDate: DueDate.best(spoken: hint, model: iso.flatMap { $0.isEmpty ? nil : parseDate($0) },
+                                                     said: now),
                                quote: quote)
     }
 }

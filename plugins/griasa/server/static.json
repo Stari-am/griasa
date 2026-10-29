@@ -1,5 +1,5 @@
 {
-  "instructions" : "Griasa holds the user's recorded meetings, the promises made in them, and what is known about each colleague. Start with list_commitments or get_next_meeting_brief for \"what is open\" and \"what is next\"; use search_meetings and get_meeting for what a meeting decided; ask for get_transcript only when a summary is not enough, since it returns everything that was said. These tools only read. If the user has allowed it, add_conversation offers a chat for their review and propose_close_commitment suggests that a promise is done; neither reads, changes or deletes anything, and the user decides.",
+  "instructions" : "Griasa holds the user's recorded meetings, the promises made in them, and what is known about each colleague. For everything about one person, project or topic in one call, use get_context. Start with list_commitments or get_next_meeting_brief for \"what is open\" and \"what is next\"; use search_meetings and get_meeting for what a meeting decided; ask for get_transcript only when a summary is not enough, since it returns everything that was said. These tools only read. If the user has allowed it, add_conversation offers a chat for their review and propose_close_commitment suggests that a promise is done; neither reads, changes or deletes anything, and the user decides.",
   "tools" : [
     {
       "annotations" : {
@@ -291,6 +291,49 @@
         "type" : "object"
       },
       "title" : "Follow-up draft"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Context pack"
+      },
+      "description" : "Everything Griasa knows about one person, project or topic, in one call and within a size budget: open promises in both directions (overdue first), recent meetings with their summaries, and for a person the next meeting with them. Use it before answering a question about someone or something; follow up with get_meeting or get_transcript only for detail it leaves out. When the budget is tight, the oldest meetings are left out first and `omitted` says how many.",
+      "inputSchema" : {
+        "properties" : {
+          "about" : {
+            "description" : "A person's name or email, a project name, or topic words.",
+            "type" : "string"
+          },
+          "budget_chars" : {
+            "description" : "Roughly how much text to return. Default 12000, at most 40000.",
+            "type" : "integer"
+          },
+          "kind" : {
+            "description" : "person, project or topic. Omit to let Griasa decide: a known person, then a project, then a topic.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "about"
+        ],
+        "type" : "object"
+      },
+      "name" : "get_context",
+      "outputSchema" : {
+        "properties" : {
+          "found" : {
+            "type" : "boolean"
+          },
+          "kind" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Context pack"
     },
     {
       "annotations" : {

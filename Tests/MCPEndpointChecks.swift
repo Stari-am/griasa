@@ -485,6 +485,35 @@ do {
     raw.removeAll(); raw2.removeAll()
 }
 
+// Prompts: listed, filled, and refused without a required argument.
+let promptList = json(send(["jsonrpc": "2.0", "id": 90, "method": "prompts/list"]).body)
+let promptNames = ((promptList["result"] as? [String: Any])?["prompts"] as? [[String: Any]])?.compactMap { $0["name"] as? String } ?? []
+let owe = json(send(["jsonrpc": "2.0", "id": 91, "method": "prompts/get",
+                     "params": ["name": "what_do_i_owe", "arguments": ["person": "Иван"]]]).body)
+let oweText = (((owe["result"] as? [String: Any])?["messages"] as? [[String: Any]])?.first?["content"] as? [String: Any])?["text"] as? String ?? ""
+let missing = json(send(["jsonrpc": "2.0", "id": 92, "method": "prompts/get", "params": ["name": "what_do_i_owe"]]).body)
+let initialized = json(send(["jsonrpc": "2.0", "id": 93, "method": "initialize",
+                             "params": ["protocolVersion": "2025-06-18", "capabilities": [String: Any](),
+                                        "clientInfo": ["name": "t", "version": "1"]]]).body)
+let caps = (initialized["result"] as? [String: Any])?["capabilities"] as? [String: Any] ?? [:]
+check(promptNames == ["prep_next_call", "weekly_review", "follow_up", "what_do_i_owe"]
+      && oweText.contains("get_context") && oweText.contains("Иван")
+      && missing["error"] != nil && caps["prompts"] != nil,
+      rule: "prompts are advertised, listed, filled with their arguments, and refused without a required one",
+      meaning: "a client shows prompts as ready-made commands only when the server says it has them",
+      saw: "\(promptNames) \(missing) \(caps.keys.sorted())")
+
+// The context budget drops the oldest items of the least important section first.
+let packed = ContextBudget.fit([
+    .init(key: "promises", items: ["aaaaaaaaaa", "bbbbbbbbbb"]),
+    .init(key: "meetings", items: ["1111111111", "2222222222", "3333333333"]),
+], budget: 35)
+check(packed.sections[0].items.count == 2 && packed.sections[1].items == ["1111111111"] && packed.omitted == 2
+      && ContextBudget.fit([.init(key: "a", items: ["x"])], budget: 10).omitted == 0,
+      rule: "the context budget trims the least important section's oldest items first",
+      meaning: "a tight budget must not drop open promises while old meetings are still in the pack",
+      saw: "\(packed.sections.map(\.items)) omitted \(packed.omitted)")
+
 return failures
 }
 

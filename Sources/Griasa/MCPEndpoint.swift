@@ -39,7 +39,8 @@ enum MCPEndpoint {
 
     static let instructions = """
         Griasa holds the user's recorded meetings, the promises made in them, and \
-        what is known about each colleague. Start with list_commitments or \
+        what is known about each colleague. For everything about one person, project \
+        or topic in one call, use get_context. Start with list_commitments or \
         get_next_meeting_brief for "what is open" and "what is next"; use search_meetings \
         and get_meeting for what a meeting decided; ask for get_transcript only when \
         a summary is not enough, since it returns everything that was said. These \
@@ -110,7 +111,7 @@ enum MCPEndpoint {
         case "server/discover":
             return ok(JSONRPC.result(id: call.id, decorate([
                 "supportedVersions": supportedVersions,
-                "capabilities": ["tools": [String: Any]()],
+                "capabilities": ["tools": [String: Any](), "prompts": [String: Any]()],
                 "instructions": instructions,
                 "ttlMs": listTTLms,
                 "cacheScope": "public",
@@ -124,6 +125,22 @@ enum MCPEndpoint {
             return ok(JSONRPC.result(id: call.id, decorate(result, modern: isModern, environment)))
         case "tools/call":
             return callTool(call, modern: isModern, environment)
+        case "prompts/list":
+            return ok(JSONRPC.result(id: call.id, decorate(["prompts": MCPPrompts.listings],
+                                                           modern: isModern, environment)))
+        case "prompts/get":
+            guard let name = call.params["name"]?.stringValue else {
+                return ok(JSONRPC.failure(id: call.id, .invalidParams, "missing prompt name"))
+            }
+            var arguments: [String: String] = [:]
+            if case .object(let raw)? = call.params["arguments"] {
+                for (key, value) in raw { if let text = value as? String { arguments[key] = text } }
+            }
+            guard let prompt = MCPPrompts.get(name, arguments: arguments) else {
+                return ok(JSONRPC.failure(id: call.id, .invalidParams,
+                                          "Unknown prompt or missing argument: \(name)"))
+            }
+            return ok(JSONRPC.result(id: call.id, decorate(prompt, modern: isModern, environment)))
         default:
             // 2026-07-28 gives an unknown method an HTTP 404 with a JSON-RPC body,
             // which is how a client tells it apart from a server that does not
@@ -191,7 +208,7 @@ enum MCPEndpoint {
         let version = asked.flatMap { legacyVersions.contains($0) ? $0 : nil } ?? legacyVersions[0]
         return JSONRPC.result(id: call.id, [
             "protocolVersion": version,
-            "capabilities": ["tools": [String: Any]()],
+            "capabilities": ["tools": [String: Any](), "prompts": [String: Any]()],
             "serverInfo": ["name": "griasa", "version": environment.serverVersion],
             "instructions": instructions,
         ])

@@ -121,6 +121,18 @@ final class MCPServer: ObservableObject {
                             iconPNG: iconPNG(), staticState: bundleSnapshot())
     }
 
+    /// `Griasa --write-plugin-server <dir>`: the bridge and the tool snapshot the
+    /// agent plugin in `plugins/griasa/server/` ships — the same two files the
+    /// .mcpb carries. release.sh rewrites them and refuses to ship if they changed
+    /// without a commit, so the plugin never lags the app.
+    static func writePluginServer(to directory: URL) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(MCPBundle.bridgeSource.utf8).write(to: directory.appendingPathComponent("index.js"))
+        let state = try JSONSerialization.data(withJSONObject: bundleSnapshot(),
+                                               options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        try state.write(to: directory.appendingPathComponent("static.json"))
+    }
+
     private static func iconPNG() -> Data? {
         let image = NSApp.applicationIconImage ?? NSImage()
         let size = NSSize(width: 512, height: 512)

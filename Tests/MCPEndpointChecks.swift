@@ -627,5 +627,17 @@ do {
     }
 }
 
+// The agent plugin ships the same bridge as the .mcpb, and the same version as the app.
+let pluginBridge = (try? String(contentsOfFile: "plugins/griasa/server/index.js", encoding: .utf8)) ?? ""
+let pluginManifest = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "plugins/griasa/.claude-plugin/plugin.json")))) as? [String: Any] ?? [:]
+let geminiManifest = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "gemini-extension.json")))) as? [String: Any] ?? [:]
+let plist = NSDictionary(contentsOfFile: "Support/Info.plist") as? [String: Any] ?? [:]
+let appVersion = plist["CFBundleShortVersionString"] as? String ?? "?"
+check(pluginBridge == MCPBundle.bridgeSource
+      && pluginManifest["version"] as? String == appVersion && geminiManifest["version"] as? String == appVersion,
+      rule: "the agent plugin's bridge is the .mcpb's bridge, and its manifests carry the app's version",
+      meaning: "a plugin that lags the app talks to it with an old bridge or announces the wrong release",
+      saw: "bridge equal: \(pluginBridge == MCPBundle.bridgeSource), plugin \(pluginManifest["version"] ?? "-"), gemini \(geminiManifest["version"] ?? "-"), app \(appVersion)")
+
 return failures
 }

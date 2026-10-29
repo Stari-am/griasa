@@ -1,0 +1,14 @@
+{
+  "name": "griasa",
+  "displayName": "Griasa",
+  "version": "1.0.22",
+  "description": "Your meetings, the promises made in them and the people in them, read from Griasa on your Mac: who owes what, what was decided, and what to bring to the next call.",
+  "author": { "name": "Stari", "url": "https://github.com/Stari-am" },
+  "homepage": "https://stari-am.github.io/griasa/",
+  "repository": "https://github.com/Stari-am/griasa",
+  "license": "GPL-3.0",
+  "keywords": ["meetings", "promises", "commitments", "local-first", "macos"],
+  "documentationUrl": "https://github.com/Stari-am/griasa/tree/main/plugins/griasa",
+  "supportUrl": "https://github.com/Stari-am/griasa/issues",
+  "privacyPolicyUrl": "https://stari-am.github.io/griasa/privacy.html"
+}

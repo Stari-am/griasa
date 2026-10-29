@@ -1,0 +1,15 @@
+{
+  "name": "griasa",
+  "description": "Griasa — your meetings, promises and people, from the Griasa app on your Mac.",
+  "owner": {
+    "name": "Stari",
+    "url": "https://github.com/Stari-am"
+  },
+  "plugins": [
+    {
+      "name": "griasa",
+      "source": "./plugins/griasa",
+      "description": "Meetings, promises and people from Griasa on your Mac, for your assistant."
+    }
+  ]
+}

@@ -33,6 +33,30 @@ stored chat messages older than that are deleted at launch and once a day;
 summaries and promises are kept. The three conversation keys now show as locked
 in Settings when a profile sets them.
 
+**Search finds meetings by their words.** `search_meetings` and the topic view
+of `get_context` used to look for the query as one exact phrase, so "auth
+migration" missed "migration of auth" and «миграция авторизации» missed
+«миграцию авторизации». Now each word is matched on its own, in any order and in
+any grammatical form (Russian, Ukrainian and English endings), where a word
+begins. Meetings with every word come first, best matches first, and each result
+carries a short `matched` excerpt that shows why it was found, without the
+transcript.
+
+**Everything about someone in one call.** A new MCP tool, `get_context`, gives
+an assistant what Griasa knows about a person, project or topic within a size
+budget: the open promises in both directions (overdue first, with their quotes),
+recent meetings with summaries, and for a person the next meeting with them.
+Four ready-made prompts appear in clients that show MCP prompts: prepare for the
+next call, the weekly review, a follow-up after a meeting, and what I owe
+someone.
+
+**One plugin for every assistant.** The repository is now a Claude Code
+marketplace (`/plugin install griasa --marketplace Stari-am/griasa`) and a
+Gemini CLI extension. The plugin carries a skill that tells an assistant which
+Griasa tool answers which question, and the same local bridge as the Claude
+Desktop extension, so no token goes into any configuration. The README lists
+how to connect ChatGPT desktop and Codex, Cursor and VS Code.
+
 ## 1.0.22 — 2026-10-26
 
 **Remind me notices promises.** Select "Иван: скину схему до пятницы" in a chat and

@@ -176,11 +176,14 @@ enum MCPTools {
     static let searchMeetings = Tool(
         name: "search_meetings",
         title: "Search meetings",
-        summary: "Find recorded meetings by title or text, optionally with one participant, "
-               + "newest first. Returns id, title, date, participants and summary — never the "
-               + "transcript. Use the id with get_meeting or get_transcript.",
+        summary: "Find recorded meetings by words in the title or text, optionally with one "
+               + "participant. Words match in any order and in any grammatical form; meetings "
+               + "with every word come first, best matches first, otherwise newest first. Returns "
+               + "id, title, date, participants, summary and, when text matched, a short "
+               + "'matched' excerpt — never the transcript. Use the id with get_meeting or "
+               + "get_transcript.",
         schema: object([
-            "query": string("Words to look for in the title or text."),
+            "query": string("Words to look for in the title or text, in any order."),
             "person": string("Only meetings this person took part in."),
             "project": string("Only meetings filed under this project id, from list_projects."),
             "limit": integer("Most meetings to return. Default 10."),
@@ -202,20 +205,27 @@ enum MCPTools {
                 }
                 return entry.text.localizedCaseInsensitiveContains(person)
             }
-            .filter { entry in
-                guard let query, !query.isEmpty else { return true }
-                return entry.title.localizedCaseInsensitiveContains(query)
-                    || entry.text.localizedCaseInsensitiveContains(query)
-            }
-            .prefix(limit)
-            .map { entry -> [String: Any] in
-                ["id": entry.id.uuidString,
-                 "title": entry.title,
-                 "date": ISO8601DateFormatter().string(from: entry.date),
-                 "participants": entry.participants ?? [],
-                 "summary": MeetingPrepWatcher.summarySection(of: entry.text) ?? ""]
-            }
-        return ["meetings": Array(hits), "returned": hits.count]
+        // With words to look for, the best matches come first and say where they
+        // matched; without, the newest meetings do.
+        let ranked: [(entry: HistoryEntry, matched: String?)]
+        if let query, !query.trimmingCharacters(in: .whitespaces).isEmpty {
+            let pool = Array(hits)
+            ranked = WordSearch.rank(query, in: pool.map { .init(title: $0.title, text: $0.text) }, limit: limit)
+                .map { (pool[$0.index], $0.snippet) }
+        } else {
+            ranked = hits.prefix(limit).map { ($0, nil) }
+        }
+        let meetings = ranked.map { item -> [String: Any] in
+            var row: [String: Any] = [
+                "id": item.entry.id.uuidString,
+                "title": item.entry.title,
+                "date": ISO8601DateFormatter().string(from: item.entry.date),
+                "participants": item.entry.participants ?? [],
+                "summary": MeetingPrepWatcher.summarySection(of: item.entry.text) ?? ""]
+            if let matched = item.matched, !matched.isEmpty { row["matched"] = matched }
+            return row
+        }
+        return ["meetings": meetings, "returned": meetings.count]
     }
 
     static let meeting = Tool(
@@ -415,7 +425,8 @@ enum MCPTools {
         if wanted == "project" { return ["found": false, "projects": ProjectStore.shared.projects.map(\.name)] }
 
         // A topic: meetings that mention it, and the promises they produced.
-        let hits = meetings.filter { $0.title.localizedCaseInsensitiveContains(about) || $0.text.localizedCaseInsensitiveContains(about) }
+        let hits = WordSearch.rank(about, in: meetings.map { .init(title: $0.title, text: $0.text) }, limit: 10)
+            .map { meetings[$0.index] }
         guard !hits.isEmpty else { return ["found": false, "kind": "topic"] }
         let ids = Set(hits.map(\.id))
         let open = CommitmentStore.shared.commitments.filter { !$0.done && ($0.sourceEntryID.map(ids.contains) ?? false) }

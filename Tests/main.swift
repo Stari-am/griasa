@@ -8,7 +8,7 @@ let group0: Int = runStabilizerChecks() + runSilenceChecks() + runIdentityChecks
 let group1: Int = runCleanerChecks() + runProviderDefaultChecks() + runSecretChecks() + runModelChecks() + runManagedChecks() + runNoticeChecks() + runRecordingRulesChecks() + runImportChecks()
 let group2: Int = runFirstRunChecks() + runLocalModelChecks() + runRoutingChecks() + runRuntimeParsingChecks() + runEngineChoiceChecks() + runOllamaRequestChecks() + runPendingChecks() + runSetupMemoryChecks()
 let group3: Int = runLlamaStreamChecks() + runLlamaServerChecks() + runResumeChecks() + runGrammarChecks() + runLongMeetingChecks() + runMCPEndpointChecks() + runMCPBundleChecks() + runBenchmarkChecks()
-let group4: Int = runConversationChecks()
+let group4: Int = runConversationChecks() + runWordSearchChecks()
 let failed = group0 + group1 + group2 + group3 + group4
 if failed == 0 {
     print("checks: all passed")

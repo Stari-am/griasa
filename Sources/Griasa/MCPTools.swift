@@ -80,7 +80,7 @@ enum MCPTools {
     static let renamed = ["next_meeting_brief": "get_next_meeting_brief"]
 
     static var readOnly: [Tool] { [commitments, person, searchMeetings, meeting,
-                                   transcript, brief, upcoming, followUp, people, projects] }
+                                   transcript, brief, upcoming, followUp, context, people, projects] }
 
     // MARK: - Schemas
 
@@ -335,6 +335,94 @@ enum MCPTools {
                      "you_promised_them": brief.youPromised.map(describe),
                      "they_promised_you": brief.theyPromised.map(describe)] as [String: Any]
                 }]
+    }
+
+    static let context = Tool(
+        name: "get_context",
+        title: "Context pack",
+        summary: "Everything Griasa knows about one person, project or topic, in one call and "
+               + "within a size budget: open promises in both directions (overdue first), recent "
+               + "meetings with their summaries, and for a person the next meeting with them. "
+               + "Use it before answering a question about someone or something; follow up with "
+               + "get_meeting or get_transcript only for detail it leaves out. When the budget "
+               + "is tight, the oldest meetings are left out first and `omitted` says how many.",
+        schema: object([
+            "about": string("A person's name or email, a project name, or topic words."),
+            "kind": string("person, project or topic. Omit to let Griasa decide: a known person, then a project, then a topic."),
+            "budget_chars": integer("Roughly how much text to return. Default 12000, at most 40000."),
+        ], required: ["about"]),
+        output: result(["found": "boolean", "kind": "string"])
+    ) { params in
+        guard let about = params["about"]?.stringValue?.trimmingCharacters(in: .whitespaces),
+              !about.isEmpty else { return ["error": "about is required"] }
+        let wanted = params["kind"]?.stringValue?.lowercased()
+        let budget = min(max(params["budget_chars"]?.intValue ?? 12_000, 1_000), 40_000)
+        let iso = ISO8601DateFormatter()
+        let meetings = HistoryStore.shared.entries.filter { $0.kind == .meeting }.sorted { $0.date > $1.date }
+
+        func line(_ item: Commitment) -> String {
+            var text = (item.isMine ? "I owe" : "\(item.owner) owes") + ": " + item.text
+            if let due = item.dueDate { text += " (due \(iso.string(from: due))\(due < Date() ? ", overdue" : ""))" }
+            else if let hint = item.dueHint, !hint.isEmpty { text += " (\(hint))" }
+            if let quote = item.sourceQuote { text += " — \"\(quote)\"" }
+            text += " [\(item.sourceTitle)]"
+            return text
+        }
+        @MainActor func meetingLine(_ entry: HistoryEntry) -> String {
+            let summary = MeetingPrepWatcher.summarySection(of: entry.text) ?? ""
+            return "\(iso.string(from: entry.date)) \(entry.title) (id \(entry.id.uuidString)): \(summary)"
+        }
+        func overdueFirst(_ items: [Commitment]) -> [Commitment] {
+            items.sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        }
+        @MainActor func pack(kind: String, name: String, sections: [ContextBudget.Section], extra: [String: Any]) -> [String: Any] {
+            let (fitted, omitted) = ContextBudget.fit(sections, budget: budget)
+            var payload: [String: Any] = ["found": true, "kind": kind, "name": name, "omitted": omitted]
+            for section in fitted { payload[section.key] = section.items }
+            for (key, value) in extra { payload[key] = value }
+            return payload
+        }
+
+        // A person: the brief's own scoping of promises, so the pack agrees with it.
+        if wanted == nil || wanted == "person",
+           let person = PersonIdentity.resolve(name: about, email: about, among: PersonStore.shared.candidates)?.name {
+            let buckets = MeetingPrepWatcher.buckets(forAttendees: [person]).flatMap(\.items)
+            let withThem = meetings.filter { ($0.participants ?? []).contains { PromiseOwner.sameName($0, person) } }
+            var extra: [String: Any] = ["notes": PersonStore.shared.person(named: person)?.notes ?? ""]
+            if let next = MeetingPrepWatcher.shared.upcomingBriefs(days: 14, limit: 50)?
+                .first(where: { $0.attendees.contains { $0.knownName == person } }) {
+                extra["next_meeting"] = ["title": next.title, "starts": iso.string(from: next.start)]
+            }
+            return pack(kind: "person", name: person, sections: [
+                .init(key: "i_owe_them", items: overdueFirst(buckets.filter(\.isMine)).map(line)),
+                .init(key: "they_owe_me", items: overdueFirst(buckets.filter { !$0.isMine }).map(line)),
+                .init(key: "recent_meetings", items: withThem.prefix(10).map(meetingLine)),
+            ], extra: extra)
+        }
+        if wanted == "person" { return ["found": false, "known_names": PersonStore.shared.allNames.sorted()] }
+
+        // A project, by name.
+        if wanted == nil || wanted == "project",
+           let project = ProjectStore.shared.projects.first(where: { $0.name.caseInsensitiveCompare(about) == .orderedSame }) {
+            let inIt = meetings.filter { inProject($0, project.id) }
+            let ids = Set(inIt.map(\.id))
+            let open = CommitmentStore.shared.commitments.filter { !$0.done && ($0.sourceEntryID.map(ids.contains) ?? false) }
+            return pack(kind: "project", name: project.name, sections: [
+                .init(key: "open_promises", items: overdueFirst(open).map(line)),
+                .init(key: "recent_meetings", items: inIt.prefix(10).map(meetingLine)),
+            ], extra: [:])
+        }
+        if wanted == "project" { return ["found": false, "projects": ProjectStore.shared.projects.map(\.name)] }
+
+        // A topic: meetings that mention it, and the promises they produced.
+        let hits = meetings.filter { $0.title.localizedCaseInsensitiveContains(about) || $0.text.localizedCaseInsensitiveContains(about) }
+        guard !hits.isEmpty else { return ["found": false, "kind": "topic"] }
+        let ids = Set(hits.map(\.id))
+        let open = CommitmentStore.shared.commitments.filter { !$0.done && ($0.sourceEntryID.map(ids.contains) ?? false) }
+        return pack(kind: "topic", name: about, sections: [
+            .init(key: "open_promises", items: overdueFirst(open).map(line)),
+            .init(key: "meetings", items: hits.prefix(10).map(meetingLine)),
+        ], extra: [:])
     }
 
     static let people = Tool(

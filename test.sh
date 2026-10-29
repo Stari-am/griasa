@@ -41,6 +41,7 @@ swiftc -O \
   Sources/Griasa/PendingSummaries.swift \
   Sources/Griasa/MCPProtocol.swift \
   Sources/Griasa/MCPEndpoint.swift \
+  Sources/Griasa/MCPPrompts.swift \
   Sources/Griasa/MCPBundle.swift \
   Sources/Griasa/DownloadResume.swift \
   Sources/Griasa/TranscriptChunker.swift \
@@ -49,6 +50,7 @@ swiftc -O \
   Sources/Griasa/LongMeetingMap.swift \
   Sources/Griasa/PromiseOwner.swift \
   Sources/Griasa/FollowUp.swift \
+  Sources/Griasa/ContextBudget.swift \
   Sources/Griasa/CapturedPromise.swift \
   Sources/Griasa/DueDate.swift \
   Sources/Griasa/BenchmarkScore.swift \

@@ -368,14 +368,14 @@ enum MCPTools {
             text += " [\(item.sourceTitle)]"
             return text
         }
-        func meetingLine(_ entry: HistoryEntry) -> String {
+        @MainActor func meetingLine(_ entry: HistoryEntry) -> String {
             let summary = MeetingPrepWatcher.summarySection(of: entry.text) ?? ""
             return "\(iso.string(from: entry.date)) \(entry.title) (id \(entry.id.uuidString)): \(summary)"
         }
         func overdueFirst(_ items: [Commitment]) -> [Commitment] {
             items.sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
         }
-        func pack(kind: String, name: String, sections: [ContextBudget.Section], extra: [String: Any]) -> [String: Any] {
+        @MainActor func pack(kind: String, name: String, sections: [ContextBudget.Section], extra: [String: Any]) -> [String: Any] {
             let (fitted, omitted) = ContextBudget.fit(sections, budget: budget)
             var payload: [String: Any] = ["found": true, "kind": kind, "name": name, "omitted": omitted]
             for section in fitted { payload[section.key] = section.items }

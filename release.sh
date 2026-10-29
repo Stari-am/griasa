@@ -287,6 +287,10 @@ fi
 # the extension is built once here from the signed app and attached next to the
 # disk image. server.json and the cask are filled from Support/ templates with
 # this release's version and hashes; publishing them is printed below.
+# The agent plugin (plugins/griasa) ships the bridge and the tool snapshot as
+# files in the repository; they must match this build before it ships.
+"$APP/Contents/MacOS/Griasa" --write-plugin-server plugins/griasa/server || die "could not write the plugin's server files."
+git diff --quiet -- plugins/griasa/server || die "plugins/griasa/server changed with this build — commit it (and bump the plugin's version) before releasing."
 MCPB="$DIST/Griasa.mcpb"
 "$APP/Contents/MacOS/Griasa" --build-mcpb "$MCPB" || die "could not build $MCPB."
 MCPB_SHA=$(shasum -a 256 "$MCPB" | cut -d' ' -f1)

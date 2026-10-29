@@ -1,0 +1,360 @@
+{
+  "instructions" : "Griasa holds the user's recorded meetings, the promises made in them, and what is known about each colleague. Start with list_commitments or get_next_meeting_brief for \"what is open\" and \"what is next\"; use search_meetings and get_meeting for what a meeting decided; ask for get_transcript only when a summary is not enough, since it returns everything that was said. These tools only read. If the user has allowed it, add_conversation offers a chat for their review and propose_close_commitment suggests that a promise is done; neither reads, changes or deletes anything, and the user decides.",
+  "tools" : [
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Open promises"
+      },
+      "description" : "Open promises from recorded meetings, newest first, in two lists: 'mine' (what the user owes) and 'waiting_on_others' (what others owe the user); finished ones are left out. Use for \"what do I owe\", \"what is overdue\", \"what is Anna still waiting on\". For one colleague's whole picture use get_person; to get a name's exact spelling first, list_people.",
+      "inputSchema" : {
+        "properties" : {
+          "limit" : {
+            "description" : "Most items in each of the two lists. Default 50; older promises past the limit are left out.",
+            "type" : "integer"
+          },
+          "overdue_only" : {
+            "description" : "Only promises past their due date.",
+            "type" : "boolean"
+          },
+          "person" : {
+            "description" : "Only promises owned by this person: the exact name as list_people returns it, case-insensitive. Omit for everyone.",
+            "type" : "string"
+          },
+          "project" : {
+            "description" : "Only promises from meetings filed under this project id, from list_projects.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "list_commitments",
+      "outputSchema" : {
+        "properties" : {
+          "mine" : {
+            "type" : "array"
+          },
+          "waiting_on_others" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Open promises"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Person"
+      },
+      "description" : "Everything known about one colleague: notes, email addresses, their open promises, and the last recorded meeting with them. Accepts a name or email in any spelling; if nobody matches, returns the known names.",
+      "inputSchema" : {
+        "properties" : {
+          "name" : {
+            "description" : "Name or email address of the person.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "name"
+        ],
+        "type" : "object"
+      },
+      "name" : "get_person",
+      "outputSchema" : {
+        "properties" : {
+          "found" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Person"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Search meetings"
+      },
+      "description" : "Find recorded meetings by title or text, optionally with one participant, newest first. Returns id, title, date, participants and summary — never the transcript. Use the id with get_meeting or get_transcript.",
+      "inputSchema" : {
+        "properties" : {
+          "limit" : {
+            "description" : "Most meetings to return. Default 10.",
+            "type" : "integer"
+          },
+          "person" : {
+            "description" : "Only meetings this person took part in.",
+            "type" : "string"
+          },
+          "project" : {
+            "description" : "Only meetings filed under this project id, from list_projects.",
+            "type" : "string"
+          },
+          "query" : {
+            "description" : "Words to look for in the title or text.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "search_meetings",
+      "outputSchema" : {
+        "properties" : {
+          "meetings" : {
+            "type" : "array"
+          },
+          "returned" : {
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Search meetings"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Meeting"
+      },
+      "description" : "One meeting by id: summary, participants and the promises made in it. Does not include the transcript; use get_transcript for what was said.",
+      "inputSchema" : {
+        "properties" : {
+          "id" : {
+            "description" : "Meeting id from search_meetings.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "id"
+        ],
+        "type" : "object"
+      },
+      "name" : "get_meeting",
+      "outputSchema" : {
+        "properties" : {
+          "found" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Meeting"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Meeting transcript"
+      },
+      "description" : "The full transcript of one meeting: everything said, including remarks in passing. Long and sensitive; call it only when get_meeting's summary is not enough.",
+      "inputSchema" : {
+        "properties" : {
+          "id" : {
+            "description" : "Meeting id from search_meetings.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "id"
+        ],
+        "type" : "object"
+      },
+      "name" : "get_transcript",
+      "outputSchema" : {
+        "properties" : {
+          "found" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Meeting transcript"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Next meeting brief"
+      },
+      "description" : "Prep for the user's next calendar meeting: attendees, what each side promised the other, and what was discussed last time. Built from the calendar and recorded meetings; returns available=false with a reason when no meeting is coming up. Use before a call; for a meeting that already happened use search_meetings and get_meeting.",
+      "inputSchema" : {
+        "properties" : {
+
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "get_next_meeting_brief",
+      "outputSchema" : {
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Next meeting brief"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Upcoming meetings"
+      },
+      "description" : "The user's calendar meetings in the next days, soonest first, each with its attendees and the open promises between the user and them: what the user promised them and what they promised the user. Use for \"what's my week\", \"what do I owe the people I'm meeting\". Only events with other people or a call link; all-day events are left out. Needs calendar access; returns available=false with a reason without it. For the very next call in detail, get_next_meeting_brief.",
+      "inputSchema" : {
+        "properties" : {
+          "days" : {
+            "description" : "How many days ahead to look. Default 7, at most 14.",
+            "type" : "integer"
+          },
+          "limit" : {
+            "description" : "Most meetings to return. Default 20.",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "list_upcoming_meetings",
+      "outputSchema" : {
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Upcoming meetings"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Follow-up draft"
+      },
+      "description" : "A follow-up email for one meeting, written from Griasa's notes: the summary and who promised what for all participants, or, with person, only what that person and the user promised. Returns subject, body, the addresses Griasa knows and a mailto link. Griasa sends nothing: hand the link to the user or send the draft with the user's own mail tool after they confirm. Meeting id from search_meetings.",
+      "inputSchema" : {
+        "properties" : {
+          "id" : {
+            "description" : "Meeting id from search_meetings.",
+            "type" : "string"
+          },
+          "person" : {
+            "description" : "Only this participant's promises and the user's, addressed to them.",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "id"
+        ],
+        "type" : "object"
+      },
+      "name" : "draft_followup",
+      "outputSchema" : {
+        "properties" : {
+          "found" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Follow-up draft"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "People"
+      },
+      "description" : "Everyone Griasa knows by name, with how many of their promises are still open. Use to find the exact spelling before get_person or list_commitments.",
+      "inputSchema" : {
+        "properties" : {
+
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "list_people",
+      "outputSchema" : {
+        "properties" : {
+          "people" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "People"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Projects"
+      },
+      "description" : "List every project the user files recordings and notes under, with id and name, in the order the user keeps them in Settings; unfiled items sit in an Inbox that is not listed. Use to answer what the user is working on or to match a meeting to a project; pass an id as project to search_meetings or list_commitments.",
+      "inputSchema" : {
+        "properties" : {
+
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "list_projects",
+      "outputSchema" : {
+        "properties" : {
+          "projects" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Projects"
+    }
+  ],
+  "versions" : [
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ]
+}

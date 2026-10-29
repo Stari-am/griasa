@@ -53,6 +53,15 @@ enum GriasaMain {
             }
             await BenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
         }
+        if let flag = args.firstIndex(of: "--write-plugin-server"), args.count > flag + 1 {
+            do {
+                try MCPServer.writePluginServer(to: URL(fileURLWithPath: args[flag + 1], isDirectory: true))
+                exit(0)
+            } catch {
+                FileHandle.standardError.write(Data("write-plugin-server: \(error.localizedDescription)\n".utf8))
+                exit(1)
+            }
+        }
         if let flag = args.firstIndex(of: "--build-mcpb"), args.count > flag + 1 {
             let destination = URL(fileURLWithPath: args[flag + 1])
             do {

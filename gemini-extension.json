@@ -1,0 +1,12 @@
+{
+  "name": "griasa",
+  "version": "1.0.22",
+  "description": "Meetings, promises and people from Griasa on your Mac.",
+  "contextFileName": "plugins/griasa/skills/griasa/SKILL.md",
+  "mcpServers": {
+    "griasa": {
+      "command": "node",
+      "args": ["${extensionPath}/plugins/griasa/server/index.js"]
+    }
+  }
+}

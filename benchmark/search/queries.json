@@ -1,0 +1,338 @@
+[
+  {
+    "id": "q01",
+    "kind": "paraphrase",
+    "query": "кто сообщит заказчику о сбое",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "Я напишу клиенту из Brightmoor, что фикс будет"
+  },
+  {
+    "id": "q02",
+    "kind": "paraphrase",
+    "query": "сколько раз платёжка повторяет отправку",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "после пяти попыток они сдаются"
+  },
+  {
+    "id": "q03",
+    "kind": "cross",
+    "query": "load testing postponed to next sprint",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "Нагрузочное — не в этом спринте, Аня отказалась"
+  },
+  {
+    "id": "q04",
+    "kind": "inflection",
+    "query": "потерянное событие провайдера",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "около трёхсот сорока событий"
+  },
+  {
+    "id": "q05",
+    "kind": "inflection",
+    "query": "пятисотка порог",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "порог по пятисоткам давайте снизим до трёх"
+  },
+  {
+    "id": "q06",
+    "kind": "exact",
+    "query": "Brightmoor",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "это Brightmoor, у них интернет-магазин"
+  },
+  {
+    "id": "q07",
+    "kind": "topic",
+    "query": "постмортем инцидента",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "Нам нужен нормальный постмортем, не на полстраницы"
+  },
+  {
+    "id": "q08",
+    "kind": "question",
+    "query": "когда прогонят регресс по платежам?",
+    "meeting": "a-webhooks-sync-ru",
+    "anchor": "регресс по платежам я прогоню в среду"
+  },
+  {
+    "id": "q09",
+    "kind": "paraphrase",
+    "query": "biggest spreadsheet we can accept",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "can take files over ten megabytes now"
+  },
+  {
+    "id": "q10",
+    "kind": "cross",
+    "query": "кнопка игнорировать все несопоставленные столбцы",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "\"Ignore all unmatched\" link at the top"
+  },
+  {
+    "id": "q11",
+    "kind": "cross",
+    "query": "значки вместо иллюстраций",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "Ship with icons, measure, then decide."
+  },
+  {
+    "id": "q12",
+    "kind": "exact",
+    "query": "parse-preview",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "something like parse-preview, that returns detected"
+  },
+  {
+    "id": "q13",
+    "kind": "exact",
+    "query": "Onboarding v3",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "the page is called Onboarding v3"
+  },
+  {
+    "id": "q14",
+    "kind": "topic",
+    "query": "tracking events",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "I'll add the onboarding events to the tracking plan"
+  },
+  {
+    "id": "q15",
+    "kind": "question",
+    "query": "who owns the onboarding emails?",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "Technically marketing, but in practice nobody."
+  },
+  {
+    "id": "q16",
+    "kind": "question",
+    "query": "when is the follow-up review?",
+    "meeting": "b-onboarding-review-en",
+    "anchor": "I'll book a follow-up review for the 20th"
+  },
+  {
+    "id": "q17",
+    "kind": "paraphrase",
+    "query": "имитация пользователя для раннего обнаружения сбоев",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "синтетический чек, который раз в минуту делает реальный"
+  },
+  {
+    "id": "q18",
+    "kind": "cross",
+    "query": "push notification grouping and quiet hours",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "Плюс тихие часы, чтобы ночью не будить людей."
+  },
+  {
+    "id": "q19",
+    "kind": "inflection",
+    "query": "кандидат оффер",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "Я подготовлю оффер для кандидата А через HR до пятницы"
+  },
+  {
+    "id": "q20",
+    "kind": "inflection",
+    "query": "обращение саппорт снижение",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "снизить количество обращений в саппорт на тысячу"
+  },
+  {
+    "id": "q21",
+    "kind": "exact",
+    "query": "Loki",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "Перенос логов в Loki я сделаю в этом спринте"
+  },
+  {
+    "id": "q22",
+    "kind": "topic",
+    "query": "GraphQL для мобильных",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "переходят с REST на GraphQL для мобильных клиентов"
+  },
+  {
+    "id": "q23",
+    "kind": "topic",
+    "query": "процесс найма",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "Я бы убрал тестовое и оставил live coding"
+  },
+  {
+    "id": "q24",
+    "kind": "question",
+    "query": "когда будет готов разбор инцидента?",
+    "meeting": "c-sprint-incident-ru",
+    "anchor": "Я напишу постмортем по инциденту поиска до пятницы"
+  },
+  {
+    "id": "q25",
+    "kind": "paraphrase",
+    "query": "the top tier hardly has any buyers",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "Pro has very few customers. About forty."
+  },
+  {
+    "id": "q26",
+    "kind": "cross",
+    "query": "отключение старой версии API в июне",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "sunset date end of June, announcement in January"
+  },
+  {
+    "id": "q27",
+    "kind": "inflection",
+    "query": "крупный клиент исключение",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "выдавать фичи в виде исключения, например, крупному клиенту"
+  },
+  {
+    "id": "q28",
+    "kind": "inflection",
+    "query": "дашборд магазин",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "Дашборд по каждому магазину отдельно"
+  },
+  {
+    "id": "q29",
+    "kind": "exact",
+    "query": "Kotlin Multiplatform",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "Tom wanted to raise Kotlin Multiplatform"
+  },
+  {
+    "id": "q30",
+    "kind": "exact",
+    "query": "ninety days",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "raw events maybe ninety days, then only daily aggregates"
+  },
+  {
+    "id": "q31",
+    "kind": "topic",
+    "query": "pricing tiers",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "Right now we have three plans: Starter, Business and Pro."
+  },
+  {
+    "id": "q32",
+    "kind": "question",
+    "query": "when can the new hire join on-call?",
+    "meeting": "d-roadmap-q1-mixed",
+    "anchor": "The new person can't join the rotation before April"
+  },
+  {
+    "id": "q33",
+    "kind": "paraphrase",
+    "query": "how many orders were charged twice",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "Duplicates: 312 orders."
+  },
+  {
+    "id": "q34",
+    "kind": "cross",
+    "query": "кто отменяет заказы массово",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "there's a bulk action in the orders list"
+  },
+  {
+    "id": "q35",
+    "kind": "cross",
+    "query": "буфер запаса товара на акции",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "Marcus sets a stock buffer of three"
+  },
+  {
+    "id": "q36",
+    "kind": "exact",
+    "query": "Black Friday",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "If Black Friday is four times a normal promo"
+  },
+  {
+    "id": "q37",
+    "kind": "topic",
+    "query": "status page",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "I updated the status page, at about twelve"
+  },
+  {
+    "id": "q38",
+    "kind": "topic",
+    "query": "incident report for the CEO",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "I'll write an incident report for your CEO"
+  },
+  {
+    "id": "q39",
+    "kind": "question",
+    "query": "what is the connector timeout?",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "Your connector's timeout is thirty seconds."
+  },
+  {
+    "id": "q40",
+    "kind": "question",
+    "query": "did Marcus agree to rewrite the connector?",
+    "meeting": "e-customer-escalation-en",
+    "anchor": "I won't rewrite the connector before Thursday"
+  },
+  {
+    "id": "q41",
+    "kind": "paraphrase",
+    "query": "перевірка гарнітури заголовків на всі символи",
+    "meeting": "f-localisation-uk",
+    "anchor": "Я перевірю, чи наш шрифт заголовків підтримує"
+  },
+  {
+    "id": "q42",
+    "kind": "paraphrase",
+    "query": "єдині терміни для перекладачів",
+    "meeting": "f-localisation-uk",
+    "anchor": "Без глосарію кожен перекладач буде перекладати по-своєму"
+  },
+  {
+    "id": "q43",
+    "kind": "cross",
+    "query": "dark mode payment screen card field unreadable",
+    "meeting": "f-localisation-uk",
+    "anchor": "поле з номером картки біле, а текст у ньому"
+  },
+  {
+    "id": "q44",
+    "kind": "inflection",
+    "query": "псевдолокалізація тестова збірка",
+    "meeting": "f-localisation-uk",
+    "anchor": "я додам псевдолокалізацію в тестову збірку до середи"
+  },
+  {
+    "id": "q45",
+    "kind": "inflection",
+    "query": "шаблон пуш бекенд",
+    "meeting": "f-localisation-uk",
+    "anchor": "окремі шаблони на бекенді, близько сорока штук"
+  },
+  {
+    "id": "q46",
+    "kind": "exact",
+    "query": "App Store Google Play",
+    "meeting": "f-localisation-uk",
+    "anchor": "скріншоти для App Store і Google Play українською"
+  },
+  {
+    "id": "q47",
+    "kind": "topic",
+    "query": "тон звертання до користувачів",
+    "meeting": "f-localisation-uk",
+    "anchor": "Я б сказала, на «ви». Це сервіс для бізнесу"
+  },
+  {
+    "id": "q48",
+    "kind": "question",
+    "query": "коли готова українська версія?",
+    "meeting": "f-localisation-uk",
+    "anchor": "Українська — кінець наступного місяця, це домовлено"
+  }
+]

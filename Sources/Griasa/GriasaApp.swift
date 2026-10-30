@@ -53,6 +53,19 @@ enum GriasaMain {
             }
             await BenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
         }
+        // `Griasa --search-benchmark benchmark/meetings [--embed-url <url>]` measures
+        // meeting search on the public meetings and benchmark/search/queries.json.
+        if let flag = args.firstIndex(of: "--search-benchmark") {
+            let directory = args.count > flag + 1 && !args[flag + 1].hasPrefix("--") ? args[flag + 1] : "benchmark/meetings"
+            func value(_ name: String) -> String? {
+                args.firstIndex(of: name).flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
+            }
+            await SearchBenchmarkRun.run(meetings: directory,
+                                         queries: value("--queries") ?? "benchmark/search/queries.json",
+                                         embedURL: value("--embed-url"),
+                                         queryPrefix: value("--query-prefix") ?? "",
+                                         passagePrefix: value("--passage-prefix") ?? "")
+        }
         if let flag = args.firstIndex(of: "--write-plugin-server"), args.count > flag + 1 {
             do {
                 try MCPServer.writePluginServer(to: URL(fileURLWithPath: args[flag + 1], isDirectory: true))

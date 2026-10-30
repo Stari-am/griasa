@@ -52,6 +52,8 @@ swiftc -O \
   Sources/Griasa/FollowUp.swift \
   Sources/Griasa/ContextBudget.swift \
   Sources/Griasa/WordSearch.swift \
+  Sources/Griasa/SearchChunks.swift \
+  Sources/Griasa/HybridRank.swift \
   Sources/Griasa/CapturedPromise.swift \
   Sources/Griasa/DueDate.swift \
   Sources/Griasa/BenchmarkScore.swift \
@@ -103,6 +105,7 @@ swiftc -O \
   Tests/GrammarChecks.swift \
   Tests/ConversationChecks.swift \
   Tests/WordSearchChecks.swift \
+  Tests/HybridSearchChecks.swift \
   Tests/main.swift \
   -o "$BIN"
 

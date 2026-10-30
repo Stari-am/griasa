@@ -316,6 +316,19 @@ final class MCPServer: ObservableObject {
             send(status: status, reason: reason, on: connection)
             return
         }
+        // A search with the meaning model on needs the query's vector, and the
+        // tools are synchronous: fetch it first, then answer.
+        if let query = SemanticSearch.shared.pendingQuery(in: request.body) {
+            Task { @MainActor in
+                await SemanticSearch.shared.prepare(query)
+                self.respond(request, on: connection)
+            }
+            return
+        }
+        respond(request, on: connection)
+    }
+
+    private func respond(_ request: HTTPRequest.Parsed, on connection: NWConnection) {
         let environment = MCPEndpoint.Environment(
             serverVersion: Self.appVersion,
             tools: MCPTools.liveListings,

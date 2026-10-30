@@ -986,6 +986,7 @@ private struct SystemSettings: View {
     @State private var tokenCopied = false
     @ObservedObject private var mcp = MCPServer.shared
     @ObservedObject private var stats = UsageStats.shared
+    @ObservedObject private var search = SemanticSearch.shared
     /// "Let assistants add to Griasa": the one switch for both MCP write tools
     /// and the local HTTP endpoint. An organisation can only close it; when its
     /// profile says no the switch is locked off, and when it says yes the
@@ -1027,6 +1028,50 @@ private struct SystemSettings: View {
                 Text("Starting…").font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// The optional search model: download, progress, a switch to pause it,
+    /// and removal, which also deletes the index built with it.
+    @ViewBuilder private var searchByMeaning: some View {
+        let allowed = search.allowed
+        switch search.state {
+        case .notDownloaded:
+            HStack {
+                Text("Off — searches match words").foregroundStyle(.secondary)
+                Spacer()
+                Button("Download model (634 MB)") { search.downloadModel() }
+                    .disabled(!allowed)
+            }
+        case .downloading(let percent):
+            HStack {
+                ProgressView(value: Double(percent), total: 100)
+                Text("\(percent)%").font(.caption).monospacedDigit()
+                Button("Cancel") { search.cancelDownload() }
+            }
+        case .indexing(let done, let total):
+            HStack {
+                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                Text("Indexing meetings \(done) of \(total)").font(.caption).monospacedDigit()
+            }
+        case .ready(let meetings):
+            Text("Ready · \(meetings) meetings indexed").foregroundStyle(.secondary)
+        case .off:
+            Text("Paused — searches match words").foregroundStyle(.secondary)
+        case .failed(let message):
+            HStack {
+                Text(message).font(.caption).foregroundStyle(.red)
+                Button("Try again") { search.downloadModel() }.disabled(!allowed)
+            }
+        }
+        if EmbeddingServer.isDownloaded {
+            Toggle("Search by meaning", isOn: Binding(get: { search.userOn && allowed },
+                                                      set: { search.userOn = $0 }))
+                .disabled(!allowed)
+            Button("Remove model and index", role: .destructive) { search.removeModel() }
+        }
+        if !allowed { managedNote("Turned off by your organization.") }
+        Text("A local model (bge-m3) lets assistants find meetings by what was meant, across Russian, Ukrainian and English, not only by the words typed. It runs on this Mac; meeting text and the index built from it stay here.")
+            .font(.caption).foregroundStyle(.secondary)
     }
 
     var body: some View {
@@ -1073,6 +1118,9 @@ private struct SystemSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 addToGriasa
+            }
+            Section("Search by meaning") {
+                searchByMeaning
             }
             Section("Permissions") {
                 permissionRow("Microphone", granted: Permissions.microphoneGranted,

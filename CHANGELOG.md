@@ -42,6 +42,19 @@ begins. Meetings with every word come first, best matches first, and each result
 carries a short `matched` excerpt that shows why it was found, without the
 transcript.
 
+**Search by meaning, optional and local.** *Settings → System → Search by
+meaning* downloads a 634 MB model (bge-m3) that runs on this Mac only. Griasa
+then cuts every meeting into pieces of about 800 characters, keeps their vectors
+in `search.sqlite` (readable only by your account; re-made when a meeting
+changes, removed when it is deleted), and `search_meetings` and the topic view of
+`get_context` rank by meaning and by words together. An English question finds a
+Russian meeting, and a paraphrase finds the words actually said. On the public
+search benchmark the answer is in the first five results for 81% of queries,
+against 60% for word search. Without the model, or while it is not answering,
+word search answers as before; a search never waits for the model more than ten
+seconds. A switch pauses it, *Remove model and index* deletes both, and an
+organization can turn it off with `semanticSearchEnabled`.
+
 **Everything about someone in one call.** A new MCP tool, `get_context`, gives
 an assistant what Griasa knows about a person, project or topic within a size
 budget: the open promises in both directions (overdue first, with their quotes),

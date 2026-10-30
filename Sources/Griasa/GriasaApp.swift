@@ -198,6 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         Task { @MainActor in
             AppState.shared.bootstrap()
+            SemanticSearch.shared.start()
             if AppDelegate.demoBrief { DemoBrief.install() }
             if let tab = AppDelegate.tabToOpenOnLaunch {
                 HubController.shared.open(tab)
@@ -250,6 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         WhisperServer.shared.stop()
         LlamaServer.shared.stop()
+        EmbeddingServer.shared.stop()
         Task { @MainActor in
             if AppState.shared.isRecording {
                 await AppState.shared.stopRecording()

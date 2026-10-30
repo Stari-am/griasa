@@ -177,8 +177,9 @@ enum MCPTools {
         name: "search_meetings",
         title: "Search meetings",
         summary: "Find recorded meetings by words in the title or text, optionally with one "
-               + "participant. Words match in any order and in any grammatical form; meetings "
-               + "with every word come first, best matches first, otherwise newest first. Returns "
+               + "participant. Words match in any order and in any grammatical form, and, when the "
+               + "user has turned on search by meaning, by meaning across languages; best matches "
+               + "first, otherwise newest first. Returns "
                + "id, title, date, participants, summary and, when text matched, a short "
                + "'matched' excerpt — never the transcript. Use the id with get_meeting or "
                + "get_transcript.",
@@ -209,9 +210,8 @@ enum MCPTools {
         // matched; without, the newest meetings do.
         let ranked: [(entry: HistoryEntry, matched: String?)]
         if let query, !query.trimmingCharacters(in: .whitespaces).isEmpty {
-            let pool = Array(hits)
-            ranked = WordSearch.rank(query, in: pool.map { .init(title: $0.title, text: $0.text) }, limit: limit)
-                .map { (pool[$0.index], $0.snippet) }
+            ranked = SemanticSearch.shared.rankMeetings(query, among: Array(hits), limit: limit)
+                .map { ($0.entry, $0.matched) }
         } else {
             ranked = hits.prefix(limit).map { ($0, nil) }
         }
@@ -425,8 +425,7 @@ enum MCPTools {
         if wanted == "project" { return ["found": false, "projects": ProjectStore.shared.projects.map(\.name)] }
 
         // A topic: meetings that mention it, and the promises they produced.
-        let hits = WordSearch.rank(about, in: meetings.map { .init(title: $0.title, text: $0.text) }, limit: 10)
-            .map { meetings[$0.index] }
+        let hits = SemanticSearch.shared.rankMeetings(about, among: meetings, limit: 10).map(\.entry)
         guard !hits.isEmpty else { return ["found": false, "kind": "topic"] }
         let ids = Set(hits.map(\.id))
         let open = CommitmentStore.shared.commitments.filter { !$0.done && ($0.sourceEntryID.map(ids.contains) ?? false) }

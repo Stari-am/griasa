@@ -134,7 +134,8 @@ check(["localModelID", "localModelAutoDownload", "localEnginePreferred"].allSati
 // Conversations. Absent is the unmanaged install and must change nothing; the
 // ingest switch is only ever a veto, never an enabler.
 let convKeys = [ManagedPolicy.conversationsEnabledKey: \ManagedPolicy.conversationsEnabled,
-                ManagedPolicy.conversationIngestEnabledKey: \ManagedPolicy.conversationIngestAllowed]
+                ManagedPolicy.conversationIngestEnabledKey: \ManagedPolicy.conversationIngestAllowed,
+                ManagedPolicy.semanticSearchEnabledKey: \ManagedPolicy.semanticSearchAllowed]
 for (key, path) in convKeys {
     let cases: [(label: String, values: [String: Any], expected: Bool)] = [
         ("absent", [:], true), ("true", [key: true], true), ("false", [key: false], false),

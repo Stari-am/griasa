@@ -88,7 +88,7 @@
         "readOnlyHint" : true,
         "title" : "Search meetings"
       },
-      "description" : "Find recorded meetings by title or text, optionally with one participant, newest first. Returns id, title, date, participants and summary — never the transcript. Use the id with get_meeting or get_transcript.",
+      "description" : "Find recorded meetings by words in the title or text, optionally with one participant. Words match in any order and in any grammatical form, and, when the user has turned on search by meaning, by meaning across languages; best matches first, otherwise newest first. Returns id, title, date, participants, summary and, when text matched, a short 'matched' excerpt — never the transcript. Use the id with get_meeting or get_transcript.",
       "inputSchema" : {
         "properties" : {
           "limit" : {
@@ -104,7 +104,7 @@
             "type" : "string"
           },
           "query" : {
-            "description" : "Words to look for in the title or text.",
+            "description" : "Words to look for in the title or text, in any order.",
             "type" : "string"
           }
         },

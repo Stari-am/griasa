@@ -49,7 +49,7 @@ struct ManagedPolicy {
                                "audioRetentionDays",
                                "localModelID", "localModelAutoDownload", "localEnginePreferred",
                                conversationsEnabledKey, conversationIngestEnabledKey,
-                               conversationRetentionDaysKey]
+                               conversationRetentionDaysKey, semanticSearchEnabledKey]
         + providerKeys.values.sorted()
 
     /// The providers that stay on this Mac. A custom endpoint counts even when
@@ -87,6 +87,14 @@ struct ManagedPolicy {
     static let conversationRetentionDaysKey = "conversationRetentionDays"
 
     var conversationsEnabled: Bool { flag(Self.conversationsEnabledKey) ?? true }
+
+    /// Search by meaning: a local model turns meeting text into vectors kept in
+    /// a file beside the history. A profile that says `false` keeps the model
+    /// from being downloaded or run and the index from being built; absent
+    /// leaves it to the person, who still has to download the model.
+    static let semanticSearchEnabledKey = "semanticSearchEnabled"
+
+    var semanticSearchAllowed: Bool { flag(Self.semanticSearchEnabledKey) ?? true }
 
     /// Whether an organisation lets the person bring chats in at all. Absent
     /// means the person's own switch decides, so this is true — it never turns

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.23 — 2026-11-01
 
 **Conversations.** A new tab imports chat history (today a Telegram Desktop
 export: only the chats you tick, and the period you pick) into a local database

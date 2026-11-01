@@ -1,7 +1,7 @@
 {
   "name": "griasa",
   "displayName": "Griasa",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Your meetings, the promises made in them and the people in them, read from Griasa on your Mac: who owes what, what was decided, and what to bring to the next call.",
   "author": { "name": "Stari", "url": "https://github.com/Stari-am" },
   "homepage": "https://stari-am.github.io/griasa/",

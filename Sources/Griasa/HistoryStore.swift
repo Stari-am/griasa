@@ -307,6 +307,7 @@ final class HistoryStore: ObservableObject {
     func delete(_ entry: HistoryEntry) {
         entries.removeAll { $0.id == entry.id }
         save()
+        DecisionStore.shared.removeAll(forEntry: entry.id)
         let projectName = ProjectStore.shared.displayName(for: entry.projectID)
         Task.detached { ProjectFiles.remove(entry: entry, projectName: projectName) }
     }

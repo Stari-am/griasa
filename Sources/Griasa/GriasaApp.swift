@@ -53,6 +53,15 @@ enum GriasaMain {
             }
             await BenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
         }
+        // `Griasa --decision-benchmark benchmark/meetings [--cloud <provider>] [--only a,b]`
+        // scores decision extraction against the decisions marked in each gold.json.
+        if let flag = args.firstIndex(of: "--decision-benchmark") {
+            let directory = args.count > flag + 1 && !args[flag + 1].hasPrefix("--") ? args[flag + 1] : "benchmark/meetings"
+            let cloud = args.firstIndex(of: "--cloud").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
+            let only = args.firstIndex(of: "--only").flatMap { args.count > $0 + 1 ? args[$0 + 1] : nil }
+                .map { Set($0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }) }
+            await DecisionBenchmarkRun.run(directory: directory, cloudRaw: cloud, only: only)
+        }
         // `Griasa --search-benchmark benchmark/meetings [--embed-url <url>]` measures
         // meeting search on the public meetings and benchmark/search/queries.json.
         if let flag = args.firstIndex(of: "--search-benchmark") {

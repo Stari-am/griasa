@@ -245,6 +245,18 @@ struct MenuView: View {
                         }
                     }
                 }
+                Button {
+                    MenuBarPanel.dismiss()
+                    HubController.shared.open(.decisions)
+                } label: {
+                    Text("🪧  Decisions")
+                }
+                Button {
+                    MenuBarPanel.dismiss()
+                    HubController.shared.open(.team)
+                } label: {
+                    Text("🧑‍🤝‍🧑  My team")
+                }
                 // Only for people on the local provider who did not set it up by hand.
                 if !localModel.isReady, onLocalProvider,
                    !LocalRefreshGate.isHandConfigured(typedBaseURL: customBaseURL,

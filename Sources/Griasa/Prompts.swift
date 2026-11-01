@@ -36,6 +36,8 @@ enum Prompts {
         case commitments
         /// Deciding which already-open commitments this conversation says are done.
         case commitmentsDone
+        /// Mining the decisions taken in a meeting.
+        case decisions
         /// One day of a chat → a short summary.
         case chatDaySummary
         /// One day of a chat → the promises people made in it.
@@ -129,6 +131,26 @@ enum Prompts {
       "at": "mm:ss" of the nearest [mm:ss] timestamp before the quote if the input shows one, else null
     A promise you cannot quote is dropped. Text marked "context only" is already covered: \
     do not extract from it.
+    """
+
+    /// Appended to `.decisions` in code, for the reason `commitmentQuoteRules` is.
+    static let decisionQuoteRules = """
+
+    Every element must also carry these two keys:
+      "quote": the exact words from the input where the decision was taken, copied word for \
+    word exactly as they stand — never translated, corrected or tidied up,
+      "at": "mm:ss" of the nearest [mm:ss] timestamp before the quote if the input shows one, else null
+    A decision you cannot quote is dropped. Text marked "context only" is already covered: \
+    do not extract from it.
+    """
+
+    /// Added to `.decisions` when the input is one part of a longer transcript.
+    static let decisionPartRules = """
+
+    The input is one part of a longer meeting transcript, not finished notes. "You" is the \
+    user's microphone ({{me}}); "Them" is everything the computer played — the other \
+    participants ({{participants}}). A decision reversed in a later part cannot be seen here: \
+    list what this part settles.
     """
 
     /// Added when the input is one part of a longer transcript, where "You" and "Them" are tracks.
@@ -263,6 +285,41 @@ enum Prompts {
             - Only real, actionable promises a person explicitly took on. Skip vague intentions,
               group decisions with no owner, and things already done.
             - Keep each text self-contained (a week later it must still make sense on its own).
+            - 0 items is a valid answer: return [].
+            """
+
+        case .decisions:
+            return """
+            You extract the decisions taken in a meeting: choices the participants settled on.
+            Today is {{today}}. The user of this app is "{{me}}". Participants: {{participants}}.
+
+            A decision changes what the team does or how: a choice between options, a rule, a
+            yes or a no. A task is one person doing one thing ("Ivan will send the logs",
+            "I'll write the doc by Friday") — that is a promise, never a decision, even when it
+            was agreed.
+              Decision: "We cancel the oversold orders and give a voucher."
+              Decision: "No load testing this sprint; it moves to the backlog."
+              Decision: "The alert threshold goes down to five percent, not three."
+              Not a decision: "Maya will update the release notes by Thursday." (a task)
+              Not a decision: "Rachel sends the promo calendar on Friday." (a task)
+              Not a decision: "Maybe we should look at caching." (not settled)
+
+            Return ONLY a JSON array, no prose, no markdown fences. Each element:
+            {"type": "decision" or "task" — say "task" if it is someone doing something,
+             "text": "what was decided, one short self-contained sentence in the language of the meeting",
+             "why": "the reason given, or null",
+             "by": "who made the call (from the participants; "{{me}}" for the user), or null when it was agreed together",
+             "alternatives": ["options that were considered and not chosen"],
+             "revisit": "YYYY-MM-DD" if they said when to look at it again, resolved relative to today, or null,
+             "reversed": true if the same meeting later took this decision back, else false}
+
+            Rules:
+            - Only settled choices. Not proposals still being argued, not opinions, not
+              questions left open, not status updates.
+            - A decision taken back later in the meeting is still listed, with "reversed": true.
+            - Most meetings settle a handful of things; a list longer than a dozen is usually
+              full of tasks.
+            - Keep each text self-contained (a month later it must still make sense on its own).
             - 0 items is a valid answer: return [].
             """
 

@@ -1,5 +1,5 @@
 {
-  "instructions" : "Griasa holds the user's recorded meetings, the promises made in them, and what is known about each colleague. For everything about one person, project or topic in one call, use get_context. Start with list_commitments or get_next_meeting_brief for \"what is open\" and \"what is next\"; use search_meetings and get_meeting for what a meeting decided; ask for get_transcript only when a summary is not enough, since it returns everything that was said. These tools only read. If the user has allowed it, add_conversation offers a chat for their review and propose_close_commitment suggests that a promise is done; neither reads, changes or deletes anything, and the user decides.",
+  "instructions" : "Griasa holds the user's recorded meetings, the promises made in them, and what is known about each colleague. For everything about one person, project or topic in one call, use get_context. Start with list_commitments or get_next_meeting_brief for \"what is open\" and \"what is next\"; list_decisions for what was decided and why; search_meetings and get_meeting for what a meeting said; ask for get_transcript only when a summary is not enough, since it returns everything that was said. These tools only read. If the user has allowed it, add_conversation offers a chat for their review and propose_close_commitment suggests that a promise is done; neither reads, changes or deletes anything, and the user decides.",
   "tools" : [
     {
       "annotations" : {
@@ -27,6 +27,10 @@
           "project" : {
             "description" : "Only promises from meetings filed under this project id, from list_projects.",
             "type" : "string"
+          },
+          "team_only" : {
+            "description" : "Only promises made by the user's direct reports (people marked \"Reports to me\" in Griasa). For \"what does my team owe me\".",
+            "type" : "boolean"
           }
         },
         "required" : [
@@ -47,6 +51,61 @@
         "type" : "object"
       },
       "title" : "Open promises"
+    },
+    {
+      "annotations" : {
+        "destructiveHint" : false,
+        "idempotentHint" : true,
+        "openWorldHint" : false,
+        "readOnlyHint" : true,
+        "title" : "Decisions"
+      },
+      "description" : "Decisions taken in recorded meetings, newest first: what was decided, why, who made the call, the options not chosen, and the exact words it was decided in. Use for \"what did we decide about X\", \"why did we choose Y\", \"did we ever consider Z\". Reversed decisions are included and marked; leave them out with standing_only.",
+      "inputSchema" : {
+        "properties" : {
+          "limit" : {
+            "description" : "Most decisions to return. Default 20.",
+            "type" : "integer"
+          },
+          "person" : {
+            "description" : "Only decisions made by this person or in meetings they took part in.",
+            "type" : "string"
+          },
+          "project" : {
+            "description" : "Only decisions from meetings filed under this project id, from list_projects.",
+            "type" : "string"
+          },
+          "query" : {
+            "description" : "Words to look for in the decision, its reason, who decided, or the options rejected. Omit for the newest.",
+            "type" : "string"
+          },
+          "since" : {
+            "description" : "Only decisions from meetings on or after this date, YYYY-MM-DD.",
+            "type" : "string"
+          },
+          "standing_only" : {
+            "description" : "Leave out decisions that were reversed.",
+            "type" : "boolean"
+          }
+        },
+        "required" : [
+
+        ],
+        "type" : "object"
+      },
+      "name" : "list_decisions",
+      "outputSchema" : {
+        "properties" : {
+          "decisions" : {
+            "type" : "array"
+          },
+          "returned" : {
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "title" : "Decisions"
     },
     {
       "annotations" : {

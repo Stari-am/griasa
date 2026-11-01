@@ -24,8 +24,12 @@ below read it.
   for the attendees Griasa recognises.
 - **"My week" → `list_upcoming_meetings`** — each meeting with what the user and
   each attendee owe each other.
-- **"What did we decide about X" → `search_meetings`**, then `get_meeting` for the
-  summary and the promises made in it.
+- **"What did we decide about X", "why did we choose Y" → `list_decisions`** with
+  `query`: each decision with its reason, who made the call, the options not chosen
+  and the words it was taken in. `search_meetings` and `get_meeting` for the rest of
+  what a meeting said.
+- **"What does my team owe me" → `list_commitments` with `team_only`** — the people
+  the user marked as direct reports.
 - **A follow-up email → `draft_followup`** with the meeting id (and `person` for one
   person's promises only). Show the draft to the user; Griasa sends nothing.
 

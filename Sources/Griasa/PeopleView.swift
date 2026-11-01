@@ -141,6 +141,12 @@ private struct PersonDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
+                Toggle("Reports to me", isOn: Binding(
+                    get: { store.person(named: name)?.isDirectReport ?? false },
+                    set: { store.setDirectReport($0, for: name) }))
+                    .toggleStyle(.switch)
+                    .help("Their open promises to you gather in My team")
+
                 HubCard(icon: "note.text", title: "Notes", tint: .yellow) {
                     TextEditor(text: $notesDraft)
                         .font(.body)

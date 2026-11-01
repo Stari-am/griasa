@@ -80,6 +80,16 @@ final class PersonStore: ObservableObject {
         upsert(name: name) { $0.handles[source] = id }
     }
 
+    /// Marks or unmarks someone as reporting to the user.
+    func setDirectReport(_ on: Bool, for name: String) {
+        upsert(name: name) { $0.isDirectReport = on }
+    }
+
+    /// The people the user has marked as reporting to them, by name.
+    var directReports: [Person] {
+        people.filter(\.isDirectReport).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     func setNotes(_ notes: String, for name: String) {
         upsert(name: name) { $0.notes = notes }
     }

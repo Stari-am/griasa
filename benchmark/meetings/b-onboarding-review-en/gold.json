@@ -30,5 +30,14 @@
     {"quote": "We should really do a proper design system audit at some point", "note": "Someday talk, explicitly not this quarter."},
     {"quote": "Translations after the user tests.", "note": "A decision with no owner, not a promise."},
     {"quote": "If I have it Wednesday I can mock it Thursday.", "note": "Conditional on Alex's contract; a plan, not a promise of its own."}
+  ],
+  "decisions": [
+    {"text": "Add an \"Ignore all unmatched\" link at the top of the import preview", "by": "Alex", "quote": "Yeah, that's simple and it solves it. Let's do that.", "reversed": false},
+    {"text": "Ship with the plain design-system icons now; illustrations only later if the flow works", "by": "Alex", "quote": "I agree with Maya. Ship with icons, measure, then decide.", "reversed": false},
+    {"text": "The marketing-emails checkbox is unchecked by default until legal confirms the wording", "by": "Alex", "quote": "Olena, until legal comes back, just make it unchecked.", "reversed": false},
+    {"text": "No hardcoded strings in the new onboarding flow", "by": "Alex", "quote": "Yes, agreed, no hardcoded strings in the new flow.", "reversed": false},
+    {"text": "Translations are not part of this release: ship English, measure, translate after the user tests", "by": "Maya", "quote": "Not in this release. We'll ship English, measure, and if it works, translate.", "reversed": false},
+    {"text": "Roll the new flow out behind a feature flag, ten percent of workspaces first", "by": "Alex", "quote": "Yes, definitely. Tom, we can use the existing flag service, right?", "reversed": false},
+    {"text": "Hold a follow-up review on the 20th, same time, same people", "by": "Maya", "quote": "How about the 20th? I'll book a follow-up review for the 20th, same time, same people.", "reversed": false}
   ]
 }

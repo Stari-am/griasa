@@ -41,8 +41,8 @@ enum MCPEndpoint {
         Griasa holds the user's recorded meetings, the promises made in them, and \
         what is known about each colleague. For everything about one person, project \
         or topic in one call, use get_context. Start with list_commitments or \
-        get_next_meeting_brief for "what is open" and "what is next"; use search_meetings \
-        and get_meeting for what a meeting decided; ask for get_transcript only when \
+        get_next_meeting_brief for "what is open" and "what is next"; list_decisions for \
+        what was decided and why; search_meetings and get_meeting for what a meeting said; ask for get_transcript only when \
         a summary is not enough, since it returns everything that was said. These \
         tools only read. If the user has allowed it, add_conversation offers a chat \
         for their review and propose_close_commitment suggests that a promise is \

@@ -79,7 +79,7 @@ enum MCPTools {
     /// is added again.
     static let renamed = ["next_meeting_brief": "get_next_meeting_brief"]
 
-    static var readOnly: [Tool] { [commitments, person, searchMeetings, meeting,
+    static var readOnly: [Tool] { [commitments, decisions, person, searchMeetings, meeting,
                                    transcript, brief, upcoming, followUp, context, people, projects] }
 
     // MARK: - Schemas
@@ -110,6 +110,7 @@ enum MCPTools {
         schema: object([
             "person": string("Only promises owned by this person: the exact name as list_people returns it, case-insensitive. Omit for everyone."),
             "overdue_only": boolean("Only promises past their due date."),
+            "team_only": boolean("Only promises made by the user's direct reports (people marked \"Reports to me\" in Griasa). For \"what does my team owe me\"."),
             "project": string("Only promises from meetings filed under this project id, from list_projects."),
             "limit": integer("Most items in each of the two lists. Default 50; older promises past the limit are left out."),
         ]),
@@ -117,6 +118,8 @@ enum MCPTools {
     ) { params in
         let person = params["person"]?.stringValue
         let overdueOnly = params["overdue_only"]?.boolValue ?? false
+        let team = (params["team_only"]?.boolValue ?? false)
+            ? Set(PersonStore.shared.directReports.map { $0.name.lowercased() }) : nil
         let project = params["project"]?.stringValue.flatMap(UUID.init(uuidString:))
         let entries = Dictionary(HistoryStore.shared.entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let limit = params["limit"]?.intValue ?? 50
@@ -126,6 +129,7 @@ enum MCPTools {
             items
                 .filter { person == nil || $0.owner.caseInsensitiveCompare(person!) == .orderedSame }
                 .filter { !overdueOnly || ($0.dueDate.map { $0 < Date() } ?? false) }
+                .filter { team == nil || team!.contains($0.owner.lowercased()) }
                 .filter { item in
                     guard let project else { return true }
                     guard let id = item.sourceEntryID, let entry = entries[id] else { return false }
@@ -135,6 +139,70 @@ enum MCPTools {
                 .map(describe)
         }
         return ["mine": filter(store.openMine), "waiting_on_others": filter(store.openTheirs)]
+    }
+
+    static let decisions = Tool(
+        name: "list_decisions",
+        title: "Decisions",
+        summary: "Decisions taken in recorded meetings, newest first: what was decided, why, who "
+               + "made the call, the options not chosen, and the exact words it was decided in. "
+               + "Use for \"what did we decide about X\", \"why did we choose Y\", \"did we ever "
+               + "consider Z\". Reversed decisions are included and marked; leave them out with "
+               + "standing_only.",
+        schema: object([
+            "query": string("Words to look for in the decision, its reason, who decided, or the options rejected. Omit for the newest."),
+            "person": string("Only decisions made by this person or in meetings they took part in."),
+            "project": string("Only decisions from meetings filed under this project id, from list_projects."),
+            "since": string("Only decisions from meetings on or after this date, YYYY-MM-DD."),
+            "standing_only": boolean("Leave out decisions that were reversed."),
+            "limit": integer("Most decisions to return. Default 20."),
+        ]),
+        output: result(["decisions": "array", "returned": "integer"])
+    ) { params in
+        let query = params["query"]?.stringValue ?? ""
+        let person = params["person"]?.stringValue
+        let project = params["project"]?.stringValue.flatMap(UUID.init(uuidString:))
+        let day = ISO8601DateFormatter()
+        day.formatOptions = [.withFullDate]
+        let since = params["since"]?.stringValue.flatMap { day.date(from: $0) }
+        let standingOnly = params["standing_only"]?.boolValue ?? false
+        let limit = min(max(params["limit"]?.intValue ?? 20, 1), 100)
+        let entries = Dictionary(HistoryStore.shared.entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let pool = DecisionStore.shared.decisions.filter { decision in
+            if standingOnly && decision.reversed { return false }
+            if let since, decision.date < since { return false }
+            let entry = decision.sourceEntryID.flatMap { entries[$0] }
+            if let project {
+                guard let entry, inProject(entry, project) else { return false }
+            }
+            if let person {
+                let decided = decision.decidedBy.map { PromiseOwner.sameName($0, person) } ?? false
+                let present = (entry?.participants ?? []).contains { PromiseOwner.sameName($0, person) }
+                if !decided && !present { return false }
+            }
+            return true
+        }
+        let found = DecisionRules.search(query, in: pool, limit: limit).map(describeDecision)
+        return ["decisions": found, "returned": found.count]
+    }
+
+    nonisolated static func describeDecision(_ decision: Decision) -> [String: Any] {
+        var row: [String: Any] = [
+            "id": decision.id.uuidString,
+            "decision": decision.text,
+            "date": ISO8601DateFormatter().string(from: decision.date),
+            "meeting": decision.sourceTitle,
+            "reversed": decision.reversed,
+        ]
+        if let why = decision.why { row["why"] = why }
+        if let by = decision.decidedBy { row["decided_by"] = by }
+        if !decision.alternatives.isEmpty { row["not_chosen"] = decision.alternatives }
+        if let quote = decision.quote { row["quote"] = quote }
+        if let at = decision.at { row["at"] = at }
+        if let id = decision.sourceEntryID { row["meeting_id"] = id.uuidString }
+        if let revisit = decision.revisitDate { row["revisit"] = ISO8601DateFormatter().string(from: revisit) }
+        if let note = decision.reversedNote { row["reversed_note"] = note }
+        return row
     }
 
     static let person = Tool(
@@ -382,6 +450,17 @@ enum MCPTools {
             let summary = MeetingPrepWatcher.summarySection(of: entry.text) ?? ""
             return "\(iso.string(from: entry.date)) \(entry.title) (id \(entry.id.uuidString)): \(summary)"
         }
+        func decisionLine(_ decision: Decision) -> String {
+            var text = (decision.reversed ? "Reversed: " : "Decided: ") + decision.text
+            if let why = decision.why { text += " — because \(why)" }
+            if let by = decision.decidedBy { text += " (\(by))" }
+            if let quote = decision.quote { text += " — \"\(quote)\"" }
+            return text + " [\(decision.sourceTitle), \(iso.string(from: decision.date))]"
+        }
+        @MainActor func decisions(inMeetings ids: Set<UUID>) -> [Decision] {
+            DecisionStore.shared.decisions.filter { $0.sourceEntryID.map(ids.contains) ?? false }
+                .sorted { $0.date > $1.date }
+        }
         func overdueFirst(_ items: [Commitment]) -> [Commitment] {
             items.sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
         }
@@ -406,6 +485,7 @@ enum MCPTools {
             return pack(kind: "person", name: person, sections: [
                 .init(key: "i_owe_them", items: overdueFirst(buckets.filter(\.isMine)).map(line)),
                 .init(key: "they_owe_me", items: overdueFirst(buckets.filter { !$0.isMine }).map(line)),
+                .init(key: "decisions", items: decisions(inMeetings: Set(withThem.map(\.id))).prefix(15).map(decisionLine)),
                 .init(key: "recent_meetings", items: withThem.prefix(10).map(meetingLine)),
             ], extra: extra)
         }
@@ -419,6 +499,7 @@ enum MCPTools {
             let open = CommitmentStore.shared.commitments.filter { !$0.done && ($0.sourceEntryID.map(ids.contains) ?? false) }
             return pack(kind: "project", name: project.name, sections: [
                 .init(key: "open_promises", items: overdueFirst(open).map(line)),
+                .init(key: "decisions", items: decisions(inMeetings: ids).prefix(20).map(decisionLine)),
                 .init(key: "recent_meetings", items: inIt.prefix(10).map(meetingLine)),
             ], extra: [:])
         }
@@ -426,11 +507,13 @@ enum MCPTools {
 
         // A topic: meetings that mention it, and the promises they produced.
         let hits = SemanticSearch.shared.rankMeetings(about, among: meetings, limit: 10).map(\.entry)
-        guard !hits.isEmpty else { return ["found": false, "kind": "topic"] }
+        let decided = DecisionRules.search(about, in: DecisionStore.shared.decisions, limit: 15)
+        guard !hits.isEmpty || !decided.isEmpty else { return ["found": false, "kind": "topic"] }
         let ids = Set(hits.map(\.id))
         let open = CommitmentStore.shared.commitments.filter { !$0.done && ($0.sourceEntryID.map(ids.contains) ?? false) }
         return pack(kind: "topic", name: about, sections: [
             .init(key: "open_promises", items: overdueFirst(open).map(line)),
+            .init(key: "decisions", items: decided.map(decisionLine)),
             .init(key: "meetings", items: hits.prefix(10).map(meetingLine)),
         ], extra: [:])
     }

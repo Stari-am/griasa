@@ -43,5 +43,21 @@
     {"quote": "Если будет запись, скину ссылку.", "note": "Conditional small talk during the break."},
     {"quote": "I'd want to double check it properly, it was a ten-minute query.", "note": "A wish to re-check, not a commitment; nobody asks for it."},
     {"quote": "Then you and Maya decide on the budget.", "note": "Tom hands the decision back; not a task anyone takes."}
+  ],
+  "decisions": [
+    {"text": "\"API contract first\" is a working rule for Q1 projects that cross backend and mobile", "by": "Alex", "quote": "Let's make \"API contract first\" a working rule for Q1 projects that cross backend and mobile.", "reversed": false},
+    {"text": "Anything sales want that is not on the roadmap goes through Maya, default answer is \"Q2 candidate\"", "by": "Maya", "quote": "anything sales want that's not on this roadmap goes through me", "reversed": false},
+    {"text": "Drop the dedicated Android tablet layouts in Q1; tablets get the phone layout with max width", "by": "Alex", "quote": "we drop the dedicated Android tablet layouts in Q1. Tablets get the phone layout with max width.", "reversed": true},
+    {"text": "API v1 is sunset at the end of June, announced in January", "by": "Alex", "quote": "So: sunset date end of June, announcement in January.", "reversed": false},
+    {"text": "Big v1 integrators get a call, not just an email", "by": "Maya", "quote": "Agreed. Big ones get a call, not an email.", "reversed": false},
+    {"text": "Seller analytics beta for ten sellers by end of Q1 is a stretch goal, not a promise to sales", "by": "Alex", "quote": "Let's put it as \"beta for ten sellers by end of Q1, stretch goal\". Not a promise to sales.", "reversed": false},
+    {"text": "The churn prediction model waits until Q2 at the earliest", "by": "Alex", "quote": "Yes, Q2 at the earliest.", "reversed": false},
+    {"text": "Shopnest is Q2 unless the call changes our mind", "by": "Alex", "quote": "Okay. So Shopnest is Q2 unless the call changes our mind.", "reversed": false},
+    {"text": "Entitlements are a dependency: they come before the new Pro launch", "by": "Maya", "quote": "Agreed. It belongs in the deck as a dependency anyway", "reversed": false},
+    {"text": "Keep the dedicated Android tablet layouts; the earlier decision to drop them is void", "by": "Alex", "quote": "So, decision reversed: we keep the tablet layouts.", "reversed": false},
+    {"text": "A dedicated warehouse mode for tablets is not in Q1; fix the crashes and learn how sellers use tablets first", "by": "Alex", "quote": "I like it, but let's not put it into Q1 right now.", "reversed": false},
+    {"text": "Kotlin Multiplatform goes on the Q2 candidate list, not Q1", "by": "Alex", "quote": "Let's put it on the Q2 candidate list, not Q1.", "reversed": false},
+    {"text": "If the Q1 plan slips, scheduled changes go first, then undo", "by": "Alex", "quote": "Then the first thing to slip is scheduled changes, then undo.", "reversed": false},
+    {"text": "A data check becomes part of the template before big roadmap decisions", "by": "Alex", "quote": "Agreed. Let's make it part of the template for the next session.", "reversed": false}
   ]
 }

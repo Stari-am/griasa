@@ -248,9 +248,10 @@ enum CommitmentExtractor {
         // the notes. Only looked up when it can matter.
         var raw: String?
         var mapActions: [LongMeetingMap.MapAction]?
-        if let sourceEntryID, let path = await MainActor.run(body: {
-            HistoryStore.shared.entries.first { $0.id == sourceEntryID }?.filePath
-        }) {
+        let entryPath: String? = await MainActor.run {
+            sourceEntryID.flatMap { id in HistoryStore.shared.entries.first { $0.id == id }?.filePath }
+        }
+        if let path = entryPath {
             if markdown.count > 4_000 { raw = MeetingTranscriber.rawTranscript(besideNotes: path) }
             // Notes made in parts brought their promises with them, already
             // quoted and attributed; asking again would only be less accurate.
@@ -264,6 +265,13 @@ enum CommitmentExtractor {
             participants: participants, myName: myName,
             sourceTitle: sourceTitle, sourceEntryID: sourceEntryID,
             meetingDate: meetingDate, requireLocal: requireLocal)
+        // The decisions of the same meeting, from the same text, under the same
+        // local-only rule. Their failure never costs the promises.
+        await DecisionExtractor.extract(
+            markdown: markdown, rawTranscript: raw ?? entryPath.flatMap(MeetingTranscriber.rawTranscript(besideNotes:)),
+            participants: participants, myName: myName, sourceTitle: sourceTitle,
+            sourceEntryID: sourceEntryID, meetingDate: meetingDate, requireLocal: requireLocal,
+            promises: found.commitments.map(\.text))
         guard !found.commitments.isEmpty else { return 0 }
 
         return await MainActor.run {

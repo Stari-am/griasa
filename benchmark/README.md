@@ -41,6 +41,54 @@ Each folder holds:
   and `traps`: lines that look like promises and are not, each with its `quote`
   and a `note` saying why.
 
+## What counts as a decision
+
+`gold.json` also holds `decisions`: the choices the people in the meeting settled
+on, marked by hand, each with `text`, `by` (who made the call, or `null` when it
+was agreed together), `quote` (exact words of the transcript where it is decided)
+and `reversed`.
+
+A decision is a choice the participants settled: "we go with X", "we drop Y",
+"the launch moves to May", "Pro tier is removed". It is not a task someone takes
+on (that is a promise), a proposal still being argued, an opinion, a question left
+open or a status report. Putting a topic off to a later session ("not this
+quarter", "we decide it on Monday") is a decision only when the line itself
+settles it, such as "Shopnest is Q2 unless the call changes our mind".
+
+A decision that is taken back later in the same meeting stays in the list with
+`"reversed": true`. There is one: the Android tablet layouts in `d`, dropped at
+13 minutes and kept again at 74. The choice that replaces it, keeping them, is its
+own decision, not reversed.
+
+| Folder | Decisions | Reversed |
+|---|---:|---:|
+| `a-webhooks-sync-ru` | 6 | 0 |
+| `b-onboarding-review-en` | 7 | 0 |
+| `c-sprint-incident-ru` | 15 | 0 |
+| `d-roadmap-q1-mixed` | 14 | 1 |
+| `e-customer-escalation-en` | 12 | 0 |
+| `f-localisation-uk` | 10 | 0 |
+
+The list is the clearest decisions, not every line that sounds like one, and the
+promise scorer does not read it.
+
+`Griasa --decision-benchmark benchmark/meetings [--cloud <provider>]` runs decision
+extraction on each meeting and scores it against this list: a found decision
+matches by its quote, or failing that by the words of its text. It writes
+`dist/decision-benchmark-<date>/RESULTS.md`. First results:
+
+| Model | Recall | Precision |
+|---|---:|---:|
+| Griasa's own local model (Qwen3.5 9B) | 58% | 42% |
+| Cloud reference (Codex CLI), five meetings | 73% | 58% |
+
+Precision is understated: the list above is deliberately conservative, and some
+of what the models found and the list leaves out are real decisions (a batch
+size, a send time). The local model's weakest meeting is `d`, the long bilingual
+one, where it lists tasks as decisions; the reversed decision there was not
+caught by either model. The cloud run timed out on `c` before the time limit for
+long meetings was raised.
+
 ## What counts as a promise
 
 Someone taking on a specific piece of work: "I'll send the list by Thursday",

@@ -26,6 +26,11 @@ struct Person: Identifiable, Codable, Equatable {
     /// Handles in systems that expose no address: "linear", "slack", "github".
     var handles: [String: String] = [:]
 
+    /// Someone who reports to the user. Marked by hand in People: Griasa never
+    /// guesses who works for whom, and the *My team* view is only as right as
+    /// this flag.
+    var isDirectReport = false
+
     /// Decoded explicitly rather than by synthesis. Swift's generated decoder is
     /// the wrong tool for a file that already exists on disk without these keys:
     /// whether a missing key falls back to a property's default is a subtlety
@@ -41,6 +46,7 @@ struct Person: Identifiable, Codable, Equatable {
         dossierDate = try container.decodeIfPresent(Date.self, forKey: .dossierDate)
         emails = try container.decodeIfPresent([String].self, forKey: .emails) ?? []
         handles = try container.decodeIfPresent([String: String].self, forKey: .handles) ?? [:]
+        isDirectReport = try container.decodeIfPresent(Bool.self, forKey: .isDirectReport) ?? false
     }
 
     init(name: String, notes: String = "", emails: [String] = [], handles: [String: String] = [:]) {
@@ -88,6 +94,8 @@ struct Person: Identifiable, Codable, Equatable {
         for (system, handle) in other.handles where merged.handles[system] == nil {
             merged.handles[system] = handle
         }
+        // One record said this person reports to the user: the merged one does too.
+        merged.isDirectReport = isDirectReport || other.isDirectReport
         return merged
     }
 }

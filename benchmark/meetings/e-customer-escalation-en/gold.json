@@ -38,5 +38,19 @@
     {"quote": "That's what I'll tell my CEO.", "note": "Talk, not a task."},
     {"quote": "Let's decide that on the Monday call, not today.", "note": "Deferred: the waiting room is decided later, nobody takes a task now."},
     {"quote": "Let's take this to the architecture review on Thursday.", "note": "Deferred: the stock cache is a platform trade-off for the review, no owner."}
+  ],
+  "decisions": [
+    {"text": "The oversold orders are cancelled with a voucher", "by": "Rachel", "quote": "We'll cancel them with a voucher. I'll decide the amount with marketing today.", "reversed": false},
+    {"text": "Marcus does not rewrite the ERP connector before Thursday; the rewrite waits until after the promo season", "by": "Marcus", "quote": "Okay, scrap the rewrite, I won't rewrite the connector before Thursday.", "reversed": false},
+    {"text": "Rate limit on the connector's API key is set at 150 requests per second", "by": "Daniel", "quote": "I'd set the limit at a hundred and fifty.", "reversed": false},
+    {"text": "A low-stock buffer is used for promo products, better to show \"sold out\" than oversell", "by": "Rachel", "quote": "For promo products, that's fine. Better to say \"sold out\" than to sell something we don't have.", "reversed": false},
+    {"text": "No dedicated engineer for Harbor Lane; escalation number and an on-call brief instead", "by": "Alex", "quote": "Rachel, honestly, no, not as a permanent arrangement.", "reversed": false},
+    {"text": "Weekly Monday call with Harbor Lane until the end of January", "by": "Maya", "quote": "Then I'll set up a weekly Monday call with your team until the end of January, starting next Monday.", "reversed": false},
+    {"text": "We do not cover the vouchers Harbor Lane gave to customers", "by": "Maya", "quote": "Rachel, I'm sorry, but we can't cover the vouchers directly.", "reversed": false},
+    {"text": "No goodwill refund of all promo orders, only the duplicate charges are refunded", "by": "Alex", "quote": "I want to be straight with you: we can't do that.", "reversed": false},
+    {"text": "Promo prices are pushed the evening before, so only stock changes during the Black Friday peak", "by": "Marcus", "quote": "We usually push the promo prices at six in the morning, an hour before. We can do it the evening before.", "reversed": false},
+    {"text": "The Black Friday email goes out in waves instead of all at once", "by": "Rachel", "quote": "Okay. Waves it is. It's really not optional anymore, is it.", "reversed": false},
+    {"text": "Argue for treating Saturday as an availability breach and a service credit", "by": "Alex", "quote": "I agree. Argue for it.", "reversed": false},
+    {"text": "A full resync after an integration incident becomes a step in the incident runbook", "by": "Alex", "quote": "Agreed. Let's put it in our runbook as a step for integration incidents.", "reversed": false}
   ]
 }

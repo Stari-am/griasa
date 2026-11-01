@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+**Decisions.** After each meeting Griasa also keeps the decisions taken in it:
+what was settled, the reason, who made the call, the options not chosen, and the
+words it was decided in (a decision whose words are not in the transcript is
+dropped). A new Decisions tab lists them with search, "look at again" dates, and
+"mark as reversed"; deleting a meeting deletes its decisions. Assistants get
+`list_decisions` and a decisions section in `get_context`, and the weekly review
+prompt includes the week's decisions. On the new decision benchmark the local
+model finds 58% of the marked decisions at 42% precision, the cloud reference
+73% at 58%; a list from a local model is noisier, and a wrong entry is one
+right-click away from gone.
+
+**My team.** Switch on *Reports to me* for a person in People, and the My team
+tab shows what each of your reports owes you, overdue first, with when you last
+met. *Nudge* copies a short check-in about those promises, in Russian, Ukrainian
+or English to match them. `list_commitments` takes `team_only` for assistants.
+
 ## 1.0.23 — 2026-11-01
 
 **Conversations.** A new tab imports chat history (today a Telegram Desktop

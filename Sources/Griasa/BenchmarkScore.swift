@@ -40,10 +40,76 @@ enum BenchmarkScore {
         var note: String
     }
 
-    /// `gold.json`.
+    /// One decision in `gold.json`: what was settled, who made the call (nil
+    /// when it was agreed together), the words it was taken in, and whether the
+    /// same meeting took it back.
+    struct GoldDecision: Codable, Equatable {
+        var text: String
+        var by: String?
+        var quote: String
+        var reversed: Bool
+    }
+
+    /// `gold.json`. Decisions are optional so a gold file written before they
+    /// were labelled still loads.
     struct GoldFile: Codable, Equatable {
         var promises: [Gold]
         var traps: [Trap]
+        var decisions: [GoldDecision]?
+    }
+
+    /// One decision the app found.
+    struct DecisionPrediction: Equatable {
+        var text: String
+        var quote: String?
+        var reversed: Bool
+    }
+
+    struct DecisionResult: Equatable {
+        var gold: Int
+        var predicted: Int
+        var matched: Int
+        /// Matched pairs that agree on whether the decision was reversed.
+        var reversedCorrect: Int
+        /// Gold decisions marked reversed, and how many of them were found.
+        var goldReversed: Int
+        var reversedFound: Int
+
+        var recall: Double? { gold == 0 ? nil : Double(matched) / Double(gold) }
+        var precision: Double? { predicted == 0 ? nil : Double(matched) / Double(predicted) }
+
+        static func total(_ results: [DecisionResult]) -> DecisionResult {
+            DecisionResult(gold: results.reduce(0) { $0 + $1.gold }, predicted: results.reduce(0) { $0 + $1.predicted },
+                           matched: results.reduce(0) { $0 + $1.matched },
+                           reversedCorrect: results.reduce(0) { $0 + $1.reversedCorrect },
+                           goldReversed: results.reduce(0) { $0 + $1.goldReversed },
+                           reversedFound: results.reduce(0) { $0 + $1.reversedFound })
+        }
+    }
+
+    /// Pairs predictions with gold decisions, one to one: first by quote (the
+    /// same words, as for promises), then by the words of the text.
+    static func scoreDecisions(gold: [GoldDecision], predicted: [DecisionPrediction]) -> DecisionResult {
+        var usedGold = Set<Int>(), usedPrediction = Set<Int>()
+        var pairs: [(Int, Int)] = []
+        for (p, prediction) in predicted.enumerated() {
+            guard let quote = prediction.quote else { continue }
+            if let g = gold.indices.first(where: { !usedGold.contains($0) && sameQuote(gold[$0].quote, quote) }) {
+                usedGold.insert(g); usedPrediction.insert(p); pairs.append((g, p))
+            }
+        }
+        for (p, prediction) in predicted.enumerated() where !usedPrediction.contains(p) {
+            let best = gold.indices.filter { !usedGold.contains($0) }
+                .map { ($0, jaccard(gold[$0].text, prediction.text)) }
+                .max { $0.1 < $1.1 }
+            if let best, best.1 >= minJaccard {
+                usedGold.insert(best.0); usedPrediction.insert(p); pairs.append((best.0, p))
+            }
+        }
+        let reversedCorrect = pairs.filter { gold[$0.0].reversed == predicted[$0.1].reversed }.count
+        return DecisionResult(gold: gold.count, predicted: predicted.count, matched: pairs.count,
+                              reversedCorrect: reversedCorrect, goldReversed: gold.filter(\.reversed).count,
+                              reversedFound: pairs.filter { gold[$0.0].reversed && predicted[$0.1].reversed }.count)
     }
 
     /// One promise the app found.

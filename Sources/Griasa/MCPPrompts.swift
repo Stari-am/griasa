@@ -31,10 +31,11 @@ enum MCPPrompts {
                arguments: [("days", "How many days ahead to look at meetings. Default 7.", false)]) { args in
             let days = args["days"].flatMap { Int($0) }.map { min(max($0, 1), 14) } ?? 7
             return """
-            Give me my weekly review. Call list_commitments, then list_upcoming_meetings with \
-            days \(days). Show: what is overdue, what I owe (grouped by person), what I'm \
-            waiting on from others, and for each meeting ahead what I should bring to it. Keep \
-            it to one screen. Don't change or close anything.
+            Give me my weekly review. Call list_commitments, list_decisions for the last \
+            seven days, then list_upcoming_meetings with days \(days). Show: what is overdue, \
+            what I owe (grouped by person), what I'm waiting on from others, what was decided \
+            this week, and for each meeting ahead what I should bring to it. Keep it to one \
+            screen. Don't change or close anything.
             """
         },
         Prompt(name: "follow_up", title: "Write the follow-up for a meeting",

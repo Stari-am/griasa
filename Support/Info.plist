@@ -23,7 +23,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Optional convenience: reads the current browser tab's address so a reminder can link back to the page. If you decline, reminders work the same — just without the link.</string>
+	<string>Optional conveniences: reads the current browser tab’s address so a reminder can link back to the page, and writes the morning brief to a note in Apple Notes when you turn that on. If you decline, both features work without it.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Needed only by the {slot} snippet placeholder to read your calendar and find free time for meeting proposals. Nothing is created or modified, and every other snippet works without it.</string>
 	<key>NSHighResolutionCapable</key>

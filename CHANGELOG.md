@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+**Today, and the morning brief.** A new Today tab is the screen to start from:
+today's meetings with what you and each table owe each other, your overdue
+promises and what is due today, what your team owes you and is late on,
+decisions to look at again, and promises that look done — then every part of
+Griasa as one-click buttons, so features that hide behind a hotkey or a menu
+item are in plain sight. Every morning (8:00 on weekdays, configurable in
+Settings → Meetings → Morning brief, or the first minute after it that the Mac
+is awake) a banner sums the day up and opens Today without taking focus. The
+brief is built from what Griasa already keeps, with no model and nothing sent
+anywhere. With *Also write it to Apple Notes* on, the same brief is written to
+the note "Griasa — Today" so it is on your phone; macOS asks once for permission
+to use Notes.
+
 ## 1.0.24 — 2026-11-01
 
 **Decisions.** After each meeting Griasa also keeps the decisions taken in it:

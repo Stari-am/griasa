@@ -234,6 +234,12 @@ struct MenuView: View {
                     .foregroundStyle(.secondary)
                 Button {
                     MenuBarPanel.dismiss()
+                    HubController.shared.open(.today)
+                } label: {
+                    Text("☀️  Today")
+                }
+                Button {
+                    MenuBarPanel.dismiss()
                     HubController.shared.open(.commitments)
                 } label: {
                     HStack {

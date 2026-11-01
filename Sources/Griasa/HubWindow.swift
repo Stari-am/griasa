@@ -10,6 +10,7 @@ enum HubTab: String, Identifiable {
     case askProject
     case history
     case welcome
+    case today
     case commitments
     case decisions
     case team
@@ -32,6 +33,7 @@ enum HubTab: String, Identifiable {
         case .askProject: return "🗂 Ask Project"
         case .history: return "🕘 History"
         case .welcome: return "👋 Welcome"
+        case .today: return "☀️ Today"
         case .commitments: return "✅ Commitments"
         case .decisions: return "🪧 Decisions"
         case .team: return "🧑‍🤝‍🧑 My team"
@@ -117,6 +119,7 @@ final class HubController: NSObject, ObservableObject, NSWindowDelegate {
         case .askProject: close(.askProject)
         case .history: close(.history)
         case .welcome: close(.welcome)
+        case .today: close(.today)
         case .commitments: close(.commitments)
         case .decisions: close(.decisions)
         case .team: close(.team)
@@ -274,6 +277,8 @@ struct HubView: View {
             HistoryView().environmentObject(HistoryStore.shared)
         case .welcome:
             OnboardingView()
+        case .today:
+            TodayView()
         case .commitments:
             CommitmentsView()
         case .decisions:

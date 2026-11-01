@@ -188,6 +188,8 @@ final class AppState: ObservableObject {
             onCapture: { action in Task { @MainActor in CaptureController.run(action) } })
         SnippetExpander.shared.start()
         MeetingPrepWatcher.shared.start()
+        Notifier.install()
+        DailyBriefController.shared.start()
         MCPServer.shared.reconcile()
         if autoRecordOnLaunch {
             Task { await startRecording() }

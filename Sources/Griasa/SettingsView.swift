@@ -154,6 +154,11 @@ private struct RecordingSettings: View {
     @ObservedObject private var roster = ParticipantRoster.shared
     @AppStorage("prepBriefEnabled") private var prepBriefEnabled = true
     @AppStorage("prepLeadMinutes") private var prepLeadMinutes = 5
+    @AppStorage(DailyBriefController.enabledKey) private var dailyBriefEnabled = true
+    @AppStorage(DailyBriefController.timeKey) private var dailyBriefTime = "08:00"
+    @AppStorage(DailyBriefController.weekdaysOnlyKey) private var dailyBriefWeekdaysOnly = true
+    @AppStorage(DailyBriefController.notesKey) private var dailyBriefToNotes = true
+    @ObservedObject private var dailyBrief = DailyBriefController.shared
     @AppStorage(RecordingStorage.retentionKey) private var audioRetentionDays = 0
     @AppStorage(RecordingStorage.byProjectKey) private var recordingsByProject = false
     @State private var audioUsage: (total: Int64, freeable: Int64, recordings: Int)?
@@ -314,6 +319,28 @@ private struct RecordingSettings: View {
                     .help("Shortly before a calendar event with participants or a call link, the Prep tab opens quietly (without stealing focus): who's on the call, last meeting's summary, open promises. Needs Calendar access — granted on first use of “Prep Next Meeting” or the {slot} snippet.")
                 Stepper("Lead time: \(prepLeadMinutes) min", value: $prepLeadMinutes, in: 1...30)
                     .help("How many minutes before the meeting the brief appears.")
+            }
+            Section("Morning brief") {
+                Toggle("Show the day's brief every morning", isOn: $dailyBriefEnabled)
+                    .help("At the time below — or the first minute after it that the Mac is awake — a banner says what the day holds and the Today tab opens quietly: today's meetings with what is owed across each table, overdue promises on both sides, decisions to look at again. Built from what Griasa already keeps; no model, nothing sent anywhere.")
+                if dailyBriefEnabled {
+                    DatePicker("Time", selection: Binding(
+                        get: {
+                            let (h, m) = DailyBrief.clock(dailyBriefTime)
+                            return Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) ?? Date()
+                        },
+                        set: {
+                            let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                            dailyBriefTime = String(format: "%02d:%02d", c.hour ?? 8, c.minute ?? 0)
+                        }), displayedComponents: .hourAndMinute)
+                    Toggle("Weekdays only", isOn: $dailyBriefWeekdaysOnly)
+                    Toggle("Also write it to Apple Notes", isOn: $dailyBriefToNotes)
+                        .help("The note “Griasa — Today” in the Notes folder “Griasa”, rewritten each morning, so the brief is on your phone. It goes wherever your Notes sync: with iCloud and Advanced Data Protection on, it is end-to-end encrypted; without it, Apple holds the keys.")
+                    if let error = dailyBrief.notesError, dailyBriefToNotes {
+                        Text("Notes: \(error)").font(.caption).foregroundStyle(.red)
+                    }
+                    Button("Show today's brief now") { HubController.shared.open(.today) }
+                }
             }
             Section("Folders") {
                 TextField("Transcript mirror folder", text: $state.transcriptMirrorFolder)

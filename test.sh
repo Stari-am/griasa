@@ -54,6 +54,7 @@ swiftc -O \
   Sources/Griasa/WordSearch.swift \
   Sources/Griasa/DecisionModel.swift \
   Sources/Griasa/TeamDigest.swift \
+  Sources/Griasa/DailyBrief.swift \
   Sources/Griasa/SearchChunks.swift \
   Sources/Griasa/HybridRank.swift \
   Sources/Griasa/SearchVectors.swift \
@@ -111,6 +112,7 @@ swiftc -O \
   Tests/WordSearchChecks.swift \
   Tests/HybridSearchChecks.swift \
   Tests/DecisionChecks.swift \
+  Tests/DailyBriefChecks.swift \
   Tests/SearchIndexChecks.swift \
   Tests/main.swift \
   -o "$BIN"

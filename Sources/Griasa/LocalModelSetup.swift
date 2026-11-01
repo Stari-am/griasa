@@ -295,7 +295,7 @@ final class LocalModelSetup: ObservableObject {
         let name = engine == .griasa ? entry.displayName : model
         state = .ready(engine: engine, model: model, displayName: name)
         if previous == nil, !downloaded, engine == .ollama || engine == .lmStudio, onLocalProvider {
-            LocalNotice.post(title: "Local AI is ready",
+            Notifier.post(title: "Local AI is ready",
                           body: "Griasa uses the AI model already on this Mac (\(engine == .ollama ? "Ollama" : "LM Studio")).")
         }
         catchUp()
@@ -439,7 +439,7 @@ final class LocalModelSetup: ObservableObject {
                 // can do that without Settings): the file stays, unannounced.
                 if Task.isCancelled || !onLocalProvider { settleCancelled(); return }
                 apply(engine: .griasa, model: entry.id, entry: entry)
-                LocalNotice.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
+                Notifier.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
                 return
             } catch {
                 waitingForNetwork = false
@@ -476,7 +476,7 @@ final class LocalModelSetup: ObservableObject {
                 if let error = progress.error { state = .failed("Ollama: \(error)"); return }
                 if progress.done {
                     apply(engine: .ollama, model: tag, entry: entry, downloaded: true)
-                    LocalNotice.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
+                    Notifier.post(title: "Local AI is ready", body: "Summaries and promises now work on this Mac.")
                     return
                 }
                 if progress.total > 0 {
@@ -530,7 +530,7 @@ final class LocalModelSetup: ObservableObject {
               let smaller = LocalModelCatalog.smaller(than: failed) else { return }
         steppedDownThisLaunch = true
         defaults.set(smaller.id, forKey: Self.steppedDownIDKey)
-        LocalNotice.post(title: "Local AI switched to a smaller model",
+        Notifier.post(title: "Local AI switched to a smaller model",
                          body: "The AI model needed more memory than this Mac had free; Griasa switched to a smaller one.")
         entry = smaller
         if LlamaInstaller.isDownloaded(smaller) {
@@ -644,21 +644,5 @@ final class LocalModelSetup: ObservableObject {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(String(text.prefix(2000)))
         return recognizer.languageHypotheses(withMaximum: 3)[.english] ?? 0
-    }
-}
-
-/// A quiet banner for the two moments that matter (a runtime was found; the
-/// download finished). Asks for permission the first time; a refusal or any
-/// failure just means no banner.
-private enum LocalNotice {
-    static func post(title: String, body: String) {
-        let center = UNUserNotificationCenter.current()
-        Task {
-            guard (try? await center.requestAuthorization(options: [.alert])) == true else { return }
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            try? await center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
-        }
     }
 }

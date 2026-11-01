@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.24 — 2026-11-01
 
 **Decisions.** After each meeting Griasa also keeps the decisions taken in it:
 what was settled, the reason, who made the call, the options not chosen, and the

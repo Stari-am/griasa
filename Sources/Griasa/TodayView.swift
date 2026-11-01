@@ -88,42 +88,83 @@ struct TodayView: View {
         }
     }
 
-    /// Everything Griasa does, as a grid of buttons.
+    /// Everything Griasa does, as small widgets: an icon, a name, and one live
+    /// line — so the grid answers "what is there" and "how is it" at once.
     private var launcher: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let commitments = CommitmentStore.shared
+        let decisions = DecisionStore.shared
+        let mineOpen = commitments.openMine.count
+        let overdue = brief.day?.overdueMine.count ?? 0
+        let teamLate = brief.day?.overdueTeam.reduce(0) { $0 + $1.items.count } ?? 0
+        let reports = PersonStore.shared.directReports.count
+        let next = brief.day?.meetings.first { $0.start > Date() }
+        let meetingCount = HistoryStore.shared.entries.filter { $0.kind == .meeting }.count
+        return VStack(alignment: .leading, spacing: 10) {
             Divider().padding(.vertical, 4)
             Text("Griasa").font(.headline)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], alignment: .leading, spacing: 8) {
-                tile(state.isRecording ? "Stop recording" : "Record a meeting",
-                     systemImage: state.isRecording ? "stop.circle" : "record.circle") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], alignment: .leading, spacing: 10) {
+                widget(state.isRecording ? "Recording" : "Record",
+                       detail: state.recordingStartedAt.map { "since \($0.formatted(date: .omitted, time: .shortened)) · stop" }
+                           ?? "Mic + Mac audio",
+                       systemImage: state.isRecording ? "stop.fill" : "record.circle", tint: .red) {
                     Task { state.isRecording ? await state.stopRecording() : await state.startRecording() }
                 }
-                tile("Prep next meeting", systemImage: "list.clipboard") { MeetingPrepWatcher.shared.prepNextMeeting() }
-                tile("Commitments", systemImage: "checklist") { HubController.shared.open(.commitments) }
-                tile("Decisions", systemImage: "signpost.right.and.left") { HubController.shared.open(.decisions) }
-                tile("My team", systemImage: "person.3") { HubController.shared.open(.team) }
-                tile("People", systemImage: "person.crop.rectangle.stack") { HubController.shared.open(.people) }
-                tile("Conversations", systemImage: "bubble.left.and.bubble.right") { HubController.shared.open(.conversations) }
-                tile("Ask a project", systemImage: "folder.badge.questionmark") { AskProjectWindowController.shared.show() }
-                tile("Remind me", systemImage: "alarm") { ReminderComposer.shared.show(text: "") }
-                tile("New document", systemImage: "doc.badge.plus") { HubController.shared.open(.newDocument) }
-                tile("Import notes", systemImage: "square.and.arrow.down") { HubController.shared.open(.importNotes) }
-                tile("History", systemImage: "clock.arrow.circlepath") { HistoryWindowController.shared.show() }
-                tile("Settings", systemImage: "gearshape") { openSettings() }
+                widget("Next meeting",
+                       detail: next.map { "\($0.start.formatted(date: .omitted, time: .shortened)) \($0.title)" } ?? "Brief before the call",
+                       systemImage: "list.clipboard", tint: .blue) { MeetingPrepWatcher.shared.prepNextMeeting() }
+                widget("Commitments", detail: overdue > 0 ? "\(mineOpen) open · \(overdue) overdue" : "\(mineOpen) open",
+                       systemImage: "checklist", tint: overdue > 0 ? .red : .green) { HubController.shared.open(.commitments) }
+                widget("Decisions",
+                       detail: decisions.toRevisit.isEmpty ? "\(decisions.decisions.count) kept"
+                           : "\(decisions.toRevisit.count) to look at again",
+                       systemImage: "signpost.right.and.left", tint: .purple) { HubController.shared.open(.decisions) }
+                widget("My team",
+                       detail: reports == 0 ? "Mark who reports to you" : teamLate > 0 ? "\(teamLate) late from \(reports)" : "\(reports) people, nothing late",
+                       systemImage: "person.3.fill", tint: .orange) { HubController.shared.open(.team) }
+                widget("People", detail: "\(PersonStore.shared.allNames.count) known",
+                       systemImage: "person.crop.rectangle.stack", tint: .teal) { HubController.shared.open(.people) }
+                widget("Conversations", detail: "Chat promises",
+                       systemImage: "bubble.left.and.bubble.right.fill", tint: .cyan) { HubController.shared.open(.conversations) }
+                widget("Ask a project", detail: "\(ProjectStore.shared.projects.count) projects",
+                       systemImage: "folder.badge.questionmark", tint: .indigo) { AskProjectWindowController.shared.show() }
+                widget("Remind me", detail: "Text → reminder",
+                       systemImage: "alarm.fill", tint: .yellow) { ReminderComposer.shared.show(text: "") }
+                widget("New document", detail: "From a template",
+                       systemImage: "doc.badge.plus", tint: .mint) { HubController.shared.open(.newDocument) }
+                widget("Import notes", detail: "Zoom, Meet, Notion",
+                       systemImage: "square.and.arrow.down.fill", tint: .brown) { HubController.shared.open(.importNotes) }
+                widget("History", detail: "\(meetingCount) meetings",
+                       systemImage: "clock.arrow.circlepath", tint: .gray) { HistoryWindowController.shared.show() }
+                widget("Settings", detail: "Models, hotkeys",
+                       systemImage: "gearshape.fill", tint: .gray) { openSettings() }
             }
             Text("Dictation: hold \(state.hotkeyChoice.displayName) and speak, in any app.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 
-    private func tile(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func widget(_ title: String, detail: String, systemImage: String, tint: Color,
+                        action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 6).padding(.horizontal, 8)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
-                .contentShape(Rectangle())
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(tint.gradient))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.callout.weight(.semibold)).lineLimit(1)
+                    Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.045)))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+        .help(detail)
     }
 }

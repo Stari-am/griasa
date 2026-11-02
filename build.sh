@@ -71,12 +71,13 @@ for candidate in "${CANDIDATES[@]}"; do
         break
     fi
 done
-if [[ -n "$IDENTITY" ]]; then
-    codesign --force --sign "$IDENTITY" "$APP"
-else
-    echo "warning: none of ${CANDIDATES[*]} found — ad-hoc signing (permissions will reset on each rebuild)"
-    codesign --force --sign - "$APP"
-fi
+# The desktop widget, built into the bundle and signed before the app around it.
+Support/build-widget.sh "$APP" "$ARCH"
+SIGN="${IDENTITY:--}"
+[[ -z "$IDENTITY" ]] && echo "warning: none of ${CANDIDATES[*]} found — ad-hoc signing (permissions will reset on each rebuild)"
+codesign --force --sign "$SIGN" --entitlements Support/GriasaWidget.entitlements \
+    "$APP/Contents/PlugIns/GriasaWidget.appex"
+codesign --force --sign "$SIGN" --entitlements Support/Griasa.entitlements "$APP"
 
 echo
 echo "Built $PWD/$APP"

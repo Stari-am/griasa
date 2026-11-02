@@ -150,6 +150,10 @@ struct MenuView: View {
             }
 
             HStack {
+                Button("☀️ Today") {
+                    MenuBarPanel.dismiss()
+                    HubController.shared.open(.today)
+                }
                 Button("History…") { HistoryWindowController.shared.show() }
                 Button("Recordings Folder") { state.openRecordingsFolder() }
             }
@@ -232,12 +236,6 @@ struct MenuView: View {
                 Text("Assistant")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button {
-                    MenuBarPanel.dismiss()
-                    HubController.shared.open(.today)
-                } label: {
-                    Text("☀️  Today")
-                }
                 Button {
                     MenuBarPanel.dismiss()
                     HubController.shared.open(.commitments)

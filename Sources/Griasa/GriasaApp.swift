@@ -187,6 +187,14 @@ private struct MenuBarLabel: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// `griasa://open/<tab>` — what a tap on the desktop widget sends.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let name = WidgetSnapshot.tab(in: url), let tab = HubTab(rawValue: name) else { continue }
+            Task { @MainActor in HubController.shared.open(tab) }
+        }
+    }
+
     /// Set by `--open <tab>` before the app starts; opened once bootstrap has
     /// had a chance to load the stores, so the tab isn't drawn empty.
     nonisolated(unsafe) static var tabToOpenOnLaunch: HubTab?

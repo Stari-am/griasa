@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+**Griasa on the desktop.** A "Griasa — Today" widget for the desktop and
+Notification Center, in three sizes: the next meeting and the overdue counts;
+the same with your and your team's top overdue items; or the whole day —
+meetings, overdue, due today, late from your team, decisions to look at again.
+It reads a small file the app writes into a shared folder whenever the brief
+changes — no network, no model, no access to your history — and a click opens
+Griasa on the matching tab. Right-click the desktop → Edit Widgets… and search
+for Griasa.
+
+**Today is easier to reach and says more.** The menu has a Today button next
+to History, so the tab is a click away even when no brief banner came up. The
+buttons under the brief are now small cards that show what is in each part:
+open and overdue promises, decisions to look at again, your reports and how many
+are late, the next meeting's time, a timer while recording, and so on.
+`griasa://open/<tab>` links open a tab from anywhere.
+
 ## 1.0.25 — 2026-11-02
 
 **Today, and the morning brief.** A new Today tab is the screen to start from:

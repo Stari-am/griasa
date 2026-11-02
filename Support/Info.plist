@@ -16,6 +16,17 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0.25</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>am.stari.griasa</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>griasa</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>26</string>
 	<key>LSMinimumSystemVersion</key>

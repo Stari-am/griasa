@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import WidgetKit
 
 /// Shows the morning brief once a day: at its time (8:00 on weekdays unless
 /// changed), or the first minute after it that the Mac is awake. A banner says
@@ -20,6 +21,8 @@ final class DailyBriefController: ObservableObject {
     @Published private(set) var notesError: String?
 
     private var timer: Timer?
+    private var lastWidgetWrite: Date?
+    private var lastSnapshot: WidgetSnapshot?
 
     func start() {
         guard timer == nil else { return }
@@ -33,6 +36,9 @@ final class DailyBriefController: ObservableObject {
     }
 
     private func tick() {
+        // The desktop widget's snapshot follows the day every ten minutes,
+        // whether or not the brief itself is switched on.
+        if lastWidgetWrite.map({ Date().timeIntervalSince($0) > 600 }) ?? true { refresh() }
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: Self.enabledKey) as? Bool ?? true else { return }
         let now = Date()
@@ -60,7 +66,31 @@ final class DailyBriefController: ObservableObject {
                                     reports: PersonStore.shared.directReports.map(\.name),
                                     decisions: DecisionStore.shared.decisions)
         day = built
+        writeWidgetSnapshot(built, now: now)
         return built
+    }
+
+    /// Writes what the desktop widget shows into the app group's container,
+    /// and asks the widget to redraw when it changed. Without the app group
+    /// (a build signed without it) there is no container and nothing to do.
+    private func writeWidgetSnapshot(_ day: DailyBrief.Day, now: Date) {
+        lastWidgetWrite = now
+        guard let folder = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetSnapshot.groupID)
+        else { return }
+        var snapshot = WidgetSnapshot(from: day, now: now)
+        // Unchanged apart from the time it was made: no write, no redraw.
+        if var previous = lastSnapshot {
+            previous.generated = snapshot.generated
+            if previous == snapshot { return }
+        }
+        snapshot.generated = now
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(snapshot) else { return }
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? data.write(to: folder.appendingPathComponent(WidgetSnapshot.fileName), options: .atomic)
+        lastSnapshot = snapshot
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     /// Writes this brief into the note "Griasa — Today" in the Notes folder

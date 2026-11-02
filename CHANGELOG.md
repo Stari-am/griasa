@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.25 — 2026-11-02
 
 **Today, and the morning brief.** A new Today tab is the screen to start from:
 today's meetings with what you and each table owe each other, your overdue

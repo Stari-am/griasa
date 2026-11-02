@@ -1,6 +1,6 @@
 {
   "name": "griasa",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "description": "Meetings, promises and people from Griasa on your Mac.",
   "contextFileName": "plugins/griasa/skills/griasa/SKILL.md",
   "mcpServers": {

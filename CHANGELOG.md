@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.26 — 2026-11-02
 
 **Griasa on the desktop.** A "Griasa — Today" widget for the desktop and
 Notification Center, in three sizes: the next meeting and the overdue counts;

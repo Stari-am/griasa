@@ -91,5 +91,40 @@ do {
           meaning: "a broken preference must not stop the brief", saw: "")
 }
 
+// The desktop widget's snapshot and its links.
+do {
+    let now = at(2, 8)
+    let meetings = [
+        DailyBrief.Meeting(title: "1:1 Ivan", start: at(2, 9), end: at(2, 9, 30), attendees: ["Ivan", "A", "B", "C", "D"],
+                           youOwe: 0, theyOwe: 2),
+        DailyBrief.Meeting(title: "Standup", start: at(2, 10), end: at(2, 10, 15), attendees: [], youOwe: 1, theyOwe: 0),
+    ]
+    let late = (1...7).map { Commitment(text: "Late \($0)", owner: "Me", isMine: true, dueDate: at(1, 12), sourceTitle: "") }
+    let day = DailyBrief.make(now: now, meetings: meetings, commitments: late, reports: [], decisions: [], calendar: calendar)
+    let snapshot = WidgetSnapshot(from: day, now: now)
+    check(snapshot.overdue.count == WidgetSnapshot.listLimit && snapshot.overdueCount == 7,
+          rule: "the widget gets a few lines and the full count",
+          meaning: "the file stays small, and the number shown is still the real one",
+          saw: "\(snapshot.overdue.count) lines, count \(snapshot.overdueCount)")
+    check(snapshot.meetings.first?.attendees.count == 4,
+          rule: "a meeting carries at most four names", meaning: "the widget has room for one line", saw: "\(snapshot.meetings.first?.attendees ?? [])")
+    check(snapshot.next(after: at(2, 9, 10))?.title == "1:1 Ivan" && snapshot.next(after: at(2, 9, 31))?.title == "Standup"
+          && snapshot.next(after: at(2, 11)) == nil,
+          rule: "the next meeting stays on screen for half an hour after it starts",
+          meaning: "a meeting in progress is still the one that matters", saw: "")
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let round = try? decoder.decode(WidgetSnapshot.self, from: encoder.encode(snapshot))
+    check(round == snapshot, rule: "the snapshot reads back as written",
+          meaning: "the app writes it and the widget reads it, in different processes", saw: "\(String(describing: round))")
+    check(WidgetSnapshot.tab(in: WidgetSnapshot.link("team")) == "team"
+          && WidgetSnapshot.tab(in: URL(string: "griasa://open/")!) == nil
+          && WidgetSnapshot.tab(in: URL(string: "https://open/team")!) == nil
+          && WidgetSnapshot.tab(in: URL(string: "griasa://other/team")!) == nil,
+          rule: "only griasa://open/<tab> names a tab", meaning: "any app can open a griasa:// link", saw: "")
+}
+
 return failures
 }

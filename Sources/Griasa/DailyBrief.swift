@@ -132,3 +132,24 @@ enum DailyBrief {
         return lines.joined(separator: "\n")
     }
 }
+
+/// Built here rather than beside the type: the widget extension compiles
+/// `WidgetSnapshot` alone, without the brief and the stores it reads.
+extension WidgetSnapshot {
+    init(from day: DailyBrief.Day, now: Date) {
+        generated = now
+        self.day = day.date
+        summary = DailyBrief.summary(day)
+        meetings = day.meetings.map {
+            Meeting(title: $0.title, start: $0.start, attendees: Array($0.attendees.prefix(4)),
+                    youOwe: $0.youOwe, theyOwe: $0.theyOwe)
+        }
+        overdue = day.overdueMine.prefix(Self.listLimit).map(\.text)
+        overdueCount = day.overdueMine.count
+        dueToday = day.dueToday.prefix(Self.listLimit).map(\.text)
+        let late = day.overdueTeam.flatMap { member in member.items.map { "\(member.name): \($0.text)" } }
+        team = Array(late.prefix(Self.listLimit))
+        teamCount = late.count
+        revisit = day.revisit.prefix(Self.listLimit).map(\.text)
+    }
+}

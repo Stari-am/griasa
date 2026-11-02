@@ -38,5 +38,9 @@
 	     without this, no matter what the user granted. -->
 	<key>com.apple.security.personal-information.reminders</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>J3S39L8KJ9.am.stari.griasa</string>
+	</array>
 </dict>
 </plist>

@@ -55,6 +55,7 @@ swiftc -O \
   Sources/Griasa/DecisionModel.swift \
   Sources/Griasa/TeamDigest.swift \
   Sources/Griasa/DailyBrief.swift \
+  Sources/Griasa/WidgetSnapshot.swift \
   Sources/Griasa/SearchChunks.swift \
   Sources/Griasa/HybridRank.swift \
   Sources/Griasa/SearchVectors.swift \

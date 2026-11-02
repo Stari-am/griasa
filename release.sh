@@ -143,9 +143,19 @@ else
   Ship a real reverse-DNS id you own, e.g. RELEASE_BUNDLE_ID=am.stari.griasa ./release.sh"
 fi
 
+# The desktop widget extension, universal like the app.
+print "Building the widget extension…"
+Support/build-widget.sh "$APP" arm64 x86_64
+
 # ── Sign: Hardened Runtime + a secure timestamp, both required to notarize ──
 
 print "Signing…"
+# The extension first: signing the app seals what is inside it.
+codesign --force --sign "$IDENTITY" \
+    --options runtime \
+    --entitlements Support/GriasaWidget.entitlements \
+    --timestamp \
+    "$APP/Contents/PlugIns/GriasaWidget.appex"
 codesign --force --sign "$IDENTITY" \
     --options runtime \
     --entitlements Support/Griasa.entitlements \
@@ -227,6 +237,12 @@ needs "import EventKit"        "com.apple.security.personal-information.calendar
 needs "EKReminder|EKEntityType.reminder" "com.apple.security.personal-information.reminders" "Remind me"
 needs "AVAudioEngine|AVCaptureDevice" "com.apple.security.device.audio-input" "dictation and meeting recording"
 needs "NSAppleScript|osascript"  "com.apple.security.automation.apple-events" "the link back to a browser tab in a reminder"
+needs "forSecurityApplicationGroupIdentifier" "com.apple.security.application-groups" "the desktop widget's data"
+WIDGET_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$APP/Contents/PlugIns/GriasaWidget.appex" 2>/dev/null | plutil -p - 2>/dev/null)
+for key in com.apple.security.app-sandbox com.apple.security.application-groups; do
+    print -- "$WIDGET_ENTITLEMENTS" | grep -q "\"$key\"" || die "the widget extension is not signed with $key — macOS will not load it."
+    print "  ok  widget: $key"
+done
 print
 
 # An entitlement is only half of a permission. The other half is somebody

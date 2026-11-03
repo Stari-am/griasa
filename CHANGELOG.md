@@ -36,6 +36,10 @@ open and overdue promises, decisions to look at again, your reports and how many
 are late, the next meeting's time, a timer while recording, and so on.
 `griasa://open/<tab>` links open a tab from anywhere.
 
+**Today turns over at midnight.** The brief on the Today tab and in the widget
+moves to the new day as soon as the date changes, instead of showing yesterday
+until the next refresh or the morning brief.
+
 **Close promises from Prep.** Ticking a promise on the Prep screen before a
 call now shows at once: the circle turns into a green check and the line is
 struck through, and a second click opens it again. It was already closed in

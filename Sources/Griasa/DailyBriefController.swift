@@ -32,13 +32,19 @@ final class DailyBriefController: ObservableObject {
         timer.tolerance = 10
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        // Midnight, or a Mac woken on another day: the new day shows at once,
+        // not at the next ten-minute refresh or the morning brief.
+        NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
         tick()
     }
 
     private func tick() {
         // The desktop widget's snapshot follows the day every ten minutes,
         // whether or not the brief itself is switched on.
-        if lastWidgetWrite.map({ Date().timeIntervalSince($0) > 600 }) ?? true { refresh() }
+        let stale = day.map { !Calendar.current.isDate($0.date, inSameDayAs: Date()) } ?? false
+        if stale || lastWidgetWrite.map({ Date().timeIntervalSince($0) > 600 }) ?? true { refresh() }
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: Self.enabledKey) as? Bool ?? true else { return }
         let now = Date()

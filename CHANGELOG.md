@@ -18,6 +18,10 @@ open and overdue promises, decisions to look at again, your reports and how many
 are late, the next meeting's time, a timer while recording, and so on.
 `griasa://open/<tab>` links open a tab from anywhere.
 
+**Today turns over at midnight.** The brief on the Today tab and in the widget
+moves to the new day as soon as the date changes, instead of showing yesterday
+until the next refresh or the morning brief.
+
 ## 1.0.25 — 2026-11-02
 
 **Today, and the morning brief.** A new Today tab is the screen to start from:

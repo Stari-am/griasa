@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
@@ -1207,18 +1208,7 @@ private struct SystemSettings: View {
                 searchByMeaning
             }
             Section("Permissions") {
-                permissionRow("Microphone", granted: Permissions.microphoneGranted,
-                              detail: "Dictation and your side of meeting recordings. Without it, all text and screen features (OCR, captures, reminders, presets, projects) still work.")
-                permissionRow("Speech recognition", granted: Permissions.speechGranted,
-                              detail: "Apple's transcriber, used only as a fallback while local Whisper isn't installed. With Whisper set up, everything works without it.")
-                permissionRow("Accessibility", granted: Permissions.accessibilityGranted,
-                              detail: "Global hotkeys, reading your selection, and typing text at the cursor. Without it, every action is still available from the menu bar — use the clipboard or drag a screen region instead of a selection.")
-                permissionRow("Screen recording", granted: Permissions.screenRecordingGranted,
-                              detail: "System audio in meeting recordings, and reading the screen for OCR region / Draft reply. Without it, recordings capture your mic only, and text-selection features still work.")
-                Button("Request Missing Permissions") { Permissions.requestAll() }
-                Text("Each permission unlocks only the features listed next to it — nothing else stops working if you decline one.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                PermissionsList()
             }
 
             Section("Updates") {
@@ -1264,6 +1254,51 @@ private struct SystemSettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Every access Griasa uses, what it is for, and where it stands — checked
+/// again every few seconds while the list is open, so an answer given in
+/// System Settings shows up here without reopening the window.
+private struct PermissionsList: View {
+    @State private var statuses: [Access: Access.Status] = [:]
+    private let tick = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        ForEach(Access.allCases) { access in
+            VStack(alignment: .leading, spacing: 2) {
+                LabeledContent(access.name) {
+                    HStack(spacing: 8) {
+                        switch statuses[access] {
+                        case .granted:
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        case .notAsked:
+                            Button("Allow…") { Task { await access.request(); await refresh() } }
+                        case .denied:
+                            Button("Open Settings") { Task { await access.request(); await refresh() } }
+                            Image(systemName: "xmark.circle").foregroundStyle(.orange)
+                        case nil:
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                }
+                Text(access.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        Text("Each permission unlocks only the features listed next to it — nothing else stops working if you decline one. Browsers are asked separately, the first time “Remind me” links a reminder to a page.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .task { await refresh() }
+            .onReceive(tick) { _ in Task { await refresh() } }
+    }
+
+    private func refresh() async {
+        var next: [Access: Access.Status] = [:]
+        for access in Access.allCases { next[access] = await access.status() }
+        statuses = next
     }
 }
 

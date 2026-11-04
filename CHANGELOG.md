@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+**Every permission in one list.** Settings → System → Permissions now lists all
+nine kinds of access Griasa uses — microphone, speech recognition,
+accessibility, screen recording, calendar, reminders, notifications, Notes
+automation and iCloud Drive — each with what it unlocks, whether it is granted,
+and a button that asks for it or opens the right pane of System Settings. The
+list updates by itself when an answer is changed there.
+
 **From the iPhone, hands-free.** Settings → iPhone → *Take notes and
 recordings from iCloud Drive*: Griasa watches iCloud Drive → Griasa → Inbox and
 files whatever arrives as a meeting, so the promises in it land in Commitments

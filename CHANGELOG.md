@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+**From the iPhone, hands-free.** Settings → iPhone → *Take notes and
+recordings from iCloud Drive*: Griasa watches iCloud Drive → Griasa → Inbox and
+files whatever arrives as a meeting, so the promises in it land in Commitments
+and the people it names get them on their pages. A text file is a note; a
+recording is turned into text on the Mac, and one longer than three minutes —
+a call — is written up with a summary. Three ways in from the phone: a "Griasa
+note" Shortcut (Dictate Text → Save File), which works from the car with "Hey
+Siri, Griasa note"; Voice Memos → Share → Save to Files; and a call recorded on
+the iPhone, from Notes the same way. Read files move to Inbox → Imported.
+
+**Your promises in Reminders.** Settings → iPhone → *Keep my promises in
+Reminders* puts your own promises with a date in a "Griasa" list in Apple
+Reminders, so they are on the iPhone, the Watch and in CarPlay's Siri. Tick one
+there and it closes in Griasa; close it in Griasa and it is ticked there; reopen
+it on either side and the other follows. Anything added to the list — "Hey
+Siri, add send Ivan the deck to my Griasa list" — becomes a promise. Overdue
+promises older than a week stay off the phone.
+
 **Close promises from Prep.** Ticking a promise on the Prep screen before a
 call now shows at once: the circle turns into a green check and the line is
 struck through, and a second click opens it again. It was already closed in

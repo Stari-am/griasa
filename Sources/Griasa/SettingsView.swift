@@ -14,6 +14,8 @@ struct SettingsView: View {
                 .tabItem { Label("AI & Actions", systemImage: "sparkles") }
             CaptureSettings()
                 .tabItem { Label("Capture", systemImage: "camera.viewfinder") }
+            PhoneSettings()
+                .tabItem { Label("iPhone", systemImage: "iphone") }
             SnippetsSettings()
                 .tabItem { Label("Snippets", systemImage: "text.badge.plus") }
             ProjectsSettings()
@@ -819,7 +821,7 @@ private struct CaptureSettings: View {
                     Image(systemName: Permissions.remindersGranted ? "checkmark.circle.fill" : "xmark.circle")
                         .foregroundStyle(Permissions.remindersGranted ? .green : .orange)
                 }
-                Text("“Remind me” creates reminders in the Reminders app, so they sync to your iPhone and Watch. You'll be asked to grant access the first time; Griasa uses it only to add the reminders you ask for. This is the one permission the feature itself needs — every other Capture action works without it.")
+                Text("“Remind me” creates reminders in the Reminders app, so they sync to your iPhone and Watch. You'll be asked to grant access the first time; Griasa uses it only to add the reminders you ask for, and — when Settings → iPhone → Reminders is on — to keep its own list “Griasa” in step. This is the one permission the feature itself needs — every other Capture action works without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Convenience extra: when a reminder is captured in a browser, macOS asks once per browser for Automation access so Griasa can attach the page's address (with a jump-to-text link) to the reminder. Decline it and reminders work exactly the same — they just won't link back to the page. Other apps need nothing: the source app and window are noted automatically.")
@@ -830,6 +832,61 @@ private struct CaptureSettings: View {
                 Text("Run any prompt preset on the current clipboard from the menu bar → “Run on clipboard”.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// The iPhone side: an iCloud Drive folder the phone drops notes and
+/// recordings into, and the "Griasa" list in Reminders.
+private struct PhoneSettings: View {
+    @ObservedObject private var inbox = PhoneInboxWatcher.shared
+    @ObservedObject private var reminders = ReminderSyncController.shared
+    @AppStorage(PhoneInboxWatcher.enabledKey) private var inboxOn = false
+    @AppStorage(ReminderSyncController.enabledKey) private var remindersOn = false
+
+    var body: some View {
+        SettingsTab {
+            Section("Notes and recordings from iPhone") {
+                Toggle("Take notes and recordings from iCloud Drive", isOn: Binding(
+                    get: { inboxOn }, set: { on in Task { await inbox.setEnabled(on) } }))
+                    .help("Griasa watches iCloud Drive → Griasa → Inbox. A text file becomes a note, a recording is turned into text on this Mac; either is filed as a meeting, so the promises in it land in Commitments. Read files move to Inbox → Imported.")
+                if let problem = inbox.problem {
+                    Text(problem).font(.caption).foregroundStyle(.red)
+                }
+                if inboxOn {
+                    if let working = inbox.working {
+                        Text("Reading \(working)…").font(.caption).foregroundStyle(.secondary)
+                    } else if let last = inbox.lastImported {
+                        Text("Last: \(last)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Button("Show the Inbox folder") { NSWorkspace.shared.activateFileViewerSelecting([inbox.folder]) }
+                    Text("""
+                    On the iPhone, three ways in:
+                    • Dictate, hands-free: in Shortcuts make “Griasa note” with two actions — Dictate Text, then Save File to iCloud Drive/Griasa/Inbox (Ask Where to Save off). In the car: “Hey Siri, Griasa note”.
+                    • A voice memo: Share → Save to Files → iCloud Drive → Griasa → Inbox.
+                    • A recorded call: in Notes, open the recording, Share → Save to Files → the same folder.
+                    """)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Section("Reminders") {
+                Toggle("Keep my promises in Reminders", isOn: Binding(
+                    get: { remindersOn }, set: { on in Task { await reminders.setEnabled(on) } }))
+                    .help("Your promises with a date go to the list “Griasa” in Reminders, so they are on the iPhone and the Watch. Tick one there and it closes here; close it here and it is ticked there. Overdue promises older than a week are left off.")
+                if let problem = reminders.problem {
+                    Text(problem).font(.caption).foregroundStyle(.red)
+                }
+                if remindersOn {
+                    if let last = reminders.lastSync {
+                        Text("In step \(last.formatted(.relative(presentation: .named))).")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text("Anything added to the list becomes a promise too — in the car: “Hey Siri, add send Ivan the deck to my Griasa list”.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

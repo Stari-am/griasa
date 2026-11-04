@@ -143,7 +143,7 @@ final class CommitmentStore: ObservableObject {
         return touched
     }
 
-    private static func normalize(_ text: String) -> String {
+    static func normalize(_ text: String) -> String {
         text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ".", with: "")
     }

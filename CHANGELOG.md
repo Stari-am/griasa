@@ -1,18 +1,6 @@
 # Changelog
 
-## Unreleased
-
-**What's new, and where to start.** After an update, Today shows what the new
-version adds, each with a button to it, until you dismiss it. A new install
-gets "Start here" instead: record or import a first meeting, allow Calendar,
-mark your team. Steps already done show a check.
-
-**Every permission in one list.** Settings → System → Permissions now lists all
-nine kinds of access Griasa uses — microphone, speech recognition,
-accessibility, screen recording, calendar, reminders, notifications, Notes
-automation and iCloud Drive — each with what it unlocks, whether it is granted,
-and a button that asks for it or opens the right pane of System Settings. The
-list updates by itself when an answer is changed there.
+## 1.0.26 — 2026-11-03
 
 **From the iPhone, hands-free.** Settings → iPhone → *Take notes and
 recordings from iCloud Drive*: Griasa watches iCloud Drive → Griasa → Inbox and
@@ -32,14 +20,6 @@ it on either side and the other follows. Anything added to the list — "Hey
 Siri, add send Ivan the deck to my Griasa list" — becomes a promise. Overdue
 promises older than a week stay off the phone.
 
-**Close promises from Prep.** Ticking a promise on the Prep screen before a
-call now shows at once: the circle turns into a green check and the line is
-struck through, and a second click opens it again. It was already closed in
-Commitments before, but the row did not change, so it looked as if nothing had
-happened.
-
-## 1.0.26 — 2026-11-02
-
 **Griasa on the desktop.** A "Griasa — Today" widget for the desktop and
 Notification Center, in three sizes: the next meeting and the overdue counts;
 the same with your and your team's top overdue items; or the whole day —
@@ -55,6 +35,28 @@ buttons under the brief are now small cards that show what is in each part:
 open and overdue promises, decisions to look at again, your reports and how many
 are late, the next meeting's time, a timer while recording, and so on.
 `griasa://open/<tab>` links open a tab from anywhere.
+
+**Today turns over at midnight.** The brief on the Today tab and in the widget
+moves to the new day as soon as the date changes, instead of showing yesterday
+until the next refresh or the morning brief.
+
+**Close promises from Prep.** Ticking a promise on the Prep screen before a
+call now shows at once: the circle turns into a green check and the line is
+struck through, and a second click opens it again. It was already closed in
+Commitments before, but the row did not change, so it looked as if nothing had
+happened.
+
+**Every permission in one list.** Settings → System → Permissions now lists all
+nine kinds of access Griasa uses — microphone, speech recognition,
+accessibility, screen recording, calendar, reminders, notifications, Notes
+automation and iCloud Drive — each with what it unlocks, whether it is granted,
+and a button that asks for it or opens the right pane of System Settings. The
+list updates by itself when an answer is changed there.
+
+**What's new, and where to start.** After an update, Today shows what the new
+version adds, each with a button to it, until you dismiss it. A new install
+gets "Start here" instead: record or import a first meeting, allow Calendar,
+mark your team. Steps already done show a check.
 
 ## 1.0.25 — 2026-11-02
 

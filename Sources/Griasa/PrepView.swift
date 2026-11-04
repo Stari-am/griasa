@@ -6,6 +6,10 @@ import AppKit
 struct PrepView: View {
     @ObservedObject private var watcher = MeetingPrepWatcher.shared
     @ObservedObject private var state = AppState.shared
+    /// The brief is built once, when the meeting comes up; a promise closed
+    /// here is read back from the store, so the row shows it at once and can
+    /// be opened again with the same click.
+    @ObservedObject private var commitments = CommitmentStore.shared
 
     var body: some View {
         switch watcher.state {
@@ -239,17 +243,21 @@ struct PrepView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(shown) { item in
+                    let done = commitments.commitments.first { $0.id == item.id }?.done ?? item.done
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Button {
                             withAnimation(.snappy) { CommitmentStore.shared.toggleDone(item.id) }
                         } label: {
-                            Image(systemName: "circle")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
+                            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 15))
+                                .foregroundStyle(done ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help("Mark as done")
+                        .help(done ? "Done — click to open it again" : "Mark as done")
                         Text(showOwner ? "\(item.owner): \(item.text)" : item.text)
+                            .strikethrough(done)
+                            .foregroundStyle(done ? .secondary : .primary)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                         Text(item.date.formatted(.relative(presentation: .named)))

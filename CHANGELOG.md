@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+**Close promises from Prep.** Ticking a promise on the Prep screen before a
+call now shows at once: the circle turns into a green check and the line is
+struck through, and a second click opens it again. It was already closed in
+Commitments before, but the row did not change, so it looked as if nothing had
+happened.
+
 ## 1.0.26 — 2026-11-02
 
 **Griasa on the desktop.** A "Griasa — Today" widget for the desktop and

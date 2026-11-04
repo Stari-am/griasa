@@ -190,6 +190,8 @@ final class AppState: ObservableObject {
         MeetingPrepWatcher.shared.start()
         Notifier.install()
         DailyBriefController.shared.start()
+        PhoneInboxWatcher.shared.start()
+        ReminderSyncController.shared.start()
         MCPServer.shared.reconcile()
         if autoRecordOnLaunch {
             Task { await startRecording() }

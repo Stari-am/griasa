@@ -13,6 +13,9 @@ struct TodayView: View {
     @ObservedObject private var people = PersonStore.shared
     @ObservedObject private var history = HistoryStore.shared
     @ObservedObject private var projects = ProjectStore.shared
+    @ObservedObject private var phone = PhoneInboxWatcher.shared
+    @AppStorage(PhoneInboxWatcher.enabledKey) private var phoneOn = false
+    @AppStorage(ReminderSyncController.enabledKey) private var remindersOn = false
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -158,6 +161,9 @@ struct TodayView: View {
                 tile("Import notes", systemImage: "square.and.arrow.down", tint: .green, detail: "from Zoom, Meet, ChatGPT") {
                     HubController.shared.open(.importNotes)
                 }
+                tile("From iPhone", systemImage: "iphone", tint: .pink,
+                     detail: phoneOn || remindersOn ? (phone.lastImported ?? "notes, memos, calls")
+                                                    : "set up in Settings → iPhone") { openSettings() }
                 tile("Settings", systemImage: "gearshape", tint: .gray, detail: "models, hotkey, brief") { openSettings() }
             }
             Text("Dictation: hold \(state.hotkeyChoice.displayName) and speak, in any app.")

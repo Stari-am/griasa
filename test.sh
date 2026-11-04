@@ -56,6 +56,8 @@ swiftc -O \
   Sources/Griasa/TeamDigest.swift \
   Sources/Griasa/DailyBrief.swift \
   Sources/Griasa/WidgetSnapshot.swift \
+  Sources/Griasa/PhoneInbox.swift \
+  Sources/Griasa/ReminderSync.swift \
   Sources/Griasa/SearchChunks.swift \
   Sources/Griasa/HybridRank.swift \
   Sources/Griasa/SearchVectors.swift \
@@ -114,6 +116,7 @@ swiftc -O \
   Tests/HybridSearchChecks.swift \
   Tests/DecisionChecks.swift \
   Tests/DailyBriefChecks.swift \
+  Tests/PhoneCaptureChecks.swift \
   Tests/SearchIndexChecks.swift \
   Tests/main.swift \
   -o "$BIN"

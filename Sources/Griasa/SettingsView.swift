@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
@@ -14,6 +15,8 @@ struct SettingsView: View {
                 .tabItem { Label("AI & Actions", systemImage: "sparkles") }
             CaptureSettings()
                 .tabItem { Label("Capture", systemImage: "camera.viewfinder") }
+            PhoneSettings()
+                .tabItem { Label("iPhone", systemImage: "iphone") }
             SnippetsSettings()
                 .tabItem { Label("Snippets", systemImage: "text.badge.plus") }
             ProjectsSettings()
@@ -819,7 +822,7 @@ private struct CaptureSettings: View {
                     Image(systemName: Permissions.remindersGranted ? "checkmark.circle.fill" : "xmark.circle")
                         .foregroundStyle(Permissions.remindersGranted ? .green : .orange)
                 }
-                Text("“Remind me” creates reminders in the Reminders app, so they sync to your iPhone and Watch. You'll be asked to grant access the first time; Griasa uses it only to add the reminders you ask for. This is the one permission the feature itself needs — every other Capture action works without it.")
+                Text("“Remind me” creates reminders in the Reminders app, so they sync to your iPhone and Watch. You'll be asked to grant access the first time; Griasa uses it only to add the reminders you ask for, and — when Settings → iPhone → Reminders is on — to keep its own list “Griasa” in step. This is the one permission the feature itself needs — every other Capture action works without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Convenience extra: when a reminder is captured in a browser, macOS asks once per browser for Automation access so Griasa can attach the page's address (with a jump-to-text link) to the reminder. Decline it and reminders work exactly the same — they just won't link back to the page. Other apps need nothing: the source app and window are noted automatically.")
@@ -830,6 +833,61 @@ private struct CaptureSettings: View {
                 Text("Run any prompt preset on the current clipboard from the menu bar → “Run on clipboard”.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// The iPhone side: an iCloud Drive folder the phone drops notes and
+/// recordings into, and the "Griasa" list in Reminders.
+private struct PhoneSettings: View {
+    @ObservedObject private var inbox = PhoneInboxWatcher.shared
+    @ObservedObject private var reminders = ReminderSyncController.shared
+    @AppStorage(PhoneInboxWatcher.enabledKey) private var inboxOn = false
+    @AppStorage(ReminderSyncController.enabledKey) private var remindersOn = false
+
+    var body: some View {
+        SettingsTab {
+            Section("Notes and recordings from iPhone") {
+                Toggle("Take notes and recordings from iCloud Drive", isOn: Binding(
+                    get: { inboxOn }, set: { on in Task { await inbox.setEnabled(on) } }))
+                    .help("Griasa watches iCloud Drive → Griasa → Inbox. A text file becomes a note, a recording is turned into text on this Mac; either is filed as a meeting, so the promises in it land in Commitments. Read files move to Inbox → Imported.")
+                if let problem = inbox.problem {
+                    Text(problem).font(.caption).foregroundStyle(.red)
+                }
+                if inboxOn {
+                    if let working = inbox.working {
+                        Text("Reading \(working)…").font(.caption).foregroundStyle(.secondary)
+                    } else if let last = inbox.lastImported {
+                        Text("Last: \(last)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Button("Show the Inbox folder") { NSWorkspace.shared.activateFileViewerSelecting([inbox.folder]) }
+                    Text("""
+                    On the iPhone, three ways in:
+                    • Dictate, hands-free: in Shortcuts make “Griasa note” with two actions — Dictate Text, then Save File to iCloud Drive/Griasa/Inbox (Ask Where to Save off). In the car: “Hey Siri, Griasa note”.
+                    • A voice memo: Share → Save to Files → iCloud Drive → Griasa → Inbox.
+                    • A recorded call: in Notes, open the recording, Share → Save to Files → the same folder.
+                    """)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Section("Reminders") {
+                Toggle("Keep my promises in Reminders", isOn: Binding(
+                    get: { remindersOn }, set: { on in Task { await reminders.setEnabled(on) } }))
+                    .help("Your promises with a date go to the list “Griasa” in Reminders, so they are on the iPhone and the Watch. Tick one there and it closes here; close it here and it is ticked there. Overdue promises older than a week are left off.")
+                if let problem = reminders.problem {
+                    Text(problem).font(.caption).foregroundStyle(.red)
+                }
+                if remindersOn {
+                    if let last = reminders.lastSync {
+                        Text("In step \(last.formatted(.relative(presentation: .named))).")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text("Anything added to the list becomes a promise too — in the car: “Hey Siri, add send Ivan the deck to my Griasa list”.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -1150,18 +1208,7 @@ private struct SystemSettings: View {
                 searchByMeaning
             }
             Section("Permissions") {
-                permissionRow("Microphone", granted: Permissions.microphoneGranted,
-                              detail: "Dictation and your side of meeting recordings. Without it, all text and screen features (OCR, captures, reminders, presets, projects) still work.")
-                permissionRow("Speech recognition", granted: Permissions.speechGranted,
-                              detail: "Apple's transcriber, used only as a fallback while local Whisper isn't installed. With Whisper set up, everything works without it.")
-                permissionRow("Accessibility", granted: Permissions.accessibilityGranted,
-                              detail: "Global hotkeys, reading your selection, and typing text at the cursor. Without it, every action is still available from the menu bar — use the clipboard or drag a screen region instead of a selection.")
-                permissionRow("Screen recording", granted: Permissions.screenRecordingGranted,
-                              detail: "System audio in meeting recordings, and reading the screen for OCR region / Draft reply. Without it, recordings capture your mic only, and text-selection features still work.")
-                Button("Request Missing Permissions") { Permissions.requestAll() }
-                Text("Each permission unlocks only the features listed next to it — nothing else stops working if you decline one.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                PermissionsList()
             }
 
             Section("Updates") {
@@ -1207,6 +1254,51 @@ private struct SystemSettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Every access Griasa uses, what it is for, and where it stands — checked
+/// again every few seconds while the list is open, so an answer given in
+/// System Settings shows up here without reopening the window.
+private struct PermissionsList: View {
+    @State private var statuses: [Access: Access.Status] = [:]
+    private let tick = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        ForEach(Access.allCases) { access in
+            VStack(alignment: .leading, spacing: 2) {
+                LabeledContent(access.name) {
+                    HStack(spacing: 8) {
+                        switch statuses[access] {
+                        case .granted:
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        case .notAsked:
+                            Button("Allow…") { Task { await access.request(); await refresh() } }
+                        case .denied:
+                            Button("Open Settings") { Task { await access.request(); await refresh() } }
+                            Image(systemName: "xmark.circle").foregroundStyle(.orange)
+                        case nil:
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                }
+                Text(access.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        Text("Each permission unlocks only the features listed next to it — nothing else stops working if you decline one. Browsers are asked separately, the first time “Remind me” links a reminder to a page.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .task { await refresh() }
+            .onReceive(tick) { _ in Task { await refresh() } }
+    }
+
+    private func refresh() async {
+        var next: [Access: Access.Status] = [:]
+        for access in Access.allCases { next[access] = await access.status() }
+        statuses = next
     }
 }
 

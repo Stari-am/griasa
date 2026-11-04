@@ -9,6 +9,10 @@ window during a recording. A copy installed with Homebrew gets *Update with
 Homebrew*: Griasa quits, Terminal runs `brew upgrade --cask griasa`, and Griasa
 opens again when it is done, so Homebrew keeps track of the installed version.
 
+**Settings fit again.** With the iPhone tab added, Projects and System had
+slipped behind a `>>` button. The window is wider, so all eight tabs show, and
+the iPhone tab says what each switch does before it is turned on.
+
 ## 1.0.26 — 2026-11-03
 
 **From the iPhone, hands-free.** Settings → iPhone → *Take notes and

@@ -136,7 +136,7 @@ enum GriasaMain {
         // reads the selected index from UserDefaults when it builds the window,
         // so the index has to be written before the scene appears.
         if let flagIndex = args.firstIndex(of: "--settings"), args.count > flagIndex + 1 {
-            let names = ["dictation", "meetings", "ai", "capture", "snippets", "projects", "system"]
+            let names = ["dictation", "meetings", "ai", "capture", "iphone", "snippets", "projects", "system"]
             if let index = names.firstIndex(of: args[flagIndex + 1].lowercased()) {
                 UserDefaults.standard.set(index, forKey: "com_apple_SwiftUI_Settings_selectedTabIndex")
                 AppDelegate.openSettingsOnLaunch = true

@@ -16,11 +16,15 @@ struct TodayView: View {
     @ObservedObject private var phone = PhoneInboxWatcher.shared
     @AppStorage(PhoneInboxWatcher.enabledKey) private var phoneOn = false
     @AppStorage(ReminderSyncController.enabledKey) private var remindersOn = false
+    @AppStorage(WhatsNew.seenKey) private var whatsNewSeen = ""
+    @AppStorage("startHereDismissed") private var startHereDismissed = false
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                whatsNew
+                startHere
                 if let day = brief.day {
                     Text(day.date.formatted(date: .complete, time: .omitted)).font(.title2.bold())
                     Text(DailyBrief.summary(day)).foregroundStyle(.secondary)
@@ -42,6 +46,81 @@ struct TodayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear { brief.refresh() }
+    }
+
+    /// Once after an update: what the new version adds, each with a way to it.
+    @ViewBuilder
+    private var whatsNew: some View {
+        let firstInstall = whatsNewSeen.isEmpty && !history.entries.contains { $0.kind == .meeting }
+        let items = WhatsNew.items(current: AppInfo.version, seen: whatsNewSeen.isEmpty ? nil : whatsNewSeen,
+                                   firstInstall: firstInstall)
+        if !items.isEmpty {
+            HubCard(icon: "sparkles", title: "New in \(AppInfo.version)", tint: .pink) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(items, id: \.name) { item in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Image(systemName: item.symbol).foregroundStyle(.pink).frame(width: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.name).font(.callout.weight(.semibold))
+                                Text(item.line).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            switch item.target {
+                            case .settings: Button("Open") { openSettings() }.controlSize(.small)
+                            case .tab(let name):
+                                if let tab = HubTab(rawValue: name) {
+                                    Button("Open") { HubController.shared.open(tab) }.controlSize(.small)
+                                }
+                            case .none: EmptyView()
+                            }
+                        }
+                    }
+                }
+            } trailing: {
+                Button("Got it") { whatsNewSeen = AppInfo.version }.controlSize(.small)
+            }
+        } else if firstInstall || whatsNewSeen.isEmpty {
+            // Nothing to announce to a new install; later updates are measured from here.
+            Color.clear.frame(height: 0).onAppear { whatsNewSeen = AppInfo.version }
+        }
+    }
+
+    /// For a new install, until the first meeting is in: the three steps that
+    /// make every other screen fill itself.
+    @ViewBuilder
+    private var startHere: some View {
+        if !startHereDismissed, !history.entries.contains(where: { $0.kind == .meeting }) {
+            HubCard(icon: "flag", title: "Start here", tint: .blue) {
+                VStack(alignment: .leading, spacing: 8) {
+                    step(1, "Record a meeting, or import notes from Zoom, Meet or ChatGPT.",
+                         action: ("Record", { Task { await state.startRecording() } }),
+                         second: ("Import notes", { HubController.shared.open(.importNotes) }))
+                    step(2, "Allow Calendar, so a brief appears minutes before each call.",
+                         done: Permissions.calendarGranted, action: ("Allow…", { Task { await Access.calendar.request() } }))
+                    step(3, "In People, switch on “Reports to me” for your team, so you see what they owe you.",
+                         done: !people.directReports.isEmpty, action: ("Open People", { HubController.shared.open(.people) }))
+                    Text("Promises, decisions and people's pages then fill themselves after every meeting.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } trailing: {
+                Button("Hide") { startHereDismissed = true }.controlSize(.small)
+            }
+        }
+    }
+
+    private func step(_ n: Int, _ text: String, done: Bool = false, action: (String, () -> Void),
+                      second: (String, () -> Void)? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(n)").font(.callout.weight(.bold).monospacedDigit()).foregroundStyle(.blue)
+            Text(text).font(.callout).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if done {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            } else {
+                Button(action.0, action: action.1).controlSize(.small)
+                if let second { Button(second.0, action: second.1).controlSize(.small) }
+            }
+        }
     }
 
     @ViewBuilder

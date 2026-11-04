@@ -47,7 +47,8 @@ enum UpdateRules {
         return .direct
     }
 
-    /// The script Terminal runs for a Homebrew update. Griasa quits before it
+    /// The script Terminal runs for a Homebrew update. The person already
+    /// chose to update, so brew does not ask again. Griasa quits before it
     /// starts, so the app is not replaced under itself, and is opened again
     /// afterwards whether or not the update went through.
     static func homebrewScript(brew: String, bundleID: String) -> String {
@@ -55,7 +56,7 @@ enum UpdateRules {
         #!/bin/zsh
         echo "Updating Griasa with Homebrew…"
         echo
-        '\(brew)' upgrade --cask \(caskName)
+        HOMEBREW_NO_ASK=1 '\(brew)' upgrade --cask \(caskName)
         result=$?
         echo
         if [ $result -eq 0 ]; then

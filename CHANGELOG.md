@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+**Updates are noticed while Griasa runs.** It used to look for a new version
+only when it started, and Griasa sits in the menu bar for weeks, so an update
+could go unseen. It now checks once a day while it runs, and never shows the
+window during a recording. A copy installed with Homebrew gets *Update with
+Homebrew*: Griasa quits, Terminal runs `brew upgrade --cask griasa`, and Griasa
+opens again when it is done, so Homebrew keeps track of the installed version.
+
 ## 1.0.26 — 2026-11-03
 
 **From the iPhone, hands-free.** Settings → iPhone → *Take notes and

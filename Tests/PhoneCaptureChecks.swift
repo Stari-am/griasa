@@ -141,3 +141,40 @@ func runWhatsNewChecks() -> Int {
           "each line fits on one row of the card")
     return failures
 }
+
+/// When the running app looks for a new version, and how it is updated.
+func runUpdateChecks() -> Int {
+    var failures = 0
+    func check(_ passed: Bool, _ rule: String) {
+        if passed { return }
+        failures += 1
+        print("\n    ✗ \(rule)")
+    }
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    check(UpdateRules.isDue(lastCheck: nil, now: now), "never checked: check now")
+    check(!UpdateRules.isDue(lastCheck: now.addingTimeInterval(-3_600), now: now), "checked an hour ago: wait")
+    check(UpdateRules.isDue(lastCheck: now.addingTimeInterval(-86_400), now: now), "a day later: check again while running")
+    check(UpdateRules.isDue(lastCheck: now.addingTimeInterval(86_400 * 30), now: now), "a clock set back does not stop the checks")
+    check(UpdateRules.tick < UpdateRules.interval, "the app asks more often than it checks, so a day is not missed")
+
+    check(UpdateRules.version(fromTag: "v1.0.26") == "1.0.26", "the tag's v is dropped")
+    check(UpdateRules.isNewer("1.0.26", than: "1.0.25"), "1.0.26 is newer than 1.0.25")
+    check(UpdateRules.isNewer("1.0.100", than: "1.0.99"), "versions compare as numbers, not text")
+    check(!UpdateRules.isNewer("1.0.25", than: "1.0.25"), "the same version is not offered")
+
+    let brewed: Set<String> = ["/opt/homebrew/Caskroom/griasa", "/opt/homebrew/bin/brew"]
+    check(UpdateRules.install(appPath: "/Applications/Griasa.app", exists: brewed.contains)
+            == .homebrew(brew: "/opt/homebrew/bin/brew"), "a cask install is updated with brew")
+    let intel: Set<String> = ["/usr/local/Caskroom/griasa", "/usr/local/bin/brew"]
+    check(UpdateRules.install(appPath: "/Applications/Griasa.app", exists: intel.contains)
+            == .homebrew(brew: "/usr/local/bin/brew"), "Homebrew on an Intel Mac is found too")
+    check(UpdateRules.install(appPath: "/Applications/Griasa.app", exists: { $0 == "/opt/homebrew/bin/brew" }) == .direct,
+          "Homebrew present but Griasa not from it: the DMG")
+    check(UpdateRules.install(appPath: "/Users/me/work/Griasa Dev.app", exists: brewed.contains) == .direct,
+          "a copy outside /Applications is not the cask's")
+    let script = UpdateRules.homebrewScript(brew: "/opt/homebrew/bin/brew", bundleID: "am.stari.griasa")
+    check(script.contains("'/opt/homebrew/bin/brew' upgrade --cask griasa"), "the script upgrades the griasa cask")
+    check(script.contains("open -b 'am.stari.griasa'"), "the script opens Griasa again")
+    check(script.hasPrefix("#!/bin/zsh"), "the script runs in zsh")
+    return failures
+}

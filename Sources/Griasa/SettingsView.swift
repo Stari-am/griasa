@@ -1217,7 +1217,9 @@ private struct SystemSettings: View {
                     Button("Check for Updates…") {
                         Task { await UpdateChecker.check(userInitiated: true) }
                     }
-                    Text("Griasa also checks the GitHub Releases page once a day. Nothing is sent — it only reads the latest version number.")
+                    Text(UpdateChecker.install == .direct
+                         ? "Griasa checks the GitHub Releases page once a day while it runs, never during a recording. Nothing is sent — it only reads the latest version number."
+                         : "Griasa checks the GitHub Releases page once a day while it runs, never during a recording. It was installed with Homebrew, so an update runs “brew upgrade --cask griasa” in Terminal.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {

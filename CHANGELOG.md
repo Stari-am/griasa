@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+**What's new, and where to start.** After an update, Today shows what the new
+version adds, each with a button to it, until you dismiss it. A new install
+gets "Start here" instead: record or import a first meeting, allow Calendar,
+mark your team. Steps already done show a check.
+
 **Every permission in one list.** Settings → System → Permissions now lists all
 nine kinds of access Griasa uses — microphone, speech recognition,
 accessibility, screen recording, calendar, reminders, notifications, Notes

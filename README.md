@@ -52,6 +52,17 @@ the meeting roster, with no setup step.
 speaking MCP — over a local, token-protected, read-only endpoint, and Claude Desktop
 installs it in one click.
 
+**Your day on one screen.** Today shows the meetings ahead and what you and each
+table owe each other, your overdue promises, what your team is late on and the
+decisions due for another look. A morning brief brings it up at 8:00, and a
+desktop widget keeps it in view. Each meeting also yields its decisions: what
+was settled, why, by whom, and when to look at it again.
+
+**From the iPhone, hands-free.** No iPhone app is needed. Say "Hey Siri, Griasa
+note" in the car, or save a voice memo or a recorded call to iCloud Drive, and it
+is waiting on the Mac as a meeting with its promises. Your dated promises sit in
+a "Griasa" list in Apple Reminders, and ticking one on the phone closes it here.
+
 Everything runs at once: you can dictate while a conversation is being recorded.
 Most of the pieces are small, and Apple could ship several of them tomorrow. What
 is hard to copy is that they are one thing — the reminder made during a call, the
@@ -60,6 +71,8 @@ the brief before the next meeting with them all point at the same people and the
 same history. Separate apps would need separate integrations and would still lose
 the joins, because a join is not a feature any one of them owns.
 
+Every feature, by the name used for it in the app, is in
+**[docs/FEATURES.md](docs/FEATURES.md)**.
 **[The project page](https://stari-am.github.io/griasa/) has the rest: more
 screenshots, what leaves your Mac and what doesn't, the engineering that turned
 out harder than it looked, and the questions people actually ask.**

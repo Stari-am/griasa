@@ -4,7 +4,7 @@ cask "griasa" do
 
   url "https://github.com/Stari-am/griasa/releases/download/v#{version}/Griasa-#{version}.dmg"
   name "Griasa"
-  desc "Local-first meeting memory: who promised what, briefs and dictation"
+  desc "Remembers what was promised in your meetings, on your Mac"
   homepage "https://stari-am.github.io/griasa/"
 
   livecheck do

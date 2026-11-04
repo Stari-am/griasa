@@ -119,3 +119,25 @@ do {
 
 return failures
 }
+
+/// The "New in" card on Today.
+func runWhatsNewChecks() -> Int {
+    var failures = 0
+    func check(_ passed: Bool, _ rule: String) {
+        if passed { return }
+        failures += 1
+        print("\n    ✗ \(rule)")
+    }
+    let latest = WhatsNew.releases[0].version
+    check(!WhatsNew.items(current: latest, seen: "1.0.25", firstInstall: false).isEmpty,
+          "an update shows what the new version adds")
+    check(WhatsNew.items(current: latest, seen: latest, firstInstall: false).isEmpty,
+          "once seen, the card is gone")
+    check(WhatsNew.items(current: latest, seen: nil, firstInstall: true).isEmpty,
+          "a first install gets the first steps, not release notes")
+    check(WhatsNew.items(current: "9.9.9", seen: "1.0.25", firstInstall: false).isEmpty,
+          "a version without notes shows no card")
+    check(WhatsNew.releases.allSatisfy { release in release.items.allSatisfy { $0.line.count <= 80 } },
+          "each line fits on one row of the card")
+    return failures
+}

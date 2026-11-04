@@ -58,6 +58,7 @@ swiftc -O \
   Sources/Griasa/WidgetSnapshot.swift \
   Sources/Griasa/PhoneInbox.swift \
   Sources/Griasa/ReminderSync.swift \
+  Sources/Griasa/WhatsNew.swift \
   Sources/Griasa/SearchChunks.swift \
   Sources/Griasa/HybridRank.swift \
   Sources/Griasa/SearchVectors.swift \

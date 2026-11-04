@@ -25,7 +25,7 @@ enum MCPBundle {
             "name": extensionName,
             "display_name": "Griasa",
             "version": semver(appVersion),
-            "description": "Ask Claude about your Griasa meetings: open promises, people, and what the next meeting is about.",
+            "description": "Your meetings, the promises and decisions made in them, and the people in them, read from Griasa on your Mac.",
             "long_description": "Connects Claude Desktop to Griasa on this Mac. Claude can read your open "
                 + "promises, colleagues, meeting summaries and the next meeting's brief; transcripts are "
                 + "returned only when asked for. Read-only, and everything stays on this Mac until Claude "

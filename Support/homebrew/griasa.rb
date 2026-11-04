@@ -12,7 +12,7 @@ cask "griasa" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
   # The speech and AI engines Griasa would otherwise install with brew on first launch.
   depends_on formula: ["whisper.cpp", "llama.cpp"]
 

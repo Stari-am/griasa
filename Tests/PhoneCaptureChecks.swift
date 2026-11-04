@@ -173,7 +173,7 @@ func runUpdateChecks() -> Int {
     check(UpdateRules.install(appPath: "/Users/me/work/Griasa Dev.app", exists: brewed.contains) == .direct,
           "a copy outside /Applications is not the cask's")
     let script = UpdateRules.homebrewScript(brew: "/opt/homebrew/bin/brew", bundleID: "am.stari.griasa")
-    check(script.contains("'/opt/homebrew/bin/brew' upgrade --cask griasa"), "the script upgrades the griasa cask")
+    check(script.contains("HOMEBREW_NO_ASK=1 '/opt/homebrew/bin/brew' upgrade --cask griasa"), "the script upgrades the griasa cask without asking again")
     check(script.contains("open -b 'am.stari.griasa'"), "the script opens Griasa again")
     check(script.hasPrefix("#!/bin/zsh"), "the script runs in zsh")
     return failures

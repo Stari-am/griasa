@@ -178,3 +178,36 @@ func runUpdateChecks() -> Int {
     check(script.hasPrefix("#!/bin/zsh"), "the script runs in zsh")
     return failures
 }
+
+/// "Meetings with these people", in History and in search_meetings.
+func runMeetingPeopleChecks() -> Int {
+    var failures = 0
+    func check(_ passed: Bool, _ rule: String) {
+        if passed { return }
+        failures += 1
+        print("\n    ✗ \(rule)")
+    }
+    let roster = ["Priya Shah", "Ivan Petrov", "Анна Смирнова"]
+    func match(_ people: [String], _ mode: MeetingPeople.Mode = .all,
+               participants: [String]? = roster, text: String = "") -> Bool {
+        MeetingPeople.matches(participants: participants, text: text, people: people, mode: mode)
+    }
+    check(match([]), "no people asked for: every meeting")
+    check(match(["Priya"]), "a first name finds the full name")
+    check(match(["priya shah"]), "case does not matter")
+    check(match(["Anna"]), "Latin spelling finds a Cyrillic name")
+    check(match(["Priya", "Ivan"]), "all: both were there")
+    check(!match(["Priya", "Maria"]), "all: one missing, no match")
+    check(match(["Priya", "Maria"], .any), "any: one was there")
+    check(!match(["Maria", "Omar"], .any), "any: none was there")
+    check(!match(["Ivan Sidorov"]), "a different Ivan is not this Ivan")
+    check(!match(["Maria"], participants: roster, text: "We should ask Maria."),
+          "a name only mentioned is not a participant when the roster is known")
+    check(match(["Maria"], participants: nil, text: "Call with Maria about pricing."),
+          "no roster: the text is the best there is")
+    check(match(["  ", "Priya", "priya"]), "blanks and repeats are ignored")
+    check(MeetingPeople.cleaned([" Anna ", "", "anna", "Ivan"]) == ["Anna", "Ivan"], "names are cleaned in order")
+    check(MeetingPeople.roster([["Ivan", "Priya"], ["Priya"], ["Anna", "Priya", "Priya"]]) == ["Priya", "Anna", "Ivan"],
+          "the picker lists the most frequent first, then by name, each once")
+    return failures
+}

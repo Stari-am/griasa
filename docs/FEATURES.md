@@ -157,9 +157,9 @@ first step.
 - *First step:* make one project.
 
 **Search**
-- *Line:* Find a meeting by its words or by what it was about.
-- *Description:* Word search works on any phrasing and word order. Search by meaning (an optional download) also finds meetings that put the same thing in other words.
-- *Where:* History; also what assistants use.
+- *Line:* Find a meeting by its words, by what it was about, or by who was in it.
+- *Description:* Word search works on any phrasing and word order. Search by meaning (an optional download) also finds meetings that put the same thing in other words. Meetings can also be narrowed to the people in them: one person, or several — every one of them, or any.
+- *Where:* History (the people menu under the project picker); also what assistants use.
 - *First step:* nothing for word search; Settings to add search by meaning.
 
 ### Your assistant, your models

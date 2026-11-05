@@ -317,10 +317,18 @@ final class HistoryStore: ObservableObject {
         save()
     }
 
-    func filtered(_ query: String, project: UUID? = nil) -> [HistoryEntry] {
+    func filtered(_ query: String, project: UUID? = nil,
+                  people: [String] = [], mode: MeetingPeople.Mode = .all) -> [HistoryEntry] {
         var result = entries
         if let project {
             result = result.filter { ($0.projectID ?? Project.inboxID) == project }
+        }
+        // People take part in meetings, not in dictations.
+        if !MeetingPeople.cleaned(people).isEmpty {
+            result = result.filter {
+                $0.kind == .meeting
+                    && MeetingPeople.matches(participants: $0.participants, text: $0.text, people: people, mode: mode)
+            }
         }
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return result }

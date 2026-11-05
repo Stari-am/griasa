@@ -25,7 +25,7 @@ struct SettingsView: View {
                 .tabItem { Label("System", systemImage: "gearshape") }
         }
         // Fixed, screen-safe size; each tab scrolls internally if it overflows.
-        .frame(width: 460, height: 380)
+        .frame(width: 620, height: 460)
     }
 }
 
@@ -855,6 +855,11 @@ private struct PhoneSettings: View {
                 if let problem = inbox.problem {
                     Text(problem).font(.caption).foregroundStyle(.red)
                 }
+                if !inboxOn {
+                    Text("Dictate in the car; it is waiting on the Mac as a meeting. No iPhone app is needed: whatever lands in iCloud Drive → Griasa → Inbox is filed as a meeting, and recordings are transcribed on this Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if inboxOn {
                     if let working = inbox.working {
                         Text("Reading \(working)…").font(.caption).foregroundStyle(.secondary)
@@ -878,6 +883,11 @@ private struct PhoneSettings: View {
                     .help("Your promises with a date go to the list “Griasa” in Reminders, so they are on the iPhone and the Watch. Tick one there and it closes here; close it here and it is ticked there. Overdue promises older than a week are left off.")
                 if let problem = reminders.problem {
                     Text(problem).font(.caption).foregroundStyle(.red)
+                }
+                if !remindersOn {
+                    Text("Your dated promises on the iPhone, Watch and CarPlay, both ways: a \"Griasa\" list in Apple Reminders. Tick one there and it closes here; close it here and it is ticked there.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if remindersOn {
                     if let last = reminders.lastSync {
@@ -939,13 +949,13 @@ private struct ProjectsSettings: View {
                     }
                 }
                 Button { store.add() } label: { Label("Add project", systemImage: "plus") }
-                Text("New dictations, meetings, and captures are filed automatically by Claude using each project's name and description. Each project mirrors its entries as Markdown in Documents/Griasa/Projects.")
+                Text("New dictations, meetings, and captures are filed automatically by your AI model using each project's name and description. Each project mirrors its entries as Markdown in Documents/Griasa/Projects.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Section("Ask Project") {
                 HotkeyField(label: "🗂 Ask project", stored: $askHotkey, fallback: "ctrl+opt+cmd+p")
-                Text("Opens a window where Claude answers questions using the project's entries plus the source folders above as context.")
+                Text("Opens a window where your AI model answers questions using the project's entries plus the source folders above as context.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1342,7 +1352,7 @@ private struct HotkeyField: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 90)
+                .frame(width: 110)
 
                 TextField("", text: Binding(
                     get: { parts.key.uppercased() },
@@ -1353,7 +1363,8 @@ private struct HotkeyField: View {
                         }
                     }
                 ))
-                .frame(width: 36)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 40)
                 .multilineTextAlignment(.center)
                 .disabled(parts.mods.isEmpty)
 

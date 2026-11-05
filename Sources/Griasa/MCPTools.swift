@@ -244,8 +244,8 @@ enum MCPTools {
     static let searchMeetings = Tool(
         name: "search_meetings",
         title: "Search meetings",
-        summary: "Find recorded meetings by words in the title or text, optionally with one "
-               + "participant. Words match in any order and in any grammatical form, and, when the "
+        summary: "Find recorded meetings by words in the title or text, by who took part (one "
+               + "person or several), or both. Words match in any order and in any grammatical form, and, when the "
                + "user has turned on search by meaning, by meaning across languages; best matches "
                + "first, otherwise newest first. Returns "
                + "id, title, date, participants, summary and, when text matched, a short "
@@ -253,27 +253,29 @@ enum MCPTools {
                + "get_transcript.",
         schema: object([
             "query": string("Words to look for in the title or text, in any order."),
-            "person": string("Only meetings this person took part in."),
+            "person": string("Only meetings this person took part in. For several people use people."),
+            "people": ["type": "array", "items": ["type": "string"],
+                       "description": "Only meetings these people took part in, e.g. [\"Anna\", \"Ivan Petrov\"]. Any spelling or alphabet; a first name finds the full name. See match."],
+            "match": ["type": "string", "enum": ["all", "any"],
+                      "description": "With several people: 'all' (default) for meetings where every one of them took part, 'any' for meetings with at least one of them."],
             "project": string("Only meetings filed under this project id, from list_projects."),
             "limit": integer("Most meetings to return. Default 10."),
         ]),
         output: result(["meetings": "array", "returned": "integer"])
     ) { params in
         let query = params["query"]?.stringValue
-        let person = params["person"]?.stringValue
+        var asked: [String] = []
+        if let person = params["person"]?.stringValue { asked.append(person) }
+        if case .array(let list)? = params["people"] { asked += list.compactMap { $0 as? String } }
+        else if let one = params["people"]?.stringValue { asked.append(one) }
+        let people = MeetingPeople.cleaned(asked)
+        let mode = MeetingPeople.Mode(rawValue: params["match"]?.stringValue?.lowercased() ?? "") ?? .all
         let project = params["project"]?.stringValue.flatMap(UUID.init(uuidString:))
         let limit = params["limit"]?.intValue ?? 10
         let hits = HistoryStore.shared.entries
             .filter { $0.kind == .meeting }
             .filter { project == nil || inProject($0, project!) }
-            .filter { entry in
-                guard let person else { return true }
-                if let names = entry.participants,
-                   names.contains(where: { $0.caseInsensitiveCompare(person) == .orderedSame }) {
-                    return true
-                }
-                return entry.text.localizedCaseInsensitiveContains(person)
-            }
+            .filter { MeetingPeople.matches(participants: $0.participants, text: $0.text, people: people, mode: mode) }
         // With words to look for, the best matches come first and say where they
         // matched; without, the newest meetings do.
         let ranked: [(entry: HistoryEntry, matched: String?)]
@@ -293,7 +295,17 @@ enum MCPTools {
             if let matched = item.matched, !matched.isEmpty { row["matched"] = matched }
             return row
         }
-        return ["meetings": meetings, "returned": meetings.count]
+        var payload: [String: Any] = ["meetings": meetings, "returned": meetings.count]
+        // A name nobody in Griasa has is most often a misspelling: say so, so
+        // an empty answer is not read as "never met".
+        let known = PersonStore.shared.allNames
+            + HistoryStore.shared.entries.flatMap { $0.participants ?? [] }
+        let unknown = people.filter { name in !known.contains { MeetingPeople.includes([$0], name) } }
+        if !unknown.isEmpty {
+            payload["unknown_people"] = unknown
+            payload["hint"] = "No one by these names is known; list_people gives the names Griasa has."
+        }
+        return payload
     }
 
     static let meeting = Tool(

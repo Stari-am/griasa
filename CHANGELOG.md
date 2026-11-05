@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+**Meetings by who was in them.** History has a people menu under the project
+picker: pick one person or several, and with several, choose whether every one
+of them or any of them was there. Assistants get the same through
+`search_meetings`: `people` takes one name or a list, and `match` is `all` (the
+default) or `any`. Any spelling or alphabet works, a first name finds the full
+name, and a name nobody in Griasa has comes back as `unknown_people`, so an
+empty answer is not mistaken for "never met".
+
 **Updates are noticed while Griasa runs.** It used to look for a new version
 only when it started, and Griasa sits in the menu bar for weeks, so an update
 could go unseen. It now checks once a day while it runs, and never shows the

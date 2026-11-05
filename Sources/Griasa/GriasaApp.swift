@@ -84,6 +84,20 @@ enum GriasaMain {
                 exit(1)
             }
         }
+        // `Griasa --mcp-call <tool> '<json arguments>'` runs one assistant tool
+        // against the store (GRIASA_STORE for a test one) and prints the answer,
+        // without the server, its port or its token.
+        if let flag = args.firstIndex(of: "--mcp-call"), args.count > flag + 1 {
+            let raw = args.count > flag + 2 ? args[flag + 2] : "{}"
+            let object = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] ?? [:]
+            guard let answer = MCPTools.invoke(args[flag + 1], object.mapValues(JSONValue.init)) else {
+                FileHandle.standardError.write(Data("mcp-call: no tool \(args[flag + 1])\n".utf8))
+                exit(1)
+            }
+            let data = (try? JSONSerialization.data(withJSONObject: answer, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+            print(String(decoding: data, as: UTF8.self))
+            exit(0)
+        }
         if let flag = args.firstIndex(of: "--build-mcpb"), args.count > flag + 1 {
             let destination = URL(fileURLWithPath: args[flag + 1])
             do {

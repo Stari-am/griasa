@@ -147,15 +147,30 @@
         "readOnlyHint" : true,
         "title" : "Search meetings"
       },
-      "description" : "Find recorded meetings by words in the title or text, optionally with one participant. Words match in any order and in any grammatical form, and, when the user has turned on search by meaning, by meaning across languages; best matches first, otherwise newest first. Returns id, title, date, participants, summary and, when text matched, a short 'matched' excerpt — never the transcript. Use the id with get_meeting or get_transcript.",
+      "description" : "Find recorded meetings by words in the title or text, by who took part (one person or several), or both. Words match in any order and in any grammatical form, and, when the user has turned on search by meaning, by meaning across languages; best matches first, otherwise newest first. Returns id, title, date, participants, summary and, when text matched, a short 'matched' excerpt — never the transcript. Use the id with get_meeting or get_transcript.",
       "inputSchema" : {
         "properties" : {
           "limit" : {
             "description" : "Most meetings to return. Default 10.",
             "type" : "integer"
           },
+          "match" : {
+            "description" : "With several people: 'all' (default) for meetings where every one of them took part, 'any' for meetings with at least one of them.",
+            "enum" : [
+              "all",
+              "any"
+            ],
+            "type" : "string"
+          },
+          "people" : {
+            "description" : "Only meetings these people took part in, e.g. [\"Anna\", \"Ivan Petrov\"]. Any spelling or alphabet; a first name finds the full name. See match.",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
           "person" : {
-            "description" : "Only meetings this person took part in.",
+            "description" : "Only meetings this person took part in. For several people use people.",
             "type" : "string"
           },
           "project" : {

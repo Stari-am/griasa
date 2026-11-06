@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.27 — 2026-11-06
 
 **Meetings by who was in them.** History has a people menu under the project
 picker: pick one person or several, and with several, choose whether every one

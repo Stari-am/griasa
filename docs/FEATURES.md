@@ -70,7 +70,7 @@ first step.
 
 **Meeting recording**
 - *Line:* Records both sides of a call, on your Mac.
-- *Description:* Your microphone and everything the Mac plays are recorded as two tracks, which is how the transcript knows who spoke. It is transcribed on the Mac, and written up with a summary, the key points and who took what on. Notes typed during the call are woven in at their timecode. A call that goes silent stops recording by itself.
+- *Description:* Your microphone and everything the Mac plays are recorded as two tracks, which is how the transcript knows who spoke. It is transcribed on the Mac, and written up with a summary, the key points and who took what on. Notes typed during the call are woven in at their timecode. A call that goes silent stops recording by itself. The microphone is chosen in the menu bar panel, which also shows whether it is picking up sound during a recording.
 - *Where:* the menu → Record a meeting.
 - *First step:* allow the microphone and screen recording.
 

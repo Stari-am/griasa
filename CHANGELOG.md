@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+**Choose the microphone.** Griasa used to record from whatever macOS had as
+its default input and never said which one that was, so a call app's virtual
+device, an iPhone or a closed laptop could become the input and your side of
+the meeting came out empty. The menu bar panel now shows the microphone under
+the recording button and lets you pick another one; System default stays an
+option. A chosen microphone that is unplugged falls back to the default, and
+the panel says so. While recording, it shows whether the microphone is picking
+up sound, and after fifteen seconds of nothing it suggests picking another one.
+
 ## 1.0.27 — 2026-11-06
 
 **Meetings by who was in them.** History has a people menu under the project

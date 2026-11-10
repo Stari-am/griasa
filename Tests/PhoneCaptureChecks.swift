@@ -211,3 +211,29 @@ func runMeetingPeopleChecks() -> Int {
           "the picker lists the most frequent first, then by name, each once")
     return failures
 }
+
+func runMicChoiceChecks() -> Int {
+    var failures = 0
+    func check(_ passed: Bool, _ rule: String) {
+        if passed { return }
+        failures += 1
+        print("\n    ✗ \(rule)")
+    }
+    let builtIn = MicChoice.Device(uid: "BuiltInMic", name: "MacBook Pro Microphone")
+    let usb = MicChoice.Device(uid: "USB-1", name: "Blue Yeti")
+    let teams = MicChoice.Device(uid: "Teams", name: "Microsoft Teams Audio")
+    let all = [builtIn, usb, teams]
+    check(MicChoice.resolve(chosen: "", available: all, systemDefault: teams) == teams,
+          "nothing chosen: the system default records")
+    check(MicChoice.resolve(chosen: "USB-1", available: all, systemDefault: teams) == usb,
+          "a connected choice wins over the system default")
+    check(MicChoice.resolve(chosen: "USB-1", available: [builtIn, teams], systemDefault: builtIn) == builtIn,
+          "an unplugged choice falls back to the default instead of failing")
+    check(MicChoice.resolve(chosen: "", available: [], systemDefault: nil) == nil,
+          "no inputs at all: nothing to record from")
+    check(MicChoice.isMissing(chosen: "USB-1", available: [builtIn]), "unplugged choice is reported missing")
+    check(!MicChoice.isMissing(chosen: "", available: []), "following the default is never missing")
+    check(!MicChoice.isMissing(chosen: "USB-1", available: all), "connected choice is not missing")
+    print(failures == 0 ? "  ✓ microphone choice" : "")
+    return failures
+}

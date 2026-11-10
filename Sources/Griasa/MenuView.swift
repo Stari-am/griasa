@@ -118,6 +118,8 @@ struct MenuView: View {
                 }
             }
 
+            MicPicker(recordingSince: state.recordingStartedAt)
+
             Button(state.isRecording ? "Stop Recording" : "Start Recording") {
                 Task {
                     if state.isRecording {
@@ -347,5 +349,85 @@ struct MenuView: View {
         .frame(width: 300)
         // Found it: the hint has done its job.
         .onAppear { FirstRunCoachmark.shared.dismiss() }
+    }
+}
+
+/// Which microphone recording and dictation use, and, while recording, whether
+/// the person's own voice is arriving. Without it the only way to learn that
+/// the wrong input was picked was an empty side of the transcript afterwards.
+struct MicPicker: View {
+    let recordingSince: Date?
+    @AppStorage(MicChoice.key) private var chosenUID = ""
+    @State private var devices: [MicChoice.Device] = []
+    @State private var systemDefault: MicChoice.Device?
+
+    private var missing: Bool { MicChoice.isMissing(chosen: chosenUID, available: devices) }
+    private var current: MicChoice.Device? {
+        MicChoice.resolve(chosen: chosenUID, available: devices, systemDefault: systemDefault)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Menu {
+                Button {
+                    choose("")
+                } label: {
+                    check(chosenUID.isEmpty,
+                          "System default" + (systemDefault.map { " (\($0.name))" } ?? ""))
+                }
+                Divider()
+                ForEach(devices, id: \.uid) { device in
+                    Button { choose(device.uid) } label: { check(chosenUID == device.uid, device.name) }
+                }
+                Divider()
+                Button("Sound Settings…") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension?input") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            } label: {
+                Label("Mic: \(current?.name ?? "none found")", systemImage: "mic")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("The microphone Griasa records your side of a call from")
+
+            if missing {
+                Text("The chosen microphone is not connected, so the system default is used.")
+                    .font(.caption).foregroundStyle(.orange)
+            } else if let since = recordingSince {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    voiceStatus(since: since, now: context.date)
+                }
+            }
+        }
+        .onAppear(perform: refresh)
+    }
+
+    @ViewBuilder
+    private func voiceStatus(since: Date, now: Date) -> some View {
+        if let heard = MicCapture.shared.lastVoiceAt, now.timeIntervalSince(heard) < 5 {
+            Label("Mic is picking up sound", systemImage: "waveform")
+                .font(.caption).foregroundStyle(.green)
+        } else if now.timeIntervalSince(since) > 15 && MicCapture.shared.lastVoiceAt == nil {
+            Text("No sound from this mic yet. If you have been speaking, pick another one.")
+                .font(.caption).foregroundStyle(.orange)
+        }
+    }
+
+    private func check(_ on: Bool, _ title: String) -> some View {
+        on ? AnyView(Label(title, systemImage: "checkmark")) : AnyView(Text(title))
+    }
+
+    private func choose(_ uid: String) {
+        guard uid != chosenUID else { return }
+        chosenUID = uid
+        MicCapture.shared.useChosenDevice()
+        refresh()
+    }
+
+    private func refresh() {
+        devices = AudioInputs.all()
+        systemDefault = AudioInputs.systemDefault()
     }
 }

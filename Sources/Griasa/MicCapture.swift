@@ -87,6 +87,7 @@ final class MicCapture {
 
     private func startIfNeeded() throws {
         guard !running else { return }
+        lastVoice.withLock { $0 = nil }
 
         // A new engine every time, and this is the whole fix.
         //
@@ -106,6 +107,7 @@ final class MicCapture {
         engine = AVAudioEngine()
         observeConfigurationChanges()
         let input = engine.inputNode
+        selectChosenDevice(on: input)
 
         let hardware = input.inputFormat(forBus: 0)
         guard AudioFormatMatch.usable(rate: hardware.sampleRate,
@@ -140,6 +142,10 @@ final class MicCapture {
         // affected: every consumer takes its format from `buffer.format`.
         input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, time in
             guard let self else { return }
+            if SilenceWatch.level(of: buffer) >= AudioLevel.speechThreshold {
+                let now = Date()
+                self.lastVoice.withLock { $0 = now }
+            }
             let sinks = self.consumers.withLock { $0 }
             for sink in sinks.values { sink(buffer, time) }
         }
@@ -153,11 +159,45 @@ final class MicCapture {
         running = true
     }
 
+    /// Points the engine's input at the microphone chosen in the panel. Done on
+    /// a fresh engine before any format is read, so the format checks below
+    /// describe the chosen device. A chosen device that is no longer connected
+    /// is skipped and the system default records instead.
+    private func selectChosenDevice(on input: AVAudioInputNode) {
+        let uid = AudioInputs.chosenUID
+        guard !uid.isEmpty, let unit = input.audioUnit else { return }
+        guard var id = AudioInputs.deviceID(forUID: uid) else {
+            NSLog("Griasa: the chosen microphone is not connected; recording from the system default")
+            return
+        }
+        let status = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+                                          kAudioUnitScope_Global, 0,
+                                          &id, UInt32(MemoryLayout<AudioDeviceID>.size))
+        if status != noErr {
+            NSLog("Griasa: could not switch to the chosen microphone (%d); recording from the system default", status)
+        }
+    }
+
+    /// When the microphone last carried something at speech level. Read by the
+    /// panel to show whether the person's own voice is reaching the recording.
+    private let lastVoice = OSAllocatedUnfairLock<Date?>(initialState: nil)
+
+    var lastVoiceAt: Date? { lastVoice.withLock { $0 } }
+
     /// Emptiness is re-checked here rather than trusted from the caller: a
     /// consumer can be added between a removal and this running.
     private func stopIfIdle() {
         guard running, consumers.withLock({ $0.isEmpty }) else { return }
         teardown()
+    }
+
+    /// A new microphone picked while something is recording takes effect at
+    /// once, on a fresh engine, rather than at the next recording.
+    func useChosenDevice() {
+        queue.async { [weak self] in
+            self?.lastVoice.withLock { $0 = nil }
+            self?.restartAfterConfigurationChange()
+        }
     }
 
     private func restartAfterConfigurationChange() {

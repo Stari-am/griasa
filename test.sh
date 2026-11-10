@@ -17,6 +17,7 @@ swiftc -O \
   Sources/Griasa/SilenceLevel.swift \
   Sources/Griasa/PersonIdentity.swift \
   Sources/Griasa/MeetingPeople.swift \
+  Sources/Griasa/MicChoice.swift \
   Sources/Griasa/CommitmentModel.swift \
   Sources/Griasa/CommitmentScope.swift \
   Sources/Griasa/MeetingAttendance.swift \

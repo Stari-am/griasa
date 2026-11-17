@@ -47,10 +47,8 @@ enum WhisperTranscriber {
         try? FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workDir) }
 
-        // Whisper wants 16 kHz mono PCM; afconvert ships with macOS.
         let wav = workDir.appendingPathComponent("audio.wav")
-        guard await run("/usr/bin/afconvert",
-                        ["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", url.path, wav.path]) else {
+        guard await convertToWhisperWav(url, wav) else {
             return []
         }
 
@@ -141,8 +139,7 @@ enum WhisperTranscriber {
         try? FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workDir) }
         let wav = workDir.appendingPathComponent("audio.wav")
-        guard await run("/usr/bin/afconvert",
-                        ["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", url.path, wav.path]) else {
+        guard await convertToWhisperWav(url, wav) else {
             return ""
         }
 
@@ -177,8 +174,7 @@ enum WhisperTranscriber {
             try? FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: workDir) }
             let wav = workDir.appendingPathComponent("audio.wav")
-            if await run("/usr/bin/afconvert",
-                         ["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", url.path, wav.path]),
+            if await convertToWhisperWav(url, wav),
                let text = await WhisperServer.shared.transcribe(wav: wav), !text.isEmpty {
                 let cleaned = TranscriptCleaner.clean([TranscriptSegment(start: 0, text: text)])
                     .map(\.text).joined(separator: " ")
@@ -329,6 +325,16 @@ enum WhisperTranscriber {
                 continuation.resume(returning: nil)
             }
         }
+    }
+
+    /// Whisper wants 16 kHz mono PCM; afconvert ships with macOS.
+    ///
+    /// `-m 0` keeps the first channel. `-c 1` does the same for mono and stereo,
+    /// but turns a file with discrete channels into silence: the built-in
+    /// MacBook microphone sometimes arrives as 3 discrete channels, and every
+    /// meeting recorded that way lost the user's side of the call.
+    private static func convertToWhisperWav(_ url: URL, _ wav: URL) async -> Bool {
+        await run("/usr/bin/afconvert", ["-f", "WAVE", "-d", "LEI16@16000", "-m", "0", url.path, wav.path])
     }
 
     private static func run(_ launchPath: String, _ arguments: [String]) async -> Bool {
